@@ -830,8 +830,8 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.8.0";
-  const APP_BUILD = 38;
+  const APP_VERSION = "3.8.1";
+  const APP_BUILD = 39;
   const APP_COMMIT = "";
   // BUILD_META_END
 
@@ -947,7 +947,9 @@
   const CABLE_TYPES = ["slaboproud", "cyky15", "cyky25"];
   const CABLE_LABELS = { slaboproud: "Slaboproud", cyky15: "CYKY 1,5", cyky25: "CYKY 2,5" };
   const CABLE_ICONS = { slaboproud: "🖧", cyky15: "💡", cyky25: "🔌" };
-  const CABLE_COLORS = { slaboproud: "#8e44ad", cyky15: "#f39c12", cyky25: "#2980b9" };
+  /** Výrazné barvy tras — plná čára u CYKY (neplést s čárkováním příček/nábytku). */
+  const CABLE_COLORS = { slaboproud: "#9b59b6", cyky15: "#e67e22", cyky25: "#1a73e8" };
+  const CABLE_COLORS_SEL = { slaboproud: "#6c3483", cyky15: "#ca6f1e", cyky25: "#1557b0" };
   const ELEC_WALL_PROX = 45;
   const ELEV_WALL_ORDER = ["north", "east", "south", "west"];
   const ELEV_WALL_LABELS = { north: "Sever", east: "Východ", south: "Jih", west: "Západ" };
@@ -2300,11 +2302,13 @@
       const hx = mapX(hit.x);
       g.appendChild(el("line", {
         x1: hx, y1: 0, x2: hx, y2: roomH,
-        stroke: "#2c3e50", "stroke-width": 2, "stroke-dasharray": "6,4",
+        stroke: "#aeb6bf", "stroke-width": 1, "stroke-dasharray": "2,5",
+        "pointer-events": "none",
       }));
       const t = el("text", {
         x: hx + 3, y: 14,
-        fill: "#2c3e50", "font-size": 8, "font-family": PLAN_FONT,
+        fill: "#95a5a6", "font-size": 7.5, "font-family": PLAN_FONT,
+        "pointer-events": "none",
       });
       t.textContent = hit.label;
       g.appendChild(t);
@@ -2725,6 +2729,21 @@
       });
   }
 
+  function elevRunStroke(cableType, selected) {
+    const color = selected
+      ? (CABLE_COLORS_SEL[cableType] || CABLE_COLORS[cableType] || "#e67e22")
+      : (CABLE_COLORS[cableType] || "#e67e22");
+    // CYKY = plná úzká; slaboproud = tečky (ne dlouhé čárky jako příčky)
+    const dash = cableType === "slaboproud" ? "1.2,2.2" : null;
+    return {
+      stroke: color,
+      "stroke-width": selected ? 1.15 : 0.7,
+      "stroke-linecap": "round",
+      "stroke-linejoin": "round",
+      ...(dash ? { "stroke-dasharray": dash } : {}),
+    };
+  }
+
   function drawElectroOnElevationStrip(g, panels, roomH) {
     if (!state.showElectro) return;
     const editable = state.tab === "electro" && state.elecStep === "elev";
@@ -2746,14 +2765,22 @@
       const sel = state.elecSelectedKind === "elev-run" && run.id === state.elecSelectedId;
       const color = CABLE_COLORS[run.cableType] || "#e67e22";
       const d = mapped.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" ");
+      // tenký bílý podklad kvůli čitelnosti přes příčky
+      g.appendChild(el("path", {
+        d, fill: "none",
+        stroke: "#ffffff",
+        "stroke-width": sel ? 2.2 : 1.6,
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+        "pointer-events": "none",
+        opacity: 0.85,
+      }));
       g.appendChild(el("path", {
         class: "elec-run",
         "data-elec": run.id,
         "data-elec-kind": "elev-run",
         d, fill: "none",
-        stroke: sel ? "#111" : color,
-        "stroke-width": sel ? 1.8 : 1.15,
-        "stroke-dasharray": run.cableType === "slaboproud" ? "2,2" : "5,3",
+        ...elevRunStroke(run.cableType, sel),
         "pointer-events": editable ? "stroke" : "none",
       }));
       const mid = mapped[Math.floor(mapped.length / 2)];
@@ -2761,6 +2788,7 @@
         x: mid.x + 4, y: mid.y - 4,
         fill: color, "font-size": 7.5, "font-family": PLAN_FONT,
         "pointer-events": "none",
+        "font-weight": "600",
       });
       const circName = circ ? circ.name : "";
       t.textContent = `${CABLE_LABELS[run.cableType]}${circName ? ` · ${circName}` : ""}`;
@@ -2775,8 +2803,11 @@
       if (mapped.length) {
         const d = mapped.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" ");
         g.appendChild(el("path", {
-          d, fill: "none", stroke: color, "stroke-width": 1.1, "stroke-dasharray": "3,2",
+          d, fill: "none",
+          ...elevRunStroke(state.elecCableType, false),
+          "stroke-dasharray": state.elecCableType === "slaboproud" ? "1.2,2.2" : "4,2.5",
           "pointer-events": "none",
+          opacity: 0.9,
         }));
         const last = state.elecRunDraft[state.elecRunDraft.length - 1];
         const tip = state.elecCursor || last;
