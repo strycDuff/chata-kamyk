@@ -8,9 +8,10 @@ alwaysApply: true
 After completing user-requested code/docs changes in this repo:
 
 1. **Commit** immediately (concise message, why-focused).
-2. Run `./scripts/stamp-build.sh` and make a tiny follow-up commit if `APP_BUILD` changed (build = `git rev-list --count HEAD`). Do **not** amend just to stamp — `APP_COMMIT` is injected at deploy time.
-3. **Push** to `origin` (`main` unless told otherwise).
-4. **Deploy** with `./scripts/deploy.sh` (stamps version/build/commit into the upload copy).
+2. **Push** to `origin` (`main` unless told otherwise).
+3. **Deploy** with `./scripts/deploy.sh` — this stamps `APP_VERSION` / `APP_BUILD` (= `git rev-list --count HEAD`) / `APP_COMMIT` (short SHA) into the upload copy.
+
+Do not create extra “chore: stamp build” commits. Repo source may have an empty `APP_COMMIT` and a slightly stale `APP_BUILD`; the live site is authoritative.
 
 Toolbar `#app-meta` shows `v{APP_VERSION} · build {APP_BUILD} · {APP_COMMIT}`. Bump `APP_VERSION` in the `BUILD_META` block when shipping a meaningful feature cut.
 
