@@ -149,6 +149,14 @@
     color: var(--accent);
     margin-right: 4px;
   }
+  .app-meta {
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    margin-right: 8px;
+    white-space: nowrap;
+    user-select: all;
+  }
   .toolbar label.chk {
     display: inline-flex;
     gap: 6px;
@@ -326,6 +334,7 @@
   <div class="app">
     <div class="toolbar">
       <strong class="toolbar-title">Plánovač</strong>
+      <span class="app-meta" id="app-meta" title="Verze a build">v—</span>
       <div class="tabs" id="tabs">
         <button type="button" data-tab="cabin" class="active">1 · Půdorys</button>
         <button type="button" data-tab="furniture">2 · Nábytek</button>
@@ -503,6 +512,20 @@
 
 <script>
 (() => {
+  // BUILD_META_START
+  const APP_VERSION = "3.1.0";
+  const APP_BUILD = 25;
+  const APP_COMMIT = "5db936d";
+  // BUILD_META_END
+
+  function syncAppMeta() {
+    const node = document.getElementById("app-meta");
+    if (!node) return;
+    node.textContent = `v${APP_VERSION} · build ${APP_BUILD}`;
+    node.title = `commit ${APP_COMMIT}`;
+    document.title = `Plánovač v${APP_VERSION} · build ${APP_BUILD} · Chata Kamyk`;
+  }
+
   /** Skutečná tloušťka obvodu (legenda); kreslí se tenčí — ne v měřítku. */
   const WALL_REAL = 5 + 1.8 + 12 + 4 + 1.12; // 23.92
   const WALL = 10; // vizuální tloušťka stěny v půdorysu
@@ -1592,6 +1615,7 @@
     clampSink();
     clampKitchen();
     clampDoorOffset();
+    syncAppMeta();
     const wrap = document.getElementById("canvas-wrap");
     wrap.innerHTML = "";
     wrap.appendChild(renderCabinView());
@@ -2036,6 +2060,9 @@
       furnitureLayers: state.furnitureLayers.map((l) => ({
         id: l.id, name: l.name, x: l.x, y: l.y, w: l.w, d: l.d,
       })),
+      appVersion: APP_VERSION,
+      appBuild: APP_BUILD,
+      appCommit: APP_COMMIT,
       savedAt: Date.now(),
     };
   }
@@ -2054,7 +2081,8 @@
     if (!data || typeof data !== "object") return;
     const {
       tab, measureMode, measureA, measureB, measureCursor, hoverCm, drag,
-      furnMode, furnDraw, furnitureLayers, savedAt, ...rest
+      furnMode, furnDraw, furnitureLayers, savedAt,
+      appVersion, appBuild, appCommit, ...rest
     } = data;
     Object.assign(state, rest);
     if (state.kitchenLeft == null) state.kitchenLeft = 313;

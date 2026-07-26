@@ -8,14 +8,17 @@ alwaysApply: true
 After completing user-requested code/docs changes in this repo:
 
 1. **Commit** immediately (concise message, why-focused).
-2. **Push** to `origin` (`main` unless told otherwise).
-3. **Deploy** to Cloudflare Pages project `chata-kamyk`.
+2. **Stamp build** into `koupelna/index.html` via `scripts/stamp-build.sh` (sets `APP_BUILD` = commit count, `APP_COMMIT` = short SHA). Then **amend** that stamp into the commit you just made (`git commit --amend --no-edit`) — only when the commit is yours, not pushed yet.
+3. **Push** to `origin` (`main` unless told otherwise).
+4. **Deploy** with `scripts/deploy.sh` (Cloudflare Pages project `chata-kamyk`).
+
+UI shows `v{APP_VERSION} · build {APP_BUILD}` in the planner toolbar (`#app-meta`). Bump `APP_VERSION` in the `BUILD_META` block when shipping a meaningful feature cut.
 
 Deploy notes:
 
-- Exclude `.tools/`, `.git/`, `.wrangler/` (rsync to temp dir if needed — `.tools/gh` exceeds Pages 25 MiB limit).
+- `scripts/deploy.sh` excludes `.tools/`, `.git/`, `.wrangler/`, `docs/`, `.cursor/`.
 - Use ambient `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` when set.
-- If TLS/proxy fails, `NODE_TLS_REJECT_UNAUTHORIZED=0` is acceptable on this machine for wrangler.
+- TLS workaround is inside `deploy.sh` (`NODE_TLS_REJECT_UNAUTHORIZED=0`).
 - Return the live URL (`https://chata-kamyk.pages.dev/…`) when done.
 
 Do not ask “chceš commit/deploy?” — just do it unless the user explicitly says not to.
