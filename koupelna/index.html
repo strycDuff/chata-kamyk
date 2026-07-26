@@ -268,7 +268,7 @@
           <section>
             <h3>TV příčka</h3>
             <label>Levý líc od Z: <strong id="tv-x-val">324</strong> cm</label>
-            <input type="range" id="tv-x" min="300" max="420" value="324" step="1">
+            <input type="range" id="tv-x" min="280" max="420" value="324" step="1">
             <label>Délka na jih: <strong id="tv-len-val">140</strong> cm</label>
             <input type="range" id="tv-len" min="100" max="180" value="140" step="1">
             <label>Náhled TV</label>
@@ -381,7 +381,37 @@
     { t: "wall", l: 124 }, { t: "win", l: 85 }, { t: "wall", l: 124 },
   ];
 
+  /** Šířka hit-zóny pro drag příček (cm v půdorysu). */
+  const HANDLE_HIT = 28;
+
   const TV_WIDTHS = { 50: 112, 55: 123, 65: 145 };
+
+  /** Severní okna v souřadnicích od vnějšího Z (stejně jako bathLeft / tvX). */
+  function northWindows() {
+    let c = 0;
+    const wins = [];
+    for (const s of NORTH_SEGS) {
+      if (s.t === "win") wins.push({ x0: c, x1: c + s.l });
+      c += s.l;
+    }
+    return wins;
+  }
+
+  /**
+   * Hard stop: tloušťka příčky [x, x+PART] nesmí zasahovat do severního okna.
+   * `prev` určí, na kterou stranu okna se odrazíme při přetažení.
+   */
+  function clampOffNorthWindows(x, prev = x) {
+    let nx = x;
+    for (const { x0, x1 } of northWindows()) {
+      if (nx < x1 && nx + PART > x0) {
+        if (prev + PART <= x0 + 0.01 || prev < x0) nx = x0 - PART;
+        else if (prev >= x1 - 0.01) nx = x1;
+        else nx = (prev + PART / 2) < (x0 + x1) / 2 ? x0 - PART : x1;
+      }
+    }
+    return nx;
+  }
 
   const STORAGE_KEY = "chata-kamyk-planner-variants-v2";
 
@@ -690,21 +720,21 @@
     g.appendChild(label);
 
     if (interactive) {
-      // drag handles
+      const hw = HANDLE_HIT;
       g.appendChild(el("rect", {
         class: "handle", "data-drag": "bath-east",
-        x: o.x + o.w - 4, y: o.y, width: 8, height: o.d,
-        fill: "rgba(31,78,107,0.35)", stroke: "var(--accent)", "stroke-width": 1,
+        x: o.x + o.w - hw / 2, y: o.y, width: hw, height: o.d,
+        fill: "rgba(31,78,107,0.22)", stroke: "var(--accent)", "stroke-width": 1,
       }));
       g.appendChild(el("rect", {
         class: "handle", "data-drag": "bath-west",
-        x: o.x - 4, y: o.y, width: 8, height: o.d,
-        fill: "rgba(31,78,107,0.25)", stroke: "var(--accent)", "stroke-width": 1,
+        x: o.x - hw / 2, y: o.y, width: hw, height: o.d,
+        fill: "rgba(31,78,107,0.18)", stroke: "var(--accent)", "stroke-width": 1,
       }));
       g.appendChild(el("rect", {
         class: "handle-ns", "data-drag": "bath-south",
-        x: o.x, y: o.y + o.d - 4, width: o.w, height: 8,
-        fill: "rgba(31,78,107,0.25)", stroke: "var(--accent)", "stroke-width": 1,
+        x: o.x, y: o.y + o.d - hw / 2, width: o.w, height: hw,
+        fill: "rgba(31,78,107,0.18)", stroke: "var(--accent)", "stroke-width": 1,
       }));
     }
   }
@@ -773,13 +803,14 @@
     }));
     g.appendChild(el("rect", {
       class: "handle", "data-drag": "tv-x",
-      x: tv.x - 5, y: tv.y, width: PART + 10, height: tv.d,
-      fill: "rgba(31,78,107,0.12)", stroke: "var(--accent)", "stroke-width": 1,
+      x: tv.x + PART / 2 - HANDLE_HIT / 2, y: tv.y, width: HANDLE_HIT, height: tv.d,
+      fill: "rgba(31,78,107,0.16)", stroke: "var(--accent)", "stroke-width": 1,
     }));
     g.appendChild(el("rect", {
       class: "handle-ns", "data-drag": "tv-len",
-      x: tv.x - 2, y: tv.y + tv.d - 5, width: PART + 4, height: 10,
-      fill: "rgba(31,78,107,0.35)",
+      x: tv.x + PART / 2 - HANDLE_HIT / 2, y: tv.y + tv.d - HANDLE_HIT / 2,
+      width: HANDLE_HIT, height: HANDLE_HIT,
+      fill: "rgba(31,78,107,0.3)", stroke: "var(--accent)", "stroke-width": 1,
     }));
 
     // TV safe zone band on partition length
@@ -1088,16 +1119,23 @@
     const dx = p.x - d.start.x;
     const dy = p.y - d.start.y;
     if (d.type === "bath-east") {
-      state.bathW = Math.min(180, Math.max(110, d.bathW + dx));
+      const prevEast = d.bathLeft + d.bathW - PART;
+      let east = clampOffNorthWindows(prevEast + dx, prevEast);
+      state.bathW = Math.min(180, Math.max(110, east + PART - d.bathLeft));
     } else if (d.type === "bath-west") {
-      const newLeft = Math.min(650, Math.max(480, d.bathLeft + dx));
       const right = d.bathLeft + d.bathW;
+      let newLeft = Math.min(650, Math.max(480, d.bathLeft + dx));
+      newLeft = clampOffNorthWindows(newLeft, d.bathLeft);
       state.bathLeft = newLeft;
       state.bathW = Math.min(180, Math.max(110, right - newLeft));
+      // východní líc taky nesmí vjet do okna
+      const east = clampOffNorthWindows(state.bathLeft + state.bathW - PART, state.bathLeft + state.bathW - PART);
+      state.bathW = Math.min(180, Math.max(110, east + PART - state.bathLeft));
     } else if (d.type === "bath-south") {
       state.bathD = Math.min(260, Math.max(180, d.bathD + dy));
     } else if (d.type === "tv-x") {
-      state.tvX = Math.min(420, Math.max(300, d.tvX + dx));
+      let nx = Math.min(420, Math.max(280, d.tvX + dx));
+      state.tvX = clampOffNorthWindows(nx, d.tvX);
     } else if (d.type === "tv-len") {
       state.tvLen = Math.min(180, Math.max(100, d.tvLen + dy));
     }
@@ -1222,9 +1260,20 @@
   function bindRange(id, key, lab) {
     const input = document.getElementById(id);
     input.addEventListener("input", () => {
-      state[key] = Number(input.value);
-      document.getElementById(lab).textContent = String(state[key]);
-      if (key === "doorType") {}
+      let v = Number(input.value);
+      if (key === "tvX") {
+        v = clampOffNorthWindows(v, state.tvX);
+        input.value = String(Math.round(v));
+      } else if (key === "bathLeft") {
+        v = clampOffNorthWindows(v, state.bathLeft);
+        input.value = String(Math.round(v));
+      } else if (key === "bathW") {
+        const east = clampOffNorthWindows(state.bathLeft + v - PART, state.bathLeft + state.bathW - PART);
+        v = Math.min(180, Math.max(110, east + PART - state.bathLeft));
+        input.value = String(Math.round(v));
+      }
+      state[key] = v;
+      document.getElementById(lab).textContent = String(Math.round(state[key]));
       if (key.startsWith("sink") || key === "sinkW") clampSink();
       render();
     });
