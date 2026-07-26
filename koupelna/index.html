@@ -314,18 +314,17 @@
               <button type="button" data-v="80">80</button>
             </div>
             <label>Odstup od severu: <strong id="door-offset-val">90</strong> cm</label>
-            <input type="range" id="door-offset" min="65" max="140" value="90" step="1">
+            <input type="range" id="door-offset" min="0" max="140" value="90" step="1">
+            <p class="hint" id="door-offset-hint">Typ A: od 0 cm · typ B: od 65 cm</p>
             <label>Typ</label>
             <div class="row seg" id="door-type">
-              <button type="button" data-v="A" class="active">A · zvenku → jih</button>
+              <button type="button" data-v="A" class="active">A · po stěně zvenku</button>
               <button type="button" data-v="B">B · pouzdro</button>
             </div>
-            <div id="pocket-dir-wrap" hidden>
-              <label>Směr pouzdra</label>
-              <div class="row seg" id="pocket-dir">
-                <button type="button" data-v="north">Sever</button>
-                <button type="button" data-v="south" class="active">Jih</button>
-              </div>
+            <label>Směr posunu</label>
+            <div class="row seg" id="pocket-dir">
+              <button type="button" data-v="north">Sever</button>
+              <button type="button" data-v="south" class="active">Jih</button>
             </div>
           </div>
         </details>
@@ -333,9 +332,9 @@
           <summary>Koupelna · sprcha</summary>
           <div class="side-block-body">
             <div class="row seg" id="shower-preset">
-              <button type="button" data-v="80x80">80×80</button>
+              <button type="button" data-v="80x80" class="active">80×80</button>
               <button type="button" data-v="90x90">90×90</button>
-              <button type="button" data-v="100x80" class="active">100×80</button>
+              <button type="button" data-v="100x80">100×80</button>
               <button type="button" data-v="120x80">120×80</button>
               <button type="button" data-v="full">Plná šířka</button>
             </div>
@@ -519,7 +518,7 @@
     doorOffset: 90,
     doorType: "A",
     pocketDir: "south",
-    showerPreset: "100x80",
+    showerPreset: "80x80",
     showerRotate: false,
     showerFullDepth: 80,
     sinkW: 40,
@@ -685,11 +684,38 @@
   }
   function doorTravelBox() {
     const op = doorOpeningBox();
-    if (state.doorType === "A") {
-      return { x: op.x - 4, y: op.y + op.d, w: 4, d: state.doorWidth };
-    }
     const y = state.pocketDir === "north" ? op.y - state.doorWidth : op.y + op.d;
+    // A: posuv po vnějším líci západní příčky; B: pouzdro ve příčce
+    if (state.doorType === "A") {
+      return { x: op.x - 4, y, w: 4, d: state.doorWidth };
+    }
     return { x: op.x, y, w: PART, d: state.doorWidth };
+  }
+
+  function doorOffsetMin() {
+    // Typ B drží praktický odstup od WC zóny; typ A smí níž
+    return state.doorType === "B" ? 65 : 0;
+  }
+
+  function clampDoorOffset() {
+    const bi = bathInner();
+    const min = doorOffsetMin();
+    const max = Math.max(min, Math.floor(bi.d - state.doorWidth));
+    state.doorOffset = Math.min(max, Math.max(min, state.doorOffset));
+    const input = document.getElementById("door-offset");
+    if (input) {
+      input.min = String(min);
+      input.max = String(max);
+      input.value = String(Math.round(state.doorOffset));
+    }
+    const lab = document.getElementById("door-offset-val");
+    if (lab) lab.textContent = String(Math.round(state.doorOffset));
+    const hint = document.getElementById("door-offset-hint");
+    if (hint) {
+      hint.textContent = state.doorType === "B"
+        ? `Typ B: min ${min} cm (WC zóna) · max ${max} cm`
+        : `Typ A: min ${min} cm · max ${max} cm`;
+    }
   }
   function showerSize() {
     if (state.showerPreset === "full") return { w: bathInner().w, d: state.showerFullDepth };
@@ -1077,10 +1103,13 @@
     const op = doorOpeningBox();
     const travel = doorTravelBox();
     const bi = bathInner();
-    const openingPassage = { x: bi.x, y: op.y, w: 4, d: op.d };
-    const wcPassage = { x: bi.x, y: bi.y, w: bi.w, d: 63 };
-    const badOpening = detail && (aabbOverlap(openingPassage, wcPassage) || aabbOverlap(op, wcBox())
-      || aabbOverlap(openingPassage, sh) || aabbOverlap(openingPassage, shClear));
+    // Průchod do místnosti (ne pouzdro/posuv ve stěně) × WC box / sprcha
+    const openingPassage = { x: bi.x, y: op.y, w: 8, d: op.d };
+    const badOpening = detail && (
+      aabbOverlap(openingPassage, wc) ||
+      aabbOverlap(openingPassage, sh) ||
+      aabbOverlap(openingPassage, shClear)
+    );
     const badShower = detail && !showerFits();
 
     g.appendChild(el("rect", {
@@ -1261,6 +1290,7 @@
   function render() {
     clampSink();
     clampKitchen();
+    clampDoorOffset();
     const wrap = document.getElementById("canvas-wrap");
     wrap.innerHTML = "";
     wrap.appendChild(renderCabinView());
@@ -1455,6 +1485,12 @@
         document.getElementById(lab).textContent = String(Math.round(state[key]));
         render();
         return;
+      } else if (key === "doorOffset") {
+        state.doorOffset = v;
+        clampDoorOffset();
+        document.getElementById(lab).textContent = String(Math.round(state.doorOffset));
+        render();
+        return;
       }
       state[key] = v;
       document.getElementById(lab).textContent = key === "bedFrameOffset"
@@ -1514,11 +1550,9 @@
   bindSeg("bed-variant", "bedVariant", Number);
   bindSeg("tv-variant", "tvVariant", Number);
 
-  bindSeg("door-width", "doorWidth", Number);
+  bindSeg("door-width", "doorWidth", Number, () => clampDoorOffset());
   bindRange("door-offset", "doorOffset", "door-offset-val");
-  bindSeg("door-type", "doorType", (v) => v, () => {
-    document.getElementById("pocket-dir-wrap").hidden = state.doorType !== "B";
-  });
+  bindSeg("door-type", "doorType", (v) => v, () => clampDoorOffset());
   bindSeg("pocket-dir", "pocketDir");
   bindSeg("shower-preset", "showerPreset", (v) => v, () => {
     document.getElementById("full-depth-wrap").hidden = state.showerPreset !== "full";
@@ -1565,8 +1599,8 @@
     document.getElementById("show-bed").checked = !!state.showBed;
     document.getElementById("show-dims").checked = !!state.showDims;
     document.getElementById("shower-rotate").checked = !!state.showerRotate;
-    document.getElementById("pocket-dir-wrap").hidden = state.doorType !== "B";
     document.getElementById("full-depth-wrap").hidden = state.showerPreset !== "full";
+    clampDoorOffset();
     for (const [id, key] of [
       ["bed-variant", "bedVariant"], ["tv-variant", "tvVariant"],
       ["door-width", "doorWidth"], ["door-type", "doorType"], ["pocket-dir", "pocketDir"],
