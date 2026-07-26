@@ -1,0 +1,53 @@
+/* Shared site chrome for Chata Kamyk docs hub */
+:root {
+  --site-ink: #1a1f24;
+  --site-muted: #5a6570;
+  --site-line: #c9d0d6;
+  --site-bg: #f4f1eb;
+  --site-panel: #fff;
+  --site-accent: #1f4e6b;
+}
+
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  padding: 12px 20px;
+  background: var(--site-panel);
+  border-bottom: 1px solid var(--site-line);
+  font-family: "IBM Plex Sans", "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 0.92rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.site-nav .brand {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--site-accent);
+  text-decoration: none;
+  margin-right: 8px;
+}
+
+.site-nav a:not(.brand) {
+  color: var(--site-muted);
+  text-decoration: none;
+  padding: 4px 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.site-nav a:not(.brand):hover {
+  color: var(--site-ink);
+}
+
+.site-nav a.active {
+  color: var(--site-ink);
+  border-bottom-color: var(--site-accent);
+  font-weight: 600;
+}
+
+@media print {
+  .site-nav { display: none !important; }
+}

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chata Kamyk — projektová dokumentace</title>
+<link rel="stylesheet" href="assets/site.css">
+<style>
+  body {
+    margin: 0;
+    font-family: "IBM Plex Sans", "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--site-ink);
+    background:
+      radial-gradient(ellipse at 20% 0%, rgba(31, 78, 107, 0.08), transparent 50%),
+      linear-gradient(180deg, #f7f5f1 0%, var(--site-bg) 100%);
+    min-height: 100vh;
+  }
+  main {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 48px 20px 64px;
+  }
+  h1 {
+    font-size: clamp(2rem, 5vw, 2.75rem);
+    margin: 0 0 12px;
+    letter-spacing: -0.02em;
+    color: var(--site-accent);
+  }
+  .lead {
+    font-size: 1.1rem;
+    color: var(--site-muted);
+    margin: 0 0 36px;
+    max-width: 36em;
+    line-height: 1.45;
+  }
+  .docs {
+    display: grid;
+    gap: 14px;
+  }
+  .docs a {
+    display: block;
+    padding: 20px 22px;
+    background: var(--site-panel);
+    border: 1px solid var(--site-line);
+    border-radius: 4px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  .docs a:hover {
+    border-color: var(--site-accent);
+    transform: translateY(-1px);
+  }
+  .docs h2 {
+    margin: 0 0 6px;
+    font-size: 1.15rem;
+    color: var(--site-accent);
+  }
+  .docs p {
+    margin: 0;
+    color: var(--site-muted);
+    font-size: 0.95rem;
+    line-height: 1.4;
+  }
+  footer {
+    margin-top: 48px;
+    font-size: 0.85rem;
+    color: var(--site-muted);
+  }
+</style>
+</head>
+<body>
+  <nav class="site-nav" aria-label="Hlavní navigace">
+    <a class="brand" href="./">Chata Kamyk</a>
+    <a class="active" href="./">Přehled</a>
+    <a href="koupelna/">Koupelna</a>
+    <a href="smarthome/">SmartHome</a>
+  </nav>
+  <main>
+    <h1>Chata Kamyk</h1>
+    <p class="lead">Projektová dokumentace a interaktivní podklady ke stavbě — půdorys koupelny a elektro / smart home.</p>
+    <div class="docs">
+      <a href="koupelna/">
+        <h2>Návrh koupelny</h2>
+        <p>Interaktivní 2D půdorys — dveře, sprcha, umyvadlo, kóty a kontroly kolizí.</p>
+      </a>
+      <a href="smarthome/">
+        <h2>Elektroinstalace &amp; SmartHome</h2>
+        <p>Projektová dokumentace rozvodů, zón a smart zařízení.</p>
+      </a>
+    </div>
+    <footer>Statický web · Cloudflare Pages</footer>
+  </main>
+</body>
+</html>
