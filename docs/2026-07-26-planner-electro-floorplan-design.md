@@ -1,7 +1,7 @@
 # Design: Planner — tab Elektro
 
 **Datum:** 2026-07-27  
-**Verze:** 3.8.0
+**Verze:** 3.9.0
 
 ## Struktura
 - Tab **3 · Elektro**
@@ -13,8 +13,11 @@ Default při prázdném stavu (3 typy × místnosti):
 - **Světla / Zásuvky / Datové:** Ložnice, Chodba, Kuchyně, Obývak, Venek
 
 Strom okruhů (stejný JSON, jiný pohled):
+- **Dle místnosti** (default) — místnost → typ okruhu → body
 - **Dle typu** — typ → místnosti
-- **Dle místnosti** — místnost → typy okruhů
+
+Body i trasy (`elecElevRuns.circuitId`) patří do **aktivního okruhu**.  
+Strom je společný pro Půdorys i Pohledy. V pohledech jsou ostatní okruhy ztlumené.
 
 Boční panel vlevo, širší (stromová navigace).
 
