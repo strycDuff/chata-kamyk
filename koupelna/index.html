@@ -267,6 +267,15 @@
             <label>Hloubka S–J: <strong id="bath-d-val">230</strong> cm</label>
             <input type="range" id="bath-d" min="180" max="260" value="230" step="1">
             <p class="hint" id="bath-clear-hint">Světlá šířka: 100 cm</p>
+            <button type="button" class="btn" id="btn-bath-reset" style="margin-top:8px;width:100%">Reset koupelny na výchozí</button>
+          </section>
+          <section>
+            <h3>Kuchyňská linka</h3>
+            <label>Levý okraj od vnitřního Z: <strong id="kitchen-left-val">313</strong> cm</label>
+            <input type="range" id="kitchen-left" min="307" max="806" value="313" step="1">
+            <label>Délka V–Z: <strong id="kitchen-len-val">160</strong> cm</label>
+            <input type="range" id="kitchen-len" min="100" max="280" value="160" step="1">
+            <p class="hint">Hloubka od jihu: 60 cm · hard stop u vstupních dveří</p>
           </section>
           <section>
             <h3>Postel (u východní stěny)</h3>
@@ -379,6 +388,10 @@
   const PASS_TIGHT = 90;    // 90–100 oranžová; <90 červená
   const BATH_W_MIN = 110;
   const BATH_W_MAX = 400; // teoretický strop šířky koupelny
+  const BATH_DEFAULTS = { bathLeft: 569, bathW: 125, bathD: 230 };
+  const KITCHEN_DEPTH = 60;
+  const KITCHEN_LEN_MIN = 100;
+  const KITCHEN_LEN_MAX = 280;
   /** Kóty ze zadání (okna, 569, 324, 313…) jsou od vnitřního Z líce světlosti. */
   function absX(clearX) {
     return INNER.x + clearX;
@@ -441,15 +454,17 @@
     return nx;
   }
 
-  const STORAGE_KEY = "chata-kamyk-planner-variants-v4";
+  const STORAGE_KEY = "chata-kamyk-planner-variants-v5";
 
   const state = {
     tab: "cabin",
-    bathLeft: 569, // od vnitřního Z líce světlosti
-    bathW: 125,
-    bathD: 230,
+    bathLeft: BATH_DEFAULTS.bathLeft,
+    bathW: BATH_DEFAULTS.bathW,
+    bathD: BATH_DEFAULTS.bathD,
     tvX: 324, // západní líc TV příčky od vnitřního Z
     tvLen: 140,
+    kitchenLeft: 313, // od vnitřního Z, východně od vstupních dveří
+    kitchenLen: 160,
     bedVariant: 160,
     tvVariant: 55,
     showSofa: true,
@@ -504,9 +519,48 @@
     const o = bathOuter();
     return { x: o.x + PART, y: o.y, w: o.w - 2 * PART, d: o.d - PART };
   }
+  /** Vstupní dveře na jihu — clear X interval (okna se ignorují). */
+  function southDoorClear() {
+    let c = 0;
+    for (const s of SOUTH_SEGS) {
+      if (s.t === "door") return { x0: c, x1: c + s.l };
+      c += s.l;
+    }
+    return { x0: 204, x1: 307 };
+  }
+
+  function clampKitchen() {
+    const door = southDoorClear();
+    let len = Math.min(KITCHEN_LEN_MAX, Math.max(KITCHEN_LEN_MIN, state.kitchenLen));
+    let left = state.kitchenLeft;
+    // hard stop: nesmí překrývat vstupní dveře — držet východně od dveří (default zóna)
+    const leftMin = door.x1;
+    const leftMax = Math.max(leftMin, CLEAR.w - len);
+    left = Math.min(leftMax, Math.max(leftMin, left));
+    if (left + len > CLEAR.w) len = CLEAR.w - left;
+    len = Math.min(KITCHEN_LEN_MAX, Math.max(KITCHEN_LEN_MIN, len));
+    state.kitchenLeft = left;
+    state.kitchenLen = len;
+    const leftEl = document.getElementById("kitchen-left");
+    const lenEl = document.getElementById("kitchen-len");
+    if (leftEl) {
+      leftEl.min = String(leftMin);
+      leftEl.max = String(Math.max(leftMin, CLEAR.w - KITCHEN_LEN_MIN));
+      leftEl.value = String(Math.round(left));
+    }
+    if (lenEl) {
+      lenEl.max = String(Math.max(KITCHEN_LEN_MIN, CLEAR.w - leftMin));
+      lenEl.value = String(Math.round(len));
+    }
+    const lv = document.getElementById("kitchen-left-val");
+    const ln = document.getElementById("kitchen-len-val");
+    if (lv) lv.textContent = String(Math.round(left));
+    if (ln) ln.textContent = String(Math.round(len));
+  }
+
   function kitchenBox() {
-    const y1 = INNER.y + INNER.h - 60;
-    return { x: absX(313), y: y1, w: 160, d: 60 };
+    const y1 = INNER.y + INNER.h - KITCHEN_DEPTH;
+    return { x: absX(state.kitchenLeft), y: y1, w: state.kitchenLen, d: KITCHEN_DEPTH };
   }
   function sofaPolylines() {
     const x0 = INNER.x, y0 = INNER.y;
@@ -778,12 +832,6 @@
     sdkRect(g, o.x, o.y, PART, o.d);
     sdkRect(g, o.x + o.w - PART, o.y, PART, o.d);
     sdkRect(g, o.x, o.y + o.d - PART, o.w, PART);
-    const label = el("text", {
-      x: bi.x + bi.w / 2, y: bi.y + 16, fill: "#7f8c8d",
-      "font-size": 11, "font-family": PLAN_FONT, "text-anchor": "middle",
-    });
-    label.textContent = "KOUPELNA";
-    g.appendChild(label);
 
     if (interactive) {
       const hw = HANDLE_HIT;
@@ -833,40 +881,6 @@
     g.appendChild(t);
   }
 
-  function drawPlanLegend(g, x, y) {
-    const w = 168, h = 108;
-    g.appendChild(el("rect", {
-      x, y, width: w, height: h,
-      fill: "#ffffff", stroke: "#bdc3c7", "stroke-width": 1, rx: 5,
-    }));
-    const title = el("text", {
-      x: x + 10, y: y + 16, fill: "#111111", "font-size": 11, "font-weight": "bold",
-      "font-family": PLAN_FONT,
-    });
-    title.textContent = "LEGENDA";
-    g.appendChild(title);
-    const rows = [
-      { fill: "#eaeaea", stroke: "#7f8c8d", label: "Sedačka" },
-      { fill: "#f1f2f6", stroke: "#27ae60", label: "Kuchyň" },
-      { fill: "#f5cd79", stroke: "#e67e22", label: "Postel" },
-      { fill: "#ffffff", stroke: "#00a8ff", label: "Okno", sw: 3 },
-      { fill: "#d1d8e0", stroke: "#2c3e50", label: "SDK příčka" },
-    ];
-    rows.forEach((r, i) => {
-      const ry = y + 28 + i * 15;
-      g.appendChild(el("rect", {
-        x: x + 10, y: ry - 7, width: 14, height: 10,
-        fill: r.fill, stroke: r.stroke, "stroke-width": r.sw || 1.2, rx: 2,
-      }));
-      const lab = el("text", {
-        x: x + 30, y: ry, fill: "#2c3e50", "font-size": 10, "font-family": PLAN_FONT,
-        "dominant-baseline": "middle",
-      });
-      lab.textContent = r.label;
-      g.appendChild(lab);
-    });
-  }
-
   function drawFurnitureCabin(g) {
     if (state.showSofa) {
       const s = sofaPolylines();
@@ -900,49 +914,44 @@
       g.appendChild(t);
     }
 
-    // Kitchen — linka + dřez + sklokeramika
+    // Kitchen — čistý obdélník
     const k = kitchenBox();
     g.appendChild(el("rect", {
       x: k.x, y: k.y, width: k.w, height: k.d,
       fill: "#f1f2f6", stroke: "#27ae60", "stroke-width": 2, rx: 3,
     }));
-    // dřez
-    const sinkX = k.x + 16, sinkY = k.y + 14, sinkW = 36, sinkH = 32;
-    g.appendChild(el("rect", {
-      x: sinkX, y: sinkY, width: sinkW, height: sinkH,
-      fill: "#ffffff", stroke: "#27ae60", "stroke-width": 1.2, rx: 2,
-    }));
-    g.appendChild(el("line", {
-      x1: sinkX + sinkW / 2, y1: sinkY - 6,
-      x2: sinkX + sinkW / 2, y2: sinkY + 4,
-      stroke: "#7f8c8d", "stroke-width": 1.5,
-    }));
-    g.appendChild(el("circle", {
-      cx: sinkX + sinkW / 2, cy: sinkY + 2, r: 2.2, fill: "#7f8c8d",
-    }));
-    // sklokeramika 2 plotýnky
-    const hobX = k.x + k.w - 70, hobY = k.y + 12, hobW = 52, hobH = 36;
-    g.appendChild(el("rect", {
-      x: hobX, y: hobY, width: hobW, height: hobH,
-      fill: "#2c3e50", stroke: "#111111", "stroke-width": 1, rx: 2,
-    }));
-    g.appendChild(el("circle", { cx: hobX + 16, cy: hobY + hobH / 2, r: 8, fill: "none", stroke: "#95a5a6", "stroke-width": 1.2 }));
-    g.appendChild(el("circle", { cx: hobX + 36, cy: hobY + hobH / 2, r: 8, fill: "none", stroke: "#95a5a6", "stroke-width": 1.2 }));
     const kt = el("text", {
-      x: k.x + k.w / 2, y: k.y + k.d - 8, fill: "#27ae60",
+      x: k.x + k.w / 2, y: k.y + k.d / 2, fill: "#27ae60",
       "font-size": 10, "font-family": PLAN_FONT,
-      "text-anchor": "middle",
+      "text-anchor": "middle", "dominant-baseline": "middle",
     });
-    kt.textContent = "Kuchyňská linka 160";
+    kt.textContent = `Kuchyňská linka ${Math.round(state.kitchenLen)}`;
     g.appendChild(kt);
 
-    // Passage — jen čerchovaná čára (barva = komfort); hodnota mimo půdorys
+    // Passage — čerchovaná čára + malý zalomený popisek u středu
     const pass = kitchenBathPassage();
+    const passColor = passageStroke(pass.len);
     g.appendChild(el("line", {
       x1: pass.a.x, y1: pass.a.y, x2: pass.b.x, y2: pass.b.y,
-      stroke: passageStroke(pass.len),
+      stroke: passColor,
       "stroke-width": 1.5, "stroke-dasharray": "4,4",
     }));
+    const mx = (pass.a.x + pass.b.x) / 2 + 6;
+    const my = (pass.a.y + pass.b.y) / 2 - 2;
+    const band = pass.len > PASS_COMFORT ? "komfort" : pass.len >= PASS_TIGHT ? "těsně" : "nekomfort";
+    const pt = el("text", {
+      x: mx, y: my, fill: passColor, "font-size": 8, "font-family": PLAN_FONT,
+    });
+    const l1 = el("tspan", { x: mx, dy: "0" });
+    l1.textContent = "Průchod";
+    const l2 = el("tspan", { x: mx, dy: "9" });
+    l2.textContent = `${round1(pass.len)} cm`;
+    const l3 = el("tspan", { x: mx, dy: "9" });
+    l3.textContent = `(${band})`;
+    pt.appendChild(l1);
+    pt.appendChild(l2);
+    pt.appendChild(l3);
+    g.appendChild(pt);
 
     // TV partition
     const tv = tvBox();
@@ -966,11 +975,12 @@
       fill: "transparent", stroke: "none",
     }));
 
-    const zoneColor = fit.overflow ? "var(--warn-fill)" : fit.tight ? "var(--warn-fill)" : "var(--safe)";
+    // literály (ne CSS var) — export SVG jinak vyplní černě
+    const zoneColor = fit.overflow || fit.tight ? "rgba(230,126,34,0.16)" : "rgba(39,174,96,0.14)";
     g.appendChild(el("rect", {
       x: tv.x - 18, y: tv.y + Math.max(0, (tv.d - TV_WIDTHS[state.tvVariant]) / 2),
       width: 14, height: TV_WIDTHS[state.tvVariant],
-      fill: zoneColor, stroke: fit.ok ? "var(--safe-stroke)" : "var(--warn)",
+      fill: zoneColor, stroke: fit.ok ? "#27ae60" : "#e67e22",
       "stroke-width": 1, "stroke-dasharray": "3 2",
     }));
 
@@ -983,7 +993,7 @@
         x: o.x + o.w, y: INNER.y,
         width: Math.max(0, bed.x - (o.x + o.w)),
         height: INNER.h,
-        fill: safe ? "var(--safe)" : "var(--warn-fill)",
+        fill: safe ? "rgba(39,174,96,0.14)" : "rgba(230,126,34,0.16)",
         stroke: "none",
       }));
       g.appendChild(el("rect", {
@@ -1110,9 +1120,8 @@
 
   function renderCabinView() {
     const pad = 36;
-    const padBottom = 140; // legenda + kóta průchodu pod půdorysem
     const svg = el("svg", {
-      viewBox: `${-pad} ${-pad} ${OUTER.w + pad * 2} ${OUTER.h + pad + padBottom}`,
+      viewBox: `${-pad} ${-pad} ${OUTER.w + pad * 2} ${OUTER.h + pad * 2}`,
       id: "plan-svg",
       class: state.measureMode ? "measuring" : "",
     });
@@ -1129,41 +1138,13 @@
     if (state.showDims) {
       const o = bathOuter();
       const bi = bathInner();
-      // jen relevantní vnitřní kóty koupelny (světlost chaty je v legendě)
-      dimH(g, o.x, o.x + o.w, o.y - 12, `${round1(o.w)}`, "var(--dim)");
-      dimH(g, bi.x, bi.x + bi.w, o.y + o.d + 12, `${round1(bi.w)}`, "var(--dim-soft)");
+      dimH(g, o.x, o.x + o.w, o.y - 12, `${round1(o.w)}`, "#c0392b");
+      dimH(g, bi.x, bi.x + bi.w, o.y + o.d + 12, `${round1(bi.w)}`, "#c0392b");
     }
 
     drawHoverDims(g);
     drawMeasure(g);
-
-    const living = el("text", {
-      x: INNER.x + 120, y: INNER.y + 140, fill: "#7f8c8d", "font-size": 13,
-      "font-family": PLAN_FONT, "font-weight": "bold",
-    });
-    living.textContent = "OBÝVÁK";
-    g.appendChild(living);
-    const bedL = el("text", {
-      x: INNER.x + INNER.w - 80, y: INNER.y + 36, fill: "#7f8c8d", "font-size": 13,
-      "font-family": PLAN_FONT, "font-weight": "bold", "text-anchor": "middle",
-    });
-    bedL.textContent = "LOŽNICE";
-    g.appendChild(bedL);
-
     drawNorthArrow(g, OUTER.w - 22, 22);
-    drawPlanLegend(g, 0, OUTER.h + 10);
-
-    // Kóta průchodu — pod půdorysem vpravo od legendy (bez overlapu vrstev)
-    const pass = kitchenBathPassage();
-    const passColor = passageStroke(pass.len);
-    const pt = el("text", {
-      x: 190, y: OUTER.h + 28,
-      fill: passColor, "font-size": 11, "font-weight": "bold",
-      "font-family": PLAN_FONT, "text-anchor": "start",
-    });
-    const band = pass.len > PASS_COMFORT ? "komfort" : pass.len >= PASS_TIGHT ? "těsně" : "nekomfort";
-    pt.textContent = `Průchod kuchyň ↔ koupelna: ${round1(pass.len)} cm (${band})`;
-    g.appendChild(pt);
 
     svg.appendChild(g);
     return svg;
@@ -1270,6 +1251,7 @@
 
   function render() {
     clampSink();
+    clampKitchen();
     const wrap = document.getElementById("canvas-wrap");
     wrap.innerHTML = "";
     const svg = state.tab === "cabin" ? renderCabinView() : renderBathView();
@@ -1424,6 +1406,8 @@
       ["bath-d", "bathD", "bath-d-val"],
       ["tv-x", "tvX", "tv-x-val"],
       ["tv-len", "tvLen", "tv-len-val"],
+      ["kitchen-left", "kitchenLeft", "kitchen-left-val"],
+      ["kitchen-len", "kitchenLen", "kitchen-len-val"],
       ["door-offset", "doorOffset", "door-offset-val"],
       ["sink-w", "sinkW", "sink-w-val"],
       ["sink-d", "sinkD", "sink-d-val"],
@@ -1464,6 +1448,12 @@
         const east = clampOffNorthWindows(state.bathLeft + v - PART, state.bathLeft + state.bathW - PART);
         v = clampBathW(east + PART - state.bathLeft);
         input.value = String(Math.round(v));
+      } else if (key === "kitchenLeft" || key === "kitchenLen") {
+        state[key] = v;
+        clampKitchen();
+        document.getElementById(lab).textContent = String(Math.round(state[key]));
+        render();
+        return;
       }
       state[key] = v;
       document.getElementById(lab).textContent = String(Math.round(state[key]));
@@ -1520,6 +1510,13 @@
   bindRange("bath-d", "bathD", "bath-d-val");
   bindRange("tv-x", "tvX", "tv-x-val");
   bindRange("tv-len", "tvLen", "tv-len-val");
+  bindRange("kitchen-left", "kitchenLeft", "kitchen-left-val");
+  bindRange("kitchen-len", "kitchenLen", "kitchen-len-val");
+  document.getElementById("btn-bath-reset").addEventListener("click", () => {
+    Object.assign(state, BATH_DEFAULTS);
+    syncSlidersFromState();
+    render();
+  });
   bindSeg("bed-variant", "bedVariant", Number);
   bindSeg("tv-variant", "tvVariant", Number);
 
@@ -1622,11 +1619,11 @@
     const svg = document.getElementById("plan-svg");
     if (!svg) return;
     const clone = svg.cloneNode(true);
-    // strip interactive handles from export
     clone.querySelectorAll("[data-drag]").forEach((n) => n.remove());
-    if (!state.showSofa) {
-      /* already not drawn */
-    }
+    // CSS proměnné z stránky v samostatném SVG nefungují → vložit definice
+    const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
+    style.textContent = `svg{--safe:rgba(39,174,96,0.14);--warn-fill:rgba(230,126,34,0.16);--safe-stroke:#27ae60;--warn:#e67e22;--bad:#c0392b;--dim:#c0392b;--dim-soft:#c0392b;--door:#e1b12c;--kitchen:#27ae60}`;
+    clone.insertBefore(style, clone.firstChild);
     const serializer = new XMLSerializer();
     let src = serializer.serializeToString(clone);
     if (!src.includes("xmlns=")) {
