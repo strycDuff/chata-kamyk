@@ -323,10 +323,14 @@
           <details class="side-block">
             <summary>Postel</summary>
             <div class="side-block-body">
+              <label>Matrace (šířka)</label>
               <div class="row seg" id="bed-variant">
                 <button type="button" data-v="160" class="active">160 cm</button>
                 <button type="button" data-v="140">140 cm</button>
               </div>
+              <label>Offset rámu na stranu: <strong id="bed-frame-val">2.5</strong> cm</label>
+              <input type="range" id="bed-frame" min="0" max="5" value="2.5" step="0.5">
+              <p class="hint">Vnější půdorys = matrace + 2× offset (délka matrace 200 cm)</p>
               <p class="hint" id="bed-hint">—</p>
             </div>
           </details>
@@ -433,8 +437,8 @@
   const CLEAR = { w: 906, h: 333 };
   const OUTER = { w: CLEAR.w + 2 * WALL, h: CLEAR.h + 2 * WALL };
   const INNER = { x: WALL, y: WALL, w: CLEAR.w, h: CLEAR.h };
-  const BED_LEN = 200; // delší strana S–J
-  const MIN_BED_PASS = 60; // visual safe gap bath↔bed (západní hrana postele)
+  const BED_LEN = 200; // matrace, delší strana S–J
+  const MIN_BED_PASS = 60; // visual safe gap bath↔bed (západní hrana rámu)
   const PASS_COMFORT = 100; // >100 cm zelená
   const PASS_TIGHT = 90;    // 90–100 oranžová; <90 červená
   const BATH_W_MIN = 110;
@@ -517,6 +521,7 @@
     kitchenLeft: 313, // od vnitřního Z, východně od vstupních dveří
     kitchenLen: 160,
     bedVariant: 160,
+    bedFrameOffset: 2.5, // cm na každou stranu kolem matrace
     tvVariant: 55,
     showSofa: true,
     showBed: true,
@@ -620,11 +625,17 @@
       north: { x: x0, y: y0, w: 160, d: 90 },
     };
   }
+  function bedOuterSize() {
+    const f = state.bedFrameOffset;
+    return {
+      w: state.bedVariant + 2 * f,
+      d: BED_LEN + 2 * f,
+      f,
+    };
+  }
   function bedBox() {
-    // Pravý horní roh postele = pravý horní roh světlé místnosti (SV roh)
-    // kratší (140/160) V–Z, delší 200 S–J
-    const w = state.bedVariant;
-    const d = BED_LEN;
+    // Vnější rám ve SV rohu světlosti (u východní + severní stěny)
+    const { w, d } = bedOuterSize();
     return {
       x: INNER.x + INNER.w - w,
       y: INNER.y,
@@ -632,9 +643,19 @@
       d,
     };
   }
+  function bedMattressBox() {
+    const outer = bedBox();
+    const f = state.bedFrameOffset;
+    return {
+      x: outer.x + f,
+      y: outer.y + f,
+      w: state.bedVariant,
+      d: BED_LEN,
+    };
+  }
   function bedGap() {
     const o = bathOuter();
-    const bed = bedBox();
+    const bed = bedBox(); // mezera k vnějšímu rámu
     return bed.x - (o.x + o.w);
   }
   function kitchenBathPassage() {
@@ -1016,6 +1037,8 @@
 
     if (state.showBed) {
       const bed = bedBox();
+      const mat = bedMattressBox();
+      const { f } = bedOuterSize();
       const gap = bedGap();
       const safe = gap >= MIN_BED_PASS;
       const o = bathOuter();
@@ -1026,24 +1049,33 @@
         fill: safe ? "rgba(39,174,96,0.14)" : "rgba(230,126,34,0.16)",
         stroke: "none",
       }));
+      // vnější rám
       g.appendChild(el("rect", {
         x: bed.x, y: bed.y, width: bed.w, height: bed.d,
         fill: "#f5cd79", stroke: "#e67e22", "stroke-width": 2, rx: 4,
       }));
-      // polštáře
+      // matrace (vnitřní obrys)
+      if (f > 0.05) {
+        g.appendChild(el("rect", {
+          x: mat.x, y: mat.y, width: mat.w, height: mat.d,
+          fill: "none", stroke: "#e67e22", "stroke-width": 1, "stroke-dasharray": "4,3", rx: 2,
+        }));
+      }
       g.appendChild(el("rect", {
-        x: bed.x + 8, y: bed.y + 8, width: bed.w - 16, height: 28,
+        x: mat.x + 6, y: mat.y + 6, width: Math.max(8, mat.w - 12), height: 24,
         fill: "#f6e58d", stroke: "#e67e22", "stroke-width": 1, rx: 3,
       }));
       const bt = el("text", {
-        x: bed.x + bed.w / 2, y: bed.y + bed.d / 2 + 8,
-        fill: "#e67e22", "font-size": 11, "font-family": PLAN_FONT,
+        x: bed.x + bed.w / 2, y: bed.y + bed.d / 2 + 4,
+        fill: "#e67e22", "font-size": 10, "font-family": PLAN_FONT,
         "text-anchor": "middle", "dominant-baseline": "middle",
       });
-      bt.textContent = `Postel ${state.bedVariant}×${BED_LEN}`;
+      bt.textContent = f > 0.05
+        ? `${state.bedVariant}×${BED_LEN} → ${round1(bed.w)}×${round1(bed.d)}`
+        : `Postel ${state.bedVariant}×${BED_LEN}`;
       g.appendChild(bt);
       if (state.showDims && gap > 1) {
-        dimH(g, o.x + o.w, bed.x, bed.y + 14, `${round1(gap)}`, safe ? "var(--safe-stroke)" : "var(--bad)");
+        dimH(g, o.x + o.w, bed.x, bed.y + 14, `${round1(gap)}`, safe ? "#27ae60" : "#c0392b");
       }
     }
   }
@@ -1265,8 +1297,9 @@
     document.getElementById("bath-clear-hint").textContent =
       `Světlá šířka: ${round1(bi.w)} cm · světlá hloubka: ${round1(bi.d)} cm`;
     const gap = bedGap();
+    const outer = bedOuterSize();
     document.getElementById("bed-hint").textContent =
-      `Postel ${state.bedVariant}×${BED_LEN} v SV rohu · mezera k příčce ${round1(gap)} cm · WC fixní`;
+      `Matrace ${state.bedVariant}×${BED_LEN} · rám ${round1(outer.w)}×${round1(outer.d)} (offset ${round1(outer.f)} cm) · mezera k příčce ${round1(gap)} cm`;
     const fit = tvFits(state.tvVariant);
     document.getElementById("tv-hint").textContent = fit.overflow
       ? `${state.tvVariant}" = ${fit.need} cm — přesah ${round1(-fit.margin)} cm / strana`
@@ -1438,6 +1471,7 @@
       ["tv-len", "tvLen", "tv-len-val"],
       ["kitchen-left", "kitchenLeft", "kitchen-left-val"],
       ["kitchen-len", "kitchenLen", "kitchen-len-val"],
+      ["bed-frame", "bedFrameOffset", "bed-frame-val"],
       ["door-offset", "doorOffset", "door-offset-val"],
       ["sink-w", "sinkW", "sink-w-val"],
       ["sink-d", "sinkD", "sink-d-val"],
@@ -1446,8 +1480,9 @@
     for (const [id, key, lab] of map) {
       const input = document.getElementById(id);
       if (!input) continue;
-      input.value = String(Math.round(state[key]));
-      document.getElementById(lab).textContent = String(Math.round(state[key]));
+      const v = key === "bedFrameOffset" ? round1(state[key]) : Math.round(state[key]);
+      input.value = String(v);
+      document.getElementById(lab).textContent = String(v);
     }
   }
 
@@ -1486,7 +1521,9 @@
         return;
       }
       state[key] = v;
-      document.getElementById(lab).textContent = String(Math.round(state[key]));
+      document.getElementById(lab).textContent = key === "bedFrameOffset"
+        ? String(round1(state[key]))
+        : String(Math.round(state[key]));
       if (key.startsWith("sink") || key === "sinkW") clampSink();
       render();
     });
@@ -1542,6 +1579,7 @@
   bindRange("tv-len", "tvLen", "tv-len-val");
   bindRange("kitchen-left", "kitchenLeft", "kitchen-left-val");
   bindRange("kitchen-len", "kitchenLen", "kitchen-len-val");
+  bindRange("bed-frame", "bedFrameOffset", "bed-frame-val");
   document.getElementById("btn-bath-reset").addEventListener("click", () => {
     Object.assign(state, BATH_DEFAULTS);
     syncSlidersFromState();
@@ -1590,6 +1628,7 @@
     if (tab === "cabin" || tab === "bath") state.tab = tab;
     if (state.kitchenLeft == null) state.kitchenLeft = 313;
     if (state.kitchenLen == null) state.kitchenLen = 160;
+    if (state.bedFrameOffset == null) state.bedFrameOffset = 2.5;
     state.measureMode = false;
     state.measureA = null;
     state.measureB = null;
