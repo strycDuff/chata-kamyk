@@ -279,7 +279,9 @@
       <label class="chk"><input type="checkbox" id="show-sofa" checked> Gauč</label>
       <label class="chk"><input type="checkbox" id="show-bed" checked> Postel</label>
       <label class="chk"><input type="checkbox" id="show-dims" checked> Kóty</label>
-      <button type="button" class="btn" id="btn-export">Export SVG</button>
+      <button type="button" class="btn" id="btn-export" title="SVG včetně stavu pro import na jiném PC">Export SVG</button>
+      <button type="button" class="btn" id="btn-import" title="Načíst SVG (nebo JSON) exportovaný z tohoto nástroje">Import</button>
+      <input type="file" id="import-file" accept=".svg,.json,image/svg+xml,application/json" hidden>
     </div>
 
     <div class="main">
@@ -1580,19 +1582,27 @@
     return { ...rest, savedAt: Date.now() };
   }
   function applySnapshot(data) {
-    Object.assign(state, data);
+    if (!data || typeof data !== "object") return;
+    const {
+      tab, measureMode, measureA, measureB, measureCursor, hoverCm, drag, savedAt, ...rest
+    } = data;
+    Object.assign(state, rest);
+    if (tab === "cabin" || tab === "bath") state.tab = tab;
+    if (state.kitchenLeft == null) state.kitchenLeft = 313;
+    if (state.kitchenLen == null) state.kitchenLen = 160;
     state.measureMode = false;
     state.measureA = null;
     state.measureB = null;
+    state.measureCursor = null;
+    state.hoverCm = null;
     state.drag = null;
     syncSlidersFromState();
-    document.getElementById("show-sofa").checked = state.showSofa;
-    document.getElementById("show-bed").checked = state.showBed;
-    document.getElementById("show-dims").checked = state.showDims;
-    document.getElementById("shower-rotate").checked = state.showerRotate;
+    document.getElementById("show-sofa").checked = !!state.showSofa;
+    document.getElementById("show-bed").checked = !!state.showBed;
+    document.getElementById("show-dims").checked = !!state.showDims;
+    document.getElementById("shower-rotate").checked = !!state.showerRotate;
     document.getElementById("pocket-dir-wrap").hidden = state.doorType !== "B";
     document.getElementById("full-depth-wrap").hidden = state.showerPreset !== "full";
-    // sync seg buttons
     for (const [id, key] of [
       ["bed-variant", "bedVariant"], ["tv-variant", "tvVariant"],
       ["door-width", "doorWidth"], ["door-type", "doorType"], ["pocket-dir", "pocketDir"],
@@ -1609,6 +1619,27 @@
     });
     renderVariants();
     render();
+  }
+
+  function extractImportPayload(text) {
+    const trimmed = text.trim();
+    if (!trimmed) throw new Error("Prázdný soubor");
+    if (trimmed.startsWith("{")) {
+      const obj = JSON.parse(trimmed);
+      return obj.data || obj;
+    }
+    const doc = new DOMParser().parseFromString(trimmed, "image/svg+xml");
+    const parseErr = doc.querySelector("parsererror");
+    if (parseErr) throw new Error("Neplatné SVG");
+    const node =
+      doc.querySelector("#chata-kamyk-state") ||
+      doc.querySelector("metadata [id='chata-kamyk-state']") ||
+      doc.querySelector("desc#chata-kamyk-state");
+    if (!node || !node.textContent.trim()) {
+      throw new Error("SVG neobsahuje stav plánovače (exportuj znovu aktuální verzí nástroje)");
+    }
+    const obj = JSON.parse(node.textContent.trim());
+    return obj.data || obj;
   }
   function renderVariants() {
     const ul = document.getElementById("variant-list");
@@ -1642,16 +1673,25 @@
     renderVariants();
   });
 
-  // Export SVG
+  // Export SVG (grafika + JSON stav pro import na jiném PC)
   document.getElementById("btn-export").addEventListener("click", () => {
     const svg = document.getElementById("plan-svg");
     if (!svg) return;
     const clone = svg.cloneNode(true);
     clone.querySelectorAll("[data-drag]").forEach((n) => n.remove());
-    // CSS proměnné z stránky v samostatném SVG nefungují → vložit definice
     const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
     style.textContent = `svg{--safe:rgba(39,174,96,0.14);--warn-fill:rgba(230,126,34,0.16);--safe-stroke:#27ae60;--warn:#e67e22;--bad:#c0392b;--dim:#c0392b;--dim-soft:#c0392b;--door:#e1b12c;--kitchen:#27ae60}`;
     clone.insertBefore(style, clone.firstChild);
+    const meta = document.createElementNS("http://www.w3.org/2000/svg", "metadata");
+    const desc = document.createElementNS("http://www.w3.org/2000/svg", "desc");
+    desc.setAttribute("id", "chata-kamyk-state");
+    desc.textContent = JSON.stringify({
+      v: 1,
+      app: "chata-kamyk-planner",
+      data: snapshot(),
+    });
+    meta.appendChild(desc);
+    clone.insertBefore(meta, clone.firstChild);
     const serializer = new XMLSerializer();
     let src = serializer.serializeToString(clone);
     if (!src.includes("xmlns=")) {
@@ -1663,6 +1703,24 @@
     a.download = `chata-kamyk-${state.tab}-${Date.now()}.svg`;
     a.click();
     URL.revokeObjectURL(a.href);
+  });
+
+  document.getElementById("btn-import").addEventListener("click", () => {
+    document.getElementById("import-file").click();
+  });
+  document.getElementById("import-file").addEventListener("change", async (evt) => {
+    const file = evt.target.files && evt.target.files[0];
+    evt.target.value = "";
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = extractImportPayload(text);
+      applySnapshot(data);
+      const hint = document.getElementById("measure-hint");
+      if (hint) hint.textContent = `Import OK: ${file.name}`;
+    } catch (err) {
+      alert(`Import selhal: ${err.message || err}`);
+    }
   });
 
   syncSlidersFromState();
