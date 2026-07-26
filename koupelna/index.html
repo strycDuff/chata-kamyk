@@ -114,6 +114,8 @@
   .canvas-wrap svg.measuring { cursor: crosshair; }
   .canvas-wrap .handle { cursor: ew-resize; }
   .canvas-wrap .handle-ns { cursor: ns-resize; }
+  .canvas-wrap .handle:hover,
+  .canvas-wrap .handle-ns:hover { fill: rgba(31, 78, 107, 0.12); }
   .side {
     border-left: 1px solid var(--line);
     background: var(--panel);
@@ -365,7 +367,8 @@
   const INNER = { x: WALL, y: WALL, w: CLEAR.w, h: CLEAR.h };
   const BED_LEN = 200; // delší strana S–J
   const MIN_BED_PASS = 60; // visual safe gap bath↔bed (západní hrana postele)
-  const PASS_TARGET = 105;
+  const PASS_COMFORT = 100; // >100 cm zelená
+  const PASS_TIGHT = 90;    // 90–100 oranžová; <90 červená
   const BATH_W_MIN = 110;
   const BATH_W_MAX = 400; // teoretický strop šířky koupelny
   /** Starší kóty byly od vnějšího Z při WALL_REAL — přepočet na vizuální vnějšek. */
@@ -735,22 +738,29 @@
 
     if (interactive) {
       const hw = HANDLE_HIT;
+      // Široký neviditelný hit-target — bez opacity výplně (příčka by vypadala tlustě)
       g.appendChild(el("rect", {
         class: "handle", "data-drag": "bath-east",
         x: o.x + o.w - hw / 2, y: o.y, width: hw, height: o.d,
-        fill: "rgba(31,78,107,0.22)", stroke: "var(--accent)", "stroke-width": 1,
+        fill: "transparent", stroke: "none",
       }));
       g.appendChild(el("rect", {
         class: "handle", "data-drag": "bath-west",
         x: o.x - hw / 2, y: o.y, width: hw, height: o.d,
-        fill: "rgba(31,78,107,0.18)", stroke: "var(--accent)", "stroke-width": 1,
+        fill: "transparent", stroke: "none",
       }));
       g.appendChild(el("rect", {
         class: "handle-ns", "data-drag": "bath-south",
         x: o.x, y: o.y + o.d - hw / 2, width: o.w, height: hw,
-        fill: "rgba(31,78,107,0.18)", stroke: "var(--accent)", "stroke-width": 1,
+        fill: "transparent", stroke: "none",
       }));
     }
+  }
+
+  function passageStroke(len) {
+    if (len > PASS_COMFORT) return "var(--kitchen)";
+    if (len >= PASS_TIGHT) return "var(--warn)";
+    return "var(--bad)";
   }
 
   function drawFurnitureCabin(g) {
@@ -784,22 +794,13 @@
     kt.textContent = "Kuchyň 160";
     g.appendChild(kt);
 
-    // Passage
+    // Passage — jen čerchovaná čára (barva = komfort); hodnota mimo půdorys
     const pass = kitchenBathPassage();
-    const ok = pass.len >= PASS_TARGET - 0.5;
     g.appendChild(el("line", {
       x1: pass.a.x, y1: pass.a.y, x2: pass.b.x, y2: pass.b.y,
-      stroke: ok ? "var(--kitchen)" : "var(--bad)",
+      stroke: passageStroke(pass.len),
       "stroke-width": 1.5, "stroke-dasharray": "5 4",
     }));
-    const pt = el("text", {
-      x: (pass.a.x + pass.b.x) / 2 + 8,
-      y: (pass.a.y + pass.b.y) / 2 - 6,
-      fill: ok ? "var(--kitchen)" : "var(--bad)",
-      "font-size": 11,
-    });
-    pt.textContent = `Průchod ${round1(pass.len)} cm`;
-    g.appendChild(pt);
 
     // TV partition
     const tv = tvBox();
@@ -818,13 +819,13 @@
     g.appendChild(el("rect", {
       class: "handle", "data-drag": "tv-x",
       x: tv.x + PART / 2 - HANDLE_HIT / 2, y: tv.y, width: HANDLE_HIT, height: tv.d,
-      fill: "rgba(31,78,107,0.16)", stroke: "var(--accent)", "stroke-width": 1,
+      fill: "transparent", stroke: "none",
     }));
     g.appendChild(el("rect", {
       class: "handle-ns", "data-drag": "tv-len",
       x: tv.x + PART / 2 - HANDLE_HIT / 2, y: tv.y + tv.d - HANDLE_HIT / 2,
       width: HANDLE_HIT, height: HANDLE_HIT,
-      fill: "rgba(31,78,107,0.3)", stroke: "var(--accent)", "stroke-width": 1,
+      fill: "transparent", stroke: "none",
     }));
 
     // TV safe zone band on partition length
@@ -958,8 +959,9 @@
 
   function renderCabinView() {
     const pad = 36;
+    const padBottom = 56; // místo pro kótu průchodu pod půdorysem
     const svg = el("svg", {
-      viewBox: `${-pad} ${-pad} ${OUTER.w + pad * 2} ${OUTER.h + pad * 2}`,
+      viewBox: `${-pad} ${-pad} ${OUTER.w + pad * 2} ${OUTER.h + pad + padBottom}`,
       id: "plan-svg",
       class: state.measureMode ? "measuring" : "",
     });
@@ -992,6 +994,19 @@
     });
     bedL.textContent = "LOŽNICE";
     g.appendChild(bedL);
+
+    // Kóta průchodu kuchyň↔koupelna — pod půdorysem, mimo overlap
+    const pass = kitchenBathPassage();
+    const passColor = passageStroke(pass.len);
+    const passMidX = (pass.a.x + pass.b.x) / 2;
+    const pt = el("text", {
+      x: passMidX, y: OUTER.h + 22,
+      fill: passColor, "font-size": 11, "font-weight": 600,
+      "text-anchor": "middle",
+    });
+    const band = pass.len > PASS_COMFORT ? "komfort" : pass.len >= PASS_TIGHT ? "těsně" : "nekomfort";
+    pt.textContent = `Průchod kuchyň ↔ koupelna: ${round1(pass.len)} cm (${band})`;
+    g.appendChild(pt);
 
     svg.appendChild(g);
     return svg;
@@ -1040,8 +1055,9 @@
       const pass = kitchenBathPassage();
       const fit = tvFits(state.tvVariant);
       msgs.push(`Koupelna světlá ${round1(bi.w)} × ${round1(bi.d)} cm`);
-      msgs.push(`Průchod kuchyň↔koupelna ${round1(pass.len)} cm (cíl ${PASS_TARGET})`);
-      if (pass.len < PASS_TARGET - 0.5) level = "warn";
+      msgs.push(`Průchod kuchyň↔koupelna ${round1(pass.len)} cm (>${PASS_COMFORT} komfort · ${PASS_TIGHT}–${PASS_COMFORT} těsně · <${PASS_TIGHT} nekomfort)`);
+      if (pass.len < PASS_TIGHT) level = "bad";
+      else if (pass.len <= PASS_COMFORT) level = "warn";
       if (state.showBed) {
         msgs.push(`Mezera koupelna↔postel ${round1(gap)} cm (safe ≥ ${MIN_BED_PASS})`);
         if (gap < MIN_BED_PASS) level = "warn";
@@ -1082,8 +1098,9 @@
       ? `${state.tvVariant}" = ${fit.need} cm — přesah ${round1(-fit.margin)} cm / strana`
       : `${state.tvVariant}" = ${fit.need} cm — okraj ~${round1(fit.margin)} cm / strana (safe ≥ 5)`;
     const pass = kitchenBathPassage();
+    const band = pass.len > PASS_COMFORT ? "komfort" : pass.len >= PASS_TIGHT ? "těsně" : "nekomfort";
     document.getElementById("pass-hint").textContent =
-      `PR linky → JL koupelny: ${round1(pass.len)} cm (cíl ${PASS_TARGET} cm)`;
+      `PR linky → JL koupelny: ${round1(pass.len)} cm (${band}; >${PASS_COMFORT} / ${PASS_TIGHT}–${PASS_COMFORT} / <${PASS_TIGHT})`;
   }
 
   let hoverRaf = 0;
