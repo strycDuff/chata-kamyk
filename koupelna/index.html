@@ -351,6 +351,20 @@
     color: var(--muted);
     padding: 4px 2px;
   }
+  .elec-points-panel #elec-points-panel-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+  }
+  .elec-points-panel #btn-elec-point {
+    width: 100%;
+    margin-top: 8px;
+    flex: 0 0 auto;
+  }
+  .elec-points-panel #elec-mode-hint {
+    margin: 4px 0 0;
+    flex: 0 0 auto;
+  }
   .elec-tree details.elec-branch {
     border: none;
     border-radius: 0;
@@ -879,7 +893,11 @@
           </div>
           <div class="elec-split">
             <div id="elec-list" class="elec-tree"></div>
-            <div id="elec-points-panel" class="elec-points-panel" hidden></div>
+            <div id="elec-points-panel" class="elec-points-panel" hidden>
+              <div id="elec-points-panel-body"></div>
+              <button type="button" class="btn" id="btn-elec-point">＋ Bod do aktivního okruhu</button>
+              <p class="hint" id="elec-mode-hint"></p>
+            </div>
           </div>
 
           <div id="elec-plan-tools">
@@ -892,8 +910,6 @@
             </div>
             <label>Výška bodu: <strong id="elec-h-val">30</strong> cm</label>
             <input type="range" id="elec-h" min="10" max="220" value="30" step="1">
-            <button type="button" class="btn" id="btn-elec-point" style="width:100%;margin:8px 0">＋ Bod do aktivního okruhu</button>
-            <p class="hint" id="elec-mode-hint"></p>
           </div>
 
           <div id="elec-elev-tools" hidden>
@@ -987,8 +1003,8 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.9.4";
-  const APP_BUILD = 45;
+  const APP_VERSION = "3.9.5";
+  const APP_BUILD = 46;
   const APP_COMMIT = "";
   // BUILD_META_END
 
@@ -2702,8 +2718,9 @@
 
   function renderElecActivePoints() {
     const panel = document.getElementById("elec-points-panel");
-    if (!panel) return;
-    panel.innerHTML = "";
+    const body = document.getElementById("elec-points-panel-body");
+    if (!panel || !body) return;
+    body.innerHTML = "";
     const circ = activeCircuit();
     if (!circ) {
       panel.hidden = true;
@@ -2718,13 +2735,13 @@
       `<span class="elec-ico" aria-hidden="true">${ELEC_KIND_ICONS[circ.kind]}</span>` +
       `<span>Body · ${circuitRoomKey(circ)} / ${ELEC_KIND_LABELS[circ.kind]}</span>` +
       `<span class="muted">${pts.length} bodů${runs.length ? ` · ${runs.length} tras` : ""}</span>`;
-    panel.appendChild(head);
+    body.appendChild(head);
 
     if (!pts.length) {
       const empty = document.createElement("div");
       empty.className = "elec-empty-pts";
-      empty.textContent = "Zatím žádné body — přidej tlačítkem ＋ Bod.";
-      panel.appendChild(empty);
+      empty.textContent = "Zatím žádné body — přidej tlačítkem níže.";
+      body.appendChild(empty);
       return;
     }
 
@@ -2762,7 +2779,7 @@
       });
       ul.appendChild(li);
     });
-    panel.appendChild(ul);
+    body.appendChild(ul);
   }
 
   function appendElecCircuitCard(parent, circ, { leafLabel } = {}) {
