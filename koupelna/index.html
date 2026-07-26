@@ -273,40 +273,58 @@
     border-color: var(--accent);
     background: #f3f6f8;
   }
+  .elec-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    align-items: stretch;
+    margin-bottom: 4px;
+  }
+  .elec-split:has(#elec-points-panel[hidden]) {
+    grid-template-columns: 1fr;
+  }
   .elec-tree {
     border: 1px solid var(--line);
     border-radius: 6px;
     background: #fff;
     padding: 4px 0;
-    max-height: min(36vh, 360px);
+    max-height: min(42vh, 420px);
+    min-height: 160px;
     overflow: auto;
   }
   .elec-points-panel {
     border: 1px solid var(--line);
     border-radius: 6px;
     background: #f7fafc;
-    margin: 8px 0 4px;
+    margin: 0;
     padding: 8px 8px 6px;
+    max-height: min(42vh, 420px);
+    min-height: 160px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
   }
+  .elec-points-panel[hidden] { display: none !important; }
   .elec-points-panel > .head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     font-weight: 600;
     margin-bottom: 6px;
   }
   .elec-points-panel > .head .muted {
     font-weight: 500;
     color: var(--muted);
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     margin-left: auto;
   }
   .elec-points-panel .elec-points-tree {
     list-style: none;
     margin: 0;
     padding: 0;
-    max-height: min(28vh, 240px);
+    flex: 1;
     overflow: auto;
   }
   .elec-points-panel .elec-points-tree li {
@@ -511,7 +529,7 @@
   }
   .main {
     display: grid;
-    grid-template-columns: minmax(400px, 480px) 1fr;
+    grid-template-columns: minmax(520px, 620px) 1fr;
     min-height: 0;
   }
   .main > .side { order: -1; }
@@ -859,8 +877,10 @@
             </div>
             <button type="button" class="btn-elec-new-circuit" id="btn-elec-new-circuit" title="Nový okruh">＋ okruh</button>
           </div>
-          <div id="elec-list" class="elec-tree"></div>
-          <div id="elec-points-panel" class="elec-points-panel" hidden></div>
+          <div class="elec-split">
+            <div id="elec-list" class="elec-tree"></div>
+            <div id="elec-points-panel" class="elec-points-panel" hidden></div>
+          </div>
 
           <div id="elec-plan-tools">
             <label>Typ bodu</label>
@@ -967,8 +987,8 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.9.3";
-  const APP_BUILD = 44;
+  const APP_VERSION = "3.9.4";
+  const APP_BUILD = 45;
   const APP_COMMIT = "";
   // BUILD_META_END
 
