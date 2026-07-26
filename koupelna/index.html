@@ -242,17 +242,17 @@
         <p class="sub" id="side-sub">Táhni příčky · safe zóny jsou jen vizuální</p>
         <div class="legend" id="legend">
           Světlost místností: <strong>906 × 333 cm</strong> (od SDK)<br>
-          Obvodová stěna: <strong>23,92 cm</strong> · SDK příčky: <strong>12,5 cm</strong>
+          Obvodová stěna: <strong>23,92 cm</strong> (v půdorysu zjednodušeně) · SDK příčky: <strong>12,5 cm</strong>
         </div>
         <div class="status ok" id="status">—</div>
 
         <div id="panel-cabin">
           <section>
             <h3>Koupelna (vnější)</h3>
-            <label>Levý okraj od Z: <strong id="bath-left-val">569</strong> cm</label>
-            <input type="range" id="bath-left" min="480" max="650" value="569" step="1">
+            <label>Levý okraj od Z: <strong id="bath-left-val">555</strong> cm</label>
+            <input type="range" id="bath-left" min="466" max="636" value="555" step="1">
             <label>Šířka V–Z: <strong id="bath-w-val">125</strong> cm</label>
-            <input type="range" id="bath-w" min="110" max="180" value="125" step="1">
+            <input type="range" id="bath-w" min="110" max="400" value="125" step="1">
             <label>Hloubka S–J: <strong id="bath-d-val">230</strong> cm</label>
             <input type="range" id="bath-d" min="180" max="260" value="230" step="1">
             <p class="hint" id="bath-clear-hint">Světlá šířka: 100 cm</p>
@@ -267,8 +267,8 @@
           </section>
           <section>
             <h3>TV příčka</h3>
-            <label>Levý líc od Z: <strong id="tv-x-val">324</strong> cm</label>
-            <input type="range" id="tv-x" min="280" max="420" value="324" step="1">
+            <label>Levý líc od Z: <strong id="tv-x-val">310</strong> cm</label>
+            <input type="range" id="tv-x" min="266" max="406" value="310" step="1">
             <label>Délka na jih: <strong id="tv-len-val">140</strong> cm</label>
             <input type="range" id="tv-len" min="100" max="180" value="140" step="1">
             <label>Náhled TV</label>
@@ -354,15 +354,24 @@
 
 <script>
 (() => {
-  const WALL = 5 + 1.8 + 12 + 4 + 1.12; // 23.92
+  /** Skutečná tloušťka obvodu (legenda); kreslí se tenčí — ne v měřítku. */
+  const WALL_REAL = 5 + 1.8 + 12 + 4 + 1.12; // 23.92
+  const WALL = 10; // vizuální tloušťka stěny v půdorysu
+  const OUTER_SHIFT = WALL_REAL - WALL; // posun starých kót od tlustého vnějšku
   const PART = 12.5;
-  /** 906×333 = světlost (od SDK k SDK). Vnější = světlost + 2× stěna. */
+  /** 906×333 = světlost (od SDK k SDK). Vnější rám = světlost + 2× vizuální stěna. */
   const CLEAR = { w: 906, h: 333 };
   const OUTER = { w: CLEAR.w + 2 * WALL, h: CLEAR.h + 2 * WALL };
   const INNER = { x: WALL, y: WALL, w: CLEAR.w, h: CLEAR.h };
   const BED_LEN = 200; // delší strana S–J
   const MIN_BED_PASS = 60; // visual safe gap bath↔bed (západní hrana postele)
   const PASS_TARGET = 105;
+  const BATH_W_MIN = 110;
+  const BATH_W_MAX = 400; // teoretický strop šířky koupelny
+  /** Starší kóty byly od vnějšího Z při WALL_REAL — přepočet na vizuální vnějšek. */
+  function fromOldOuterX(x) {
+    return x - OUTER_SHIFT;
+  }
 
   const NORTH_SEGS = [
     { t: "wall", l: 220 }, { t: "win", l: 96.5 }, { t: "wall", l: 120 },
@@ -386,15 +395,20 @@
 
   const TV_WIDTHS = { 50: 112, 55: 123, 65: 145 };
 
-  /** Severní okna v souřadnicích od vnějšího Z (stejně jako bathLeft / tvX). */
+  /** Severní okna v souřadnicích od vizuálního vnějšího Z (stejně jako bathLeft / tvX). */
   function northWindows() {
-    let c = 0;
+    let c = -OUTER_SHIFT;
     const wins = [];
     for (const s of NORTH_SEGS) {
       if (s.t === "win") wins.push({ x0: c, x1: c + s.l });
       c += s.l;
     }
     return wins;
+  }
+
+  function clampBathW(w, left = state.bathLeft) {
+    const cap = Math.max(BATH_W_MIN, Math.min(BATH_W_MAX, INNER.x + INNER.w - left));
+    return Math.min(cap, Math.max(BATH_W_MIN, w));
   }
 
   /**
@@ -413,14 +427,14 @@
     return nx;
   }
 
-  const STORAGE_KEY = "chata-kamyk-planner-variants-v2";
+  const STORAGE_KEY = "chata-kamyk-planner-variants-v3";
 
   const state = {
     tab: "cabin",
-    bathLeft: 569,
+    bathLeft: fromOldOuterX(569),
     bathW: 125,
     bathD: 230,
-    tvX: 324,
+    tvX: fromOldOuterX(324),
     tvLen: 140,
     bedVariant: 160,
     tvVariant: 55,
@@ -478,7 +492,7 @@
   }
   function kitchenBox() {
     const y1 = INNER.y + INNER.h - 60;
-    return { x: 313, y: y1, w: 160, d: 60 };
+    return { x: fromOldOuterX(313), y: y1, w: 160, d: 60 };
   }
   function sofaPolylines() {
     const x0 = INNER.x, y0 = INNER.y;
@@ -524,12 +538,12 @@
   }
 
   /** WC je fixní v absolutních souřadnicích (příčky se hýbou kolem něj).
-   *  Výchozí návrh: osa 65 cm od vnitřního líce západní příčky při bathLeft=569. */
+   *  Výchozí návrh: osa 65 cm od vnitřního líce západní příčky při bathLeft≈555. */
   const WC_FIXED = (() => {
     const w = 37, d = 63;
     const axisFromWestInner = 65;
-    const defaultBathLeft = 569;
-    const x = defaultBathLeft + PART + axisFromWestInner - w / 2; // 628
+    const defaultBathLeft = fromOldOuterX(569);
+    const x = defaultBathLeft + PART + axisFromWestInner - w / 2;
     const y = INNER.y; // severní vnitřní líc
     return { x, y, w, d };
   })();
@@ -664,18 +678,18 @@
   function drawCabinShell(g) {
     g.appendChild(el("rect", {
       x: 0, y: 0, width: OUTER.w, height: OUTER.h,
-      fill: "#fff", stroke: "var(--wall)", "stroke-width": 2,
+      fill: "#fff", stroke: "var(--wall)", "stroke-width": 1.5,
     }));
     g.appendChild(el("path", {
       d: `M0,0 H${OUTER.w} V${OUTER.h} H0 Z M${INNER.x},${INNER.y} V${INNER.y + INNER.h} H${INNER.x + INNER.w} V${INNER.y} Z`,
-      fill: "#2a2e32", "fill-rule": "evenodd",
+      fill: "#6e6e6e", "fill-rule": "evenodd",
     }));
   }
 
   function drawOpenings(g, side, segs) {
-    // N/S kóty (313, 307, 569…) jsou od vnějšího Z okraje; segmenty ≈ světlost 906.
+    // N/S segmenty jsou kóty od starého (tlustého) vnějšku → posun o -OUTER_SHIFT.
     // W/E segmenty jdou podél světlé výšky od vnitřního severu.
-    let cursor = (side === "west" || side === "east") ? INNER.y : 0;
+    let cursor = (side === "west" || side === "east") ? INNER.y : -OUTER_SHIFT;
     for (const seg of segs) {
       if (seg.t === "win" || seg.t === "door") {
         let x, y, w, h;
@@ -993,7 +1007,7 @@
     });
     const g = el("g", { id: "plan-root" });
     g.appendChild(el("rect", {
-      x: o.x - 30, y: o.y - WALL, width: o.w + 60, height: WALL, fill: "#2a2e32",
+      x: o.x - 30, y: o.y - WALL, width: o.w + 60, height: WALL, fill: "#6e6e6e",
     }));
     drawBathroomMass(g, { interactive: false });
     drawBathFixtures(g, { detail: true });
@@ -1094,7 +1108,7 @@
     if (legend) {
       const bi = bathInner();
       legend.innerHTML = state.tab === "cabin"
-        ? `Světlost chaty: <strong>${CLEAR.w} × ${CLEAR.h} cm</strong> (od SDK)<br>Obvodová stěna: <strong>23,92 cm</strong> · SDK příčky: <strong>12,5 cm</strong>`
+        ? `Světlost chaty: <strong>${CLEAR.w} × ${CLEAR.h} cm</strong> (od SDK)<br>Obvodová stěna: <strong>${String(WALL_REAL).replace(".", ",")} cm</strong> (v půdorysu zjednodušeně) · SDK příčky: <strong>12,5 cm</strong>`
         : `Koupelna světlá: <strong>${round1(bi.w)} × ${round1(bi.d)} cm</strong><br>WC fixní · příčky z tabu Půdorys`;
     }
   }
@@ -1121,20 +1135,19 @@
     if (d.type === "bath-east") {
       const prevEast = d.bathLeft + d.bathW - PART;
       let east = clampOffNorthWindows(prevEast + dx, prevEast);
-      state.bathW = Math.min(180, Math.max(110, east + PART - d.bathLeft));
+      state.bathW = clampBathW(east + PART - d.bathLeft, d.bathLeft);
     } else if (d.type === "bath-west") {
       const right = d.bathLeft + d.bathW;
-      let newLeft = Math.min(650, Math.max(480, d.bathLeft + dx));
+      let newLeft = Math.min(fromOldOuterX(650), Math.max(fromOldOuterX(480), d.bathLeft + dx));
       newLeft = clampOffNorthWindows(newLeft, d.bathLeft);
       state.bathLeft = newLeft;
-      state.bathW = Math.min(180, Math.max(110, right - newLeft));
-      // východní líc taky nesmí vjet do okna
+      state.bathW = clampBathW(right - newLeft, newLeft);
       const east = clampOffNorthWindows(state.bathLeft + state.bathW - PART, state.bathLeft + state.bathW - PART);
-      state.bathW = Math.min(180, Math.max(110, east + PART - state.bathLeft));
+      state.bathW = clampBathW(east + PART - state.bathLeft, state.bathLeft);
     } else if (d.type === "bath-south") {
       state.bathD = Math.min(260, Math.max(180, d.bathD + dy));
     } else if (d.type === "tv-x") {
-      let nx = Math.min(420, Math.max(280, d.tvX + dx));
+      let nx = Math.min(fromOldOuterX(420), Math.max(fromOldOuterX(280), d.tvX + dx));
       state.tvX = clampOffNorthWindows(nx, d.tvX);
     } else if (d.type === "tv-len") {
       state.tvLen = Math.min(180, Math.max(100, d.tvLen + dy));
@@ -1269,7 +1282,7 @@
         input.value = String(Math.round(v));
       } else if (key === "bathW") {
         const east = clampOffNorthWindows(state.bathLeft + v - PART, state.bathLeft + state.bathW - PART);
-        v = Math.min(180, Math.max(110, east + PART - state.bathLeft));
+        v = clampBathW(east + PART - state.bathLeft);
         input.value = String(Math.round(v));
       }
       state[key] = v;
