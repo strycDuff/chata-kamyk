@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>Plánovač půdorysu · Chata Kamyk</title>
 <link rel="stylesheet" href="../assets/site.css">
 <style>
@@ -141,12 +142,47 @@
     color: var(--muted);
     font-size: 0.85rem;
   }
-  .side section {
+  .side section,
+  .side details.side-block {
     border: 1px solid var(--line);
-    border-radius: 4px;
-    padding: 10px 12px;
+    border-radius: 6px;
     margin-bottom: 10px;
     background: #fbfcfd;
+    overflow: hidden;
+  }
+  .side section { padding: 10px 12px; }
+  .side details.side-block + details.side-block { margin-top: 0; }
+  .side details.side-block summary {
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    font-size: 0.92rem;
+    font-weight: 650;
+    color: var(--ink);
+    background: #eef2f5;
+    border-bottom: 1px solid transparent;
+  }
+  .side details.side-block[open] summary {
+    border-bottom-color: var(--line);
+    background: #e8eef3;
+  }
+  .side details.side-block summary::-webkit-details-marker { display: none; }
+  .side details.side-block summary::after {
+    content: "▸";
+    color: var(--muted);
+    font-size: 0.75rem;
+    transition: transform 0.15s ease;
+  }
+  .side details.side-block[open] summary::after {
+    transform: rotate(90deg);
+  }
+  .side details.side-block .side-block-body {
+    padding: 8px 12px 12px;
   }
   .side h3 {
     margin: 0 0 8px;
@@ -258,116 +294,129 @@
         <div class="status ok" id="status">—</div>
 
         <div id="panel-cabin">
-          <section>
-            <h3>Koupelna (vnější)</h3>
-            <label>Levý okraj od vnitřního Z: <strong id="bath-left-val">569</strong> cm</label>
-            <input type="range" id="bath-left" min="480" max="650" value="569" step="1">
-            <label>Šířka V–Z: <strong id="bath-w-val">125</strong> cm</label>
-            <input type="range" id="bath-w" min="110" max="400" value="125" step="1">
-            <label>Hloubka S–J: <strong id="bath-d-val">230</strong> cm</label>
-            <input type="range" id="bath-d" min="180" max="260" value="230" step="1">
-            <p class="hint" id="bath-clear-hint">Světlá šířka: 100 cm</p>
-            <button type="button" class="btn" id="btn-bath-reset" style="margin-top:8px;width:100%">Reset koupelny na výchozí</button>
-          </section>
-          <section>
-            <h3>Kuchyňská linka</h3>
-            <label>Levý okraj od vnitřního Z: <strong id="kitchen-left-val">313</strong> cm</label>
-            <input type="range" id="kitchen-left" min="307" max="806" value="313" step="1">
-            <label>Délka V–Z: <strong id="kitchen-len-val">160</strong> cm</label>
-            <input type="range" id="kitchen-len" min="100" max="280" value="160" step="1">
-            <p class="hint">Hloubka od jihu: 60 cm · hard stop u vstupních dveří</p>
-          </section>
-          <section>
-            <h3>Postel (u východní stěny)</h3>
-            <div class="row seg" id="bed-variant">
-              <button type="button" data-v="160" class="active">160 cm</button>
-              <button type="button" data-v="140">140 cm</button>
+          <details class="side-block" open>
+            <summary>Koupelna</summary>
+            <div class="side-block-body">
+              <label>Levý okraj od vnitřního Z: <strong id="bath-left-val">569</strong> cm</label>
+              <input type="range" id="bath-left" min="480" max="650" value="569" step="1">
+              <label>Šířka V–Z: <strong id="bath-w-val">125</strong> cm</label>
+              <input type="range" id="bath-w" min="110" max="400" value="125" step="1">
+              <label>Hloubka S–J: <strong id="bath-d-val">230</strong> cm</label>
+              <input type="range" id="bath-d" min="180" max="260" value="230" step="1">
+              <p class="hint" id="bath-clear-hint">Světlá šířka: 100 cm</p>
+              <button type="button" class="btn" id="btn-bath-reset" style="margin-top:8px;width:100%">Reset koupelny na výchozí</button>
             </div>
-            <p class="hint" id="bed-hint">—</p>
-          </section>
-          <section>
-            <h3>TV příčka</h3>
-            <label>Levý líc od vnitřního Z: <strong id="tv-x-val">324</strong> cm</label>
-            <input type="range" id="tv-x" min="280" max="420" value="324" step="1">
-            <label>Délka na jih: <strong id="tv-len-val">140</strong> cm</label>
-            <input type="range" id="tv-len" min="100" max="180" value="140" step="1">
-            <label>Náhled TV</label>
-            <div class="row seg" id="tv-variant">
-              <button type="button" data-v="50">50"</button>
-              <button type="button" data-v="55" class="active">55"</button>
-              <button type="button" data-v="65">65"</button>
+          </details>
+          <details class="side-block" open>
+            <summary>Kuchyň</summary>
+            <div class="side-block-body">
+              <label>Levý okraj od vnitřního Z: <strong id="kitchen-left-val">313</strong> cm</label>
+              <input type="range" id="kitchen-left" min="307" max="806" value="313" step="1">
+              <label>Délka V–Z: <strong id="kitchen-len-val">160</strong> cm</label>
+              <input type="range" id="kitchen-len" min="100" max="280" value="160" step="1">
+              <p class="hint">Hloubka od jihu: 60 cm · hard stop u vstupních dveří</p>
+              <p class="hint" id="pass-hint">PR linky → JL koupelny</p>
             </div>
-            <p class="hint" id="tv-hint">—</p>
-          </section>
-          <section>
-            <h3>Průchod kuchyň ↔ koupelna</h3>
-            <p class="hint" id="pass-hint">PR linky → JL koupelny</p>
-          </section>
+          </details>
+          <details class="side-block">
+            <summary>Postel</summary>
+            <div class="side-block-body">
+              <div class="row seg" id="bed-variant">
+                <button type="button" data-v="160" class="active">160 cm</button>
+                <button type="button" data-v="140">140 cm</button>
+              </div>
+              <p class="hint" id="bed-hint">—</p>
+            </div>
+          </details>
+          <details class="side-block">
+            <summary>TV příčka</summary>
+            <div class="side-block-body">
+              <label>Levý líc od vnitřního Z: <strong id="tv-x-val">324</strong> cm</label>
+              <input type="range" id="tv-x" min="280" max="420" value="324" step="1">
+              <label>Délka na jih: <strong id="tv-len-val">140</strong> cm</label>
+              <input type="range" id="tv-len" min="100" max="180" value="140" step="1">
+              <label>Náhled TV</label>
+              <div class="row seg" id="tv-variant">
+                <button type="button" data-v="50">50"</button>
+                <button type="button" data-v="55" class="active">55"</button>
+                <button type="button" data-v="65">65"</button>
+              </div>
+              <p class="hint" id="tv-hint">—</p>
+            </div>
+          </details>
         </div>
 
         <div id="panel-bath" hidden>
-          <section>
-            <h3>Dveře</h3>
-            <label>Šířka</label>
-            <div class="row seg" id="door-width">
-              <button type="button" data-v="60">60</button>
-              <button type="button" data-v="70" class="active">70</button>
-              <button type="button" data-v="80">80</button>
-            </div>
-            <label>Odstup od severu: <strong id="door-offset-val">90</strong> cm</label>
-            <input type="range" id="door-offset" min="65" max="140" value="90" step="1">
-            <label>Typ</label>
-            <div class="row seg" id="door-type">
-              <button type="button" data-v="A" class="active">A · zvenku → jih</button>
-              <button type="button" data-v="B">B · pouzdro</button>
-            </div>
-            <div id="pocket-dir-wrap" hidden>
-              <label>Směr pouzdra</label>
-              <div class="row seg" id="pocket-dir">
-                <button type="button" data-v="north">Sever</button>
-                <button type="button" data-v="south" class="active">Jih</button>
+          <details class="side-block" open>
+            <summary>Dveře</summary>
+            <div class="side-block-body">
+              <label>Šířka</label>
+              <div class="row seg" id="door-width">
+                <button type="button" data-v="60">60</button>
+                <button type="button" data-v="70" class="active">70</button>
+                <button type="button" data-v="80">80</button>
+              </div>
+              <label>Odstup od severu: <strong id="door-offset-val">90</strong> cm</label>
+              <input type="range" id="door-offset" min="65" max="140" value="90" step="1">
+              <label>Typ</label>
+              <div class="row seg" id="door-type">
+                <button type="button" data-v="A" class="active">A · zvenku → jih</button>
+                <button type="button" data-v="B">B · pouzdro</button>
+              </div>
+              <div id="pocket-dir-wrap" hidden>
+                <label>Směr pouzdra</label>
+                <div class="row seg" id="pocket-dir">
+                  <button type="button" data-v="north">Sever</button>
+                  <button type="button" data-v="south" class="active">Jih</button>
+                </div>
               </div>
             </div>
-          </section>
-          <section>
-            <h3>Sprcha</h3>
-            <div class="row seg" id="shower-preset">
-              <button type="button" data-v="80x80">80×80</button>
-              <button type="button" data-v="90x90">90×90</button>
-              <button type="button" data-v="100x80" class="active">100×80</button>
-              <button type="button" data-v="120x80">120×80</button>
-              <button type="button" data-v="full">Plná šířka</button>
-            </div>
-            <label><input type="checkbox" id="shower-rotate"> Otočit 90°</label>
-            <div id="full-depth-wrap" hidden>
-              <label>Hloubka plné šířky</label>
-              <div class="row seg" id="shower-full-depth">
-                <button type="button" data-v="70">70</button>
-                <button type="button" data-v="80" class="active">80</button>
-                <button type="button" data-v="90">90</button>
+          </details>
+          <details class="side-block" open>
+            <summary>Sprcha</summary>
+            <div class="side-block-body">
+              <div class="row seg" id="shower-preset">
+                <button type="button" data-v="80x80">80×80</button>
+                <button type="button" data-v="90x90">90×90</button>
+                <button type="button" data-v="100x80" class="active">100×80</button>
+                <button type="button" data-v="120x80">120×80</button>
+                <button type="button" data-v="full">Plná šířka</button>
+              </div>
+              <label><input type="checkbox" id="shower-rotate"> Otočit 90°</label>
+              <div id="full-depth-wrap" hidden>
+                <label>Hloubka plné šířky</label>
+                <div class="row seg" id="shower-full-depth">
+                  <button type="button" data-v="70">70</button>
+                  <button type="button" data-v="80" class="active">80</button>
+                  <button type="button" data-v="90">90</button>
+                </div>
               </div>
             </div>
-          </section>
-          <section>
-            <h3>Umyvadlo (malé)</h3>
-            <label>Šířka: <strong id="sink-w-val">40</strong> cm</label>
-            <input type="range" id="sink-w" min="30" max="50" value="40" step="1">
-            <label>Hloubka: <strong id="sink-d-val">30</strong> cm</label>
-            <input type="range" id="sink-d" min="25" max="40" value="30" step="1">
-            <label>Odstup od severu: <strong id="sink-off-val">70</strong> cm</label>
-            <input type="range" id="sink-offset" min="0" max="180" value="70" step="1">
-          </section>
+          </details>
+          <details class="side-block">
+            <summary>Umyvadlo</summary>
+            <div class="side-block-body">
+              <label>Šířka: <strong id="sink-w-val">40</strong> cm</label>
+              <input type="range" id="sink-w" min="30" max="50" value="40" step="1">
+              <label>Hloubka: <strong id="sink-d-val">30</strong> cm</label>
+              <input type="range" id="sink-d" min="25" max="40" value="30" step="1">
+              <label>Odstup od severu: <strong id="sink-off-val">70</strong> cm</label>
+              <input type="range" id="sink-offset" min="0" max="180" value="70" step="1">
+            </div>
+          </details>
         </div>
 
-        <section>
-          <h3>Varianty (lokálně)</h3>
-          <label>Název</label>
-          <input type="text" id="variant-name" placeholder="např. Postel 140 + koupelna širší">
-          <div class="row" style="margin-top:8px">
-            <button type="button" class="btn" id="btn-save-variant">Uložit</button>
+        <details class="side-block">
+          <summary>Varianty</summary>
+          <div class="side-block-body">
+            <label>Název</label>
+            <input type="text" id="variant-name" placeholder="např. Postel 140 + koupelna širší">
+            <div class="row" style="margin-top:8px">
+              <button type="button" class="btn" id="btn-save-variant">Uložit</button>
+            </div>
+            <ul class="variant-list" id="variant-list"></ul>
           </div>
-          <ul class="variant-list" id="variant-list"></ul>
-        </section>
+        </details>
       </aside>
     </div>
   </div>
