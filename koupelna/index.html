@@ -543,13 +543,22 @@
           </div>
 
           <div id="elec-plan-tools">
-            <p class="hint">Umísti body do složek okruhů. + Bod = jeden kus, pak dorovnej dragem.</p>
-            <label>Okruh</label>
-            <div class="row seg" id="elec-circuit">
-              <button type="button" data-v="data">Datové</button>
-              <button type="button" data-v="lights">Světla</button>
-              <button type="button" data-v="sockets" class="active">Zásuvky</button>
+            <p class="hint">Nejdřív vytvoř <strong>okruh</strong> (složku), pak do něj dávej body. + Bod = jeden kus → dorovnej dragem.</p>
+            <button type="button" class="btn" id="btn-elec-new-circuit" style="width:100%;margin-bottom:8px">+ Nový okruh</button>
+            <div id="elec-new-circuit-form" hidden style="border:1px solid var(--line);border-radius:4px;padding:8px;margin-bottom:8px;background:#fff">
+              <label>Typ okruhu</label>
+              <div class="row seg" id="elec-new-kind">
+                <button type="button" data-v="data">Datové</button>
+                <button type="button" data-v="lights">Světla</button>
+                <button type="button" data-v="sockets" class="active">Zásuvky</button>
+              </div>
+              <label>Název okruhu</label>
+              <input type="text" id="elec-new-name" placeholder="např. Ložnice" value="Ložnice">
+              <label>Místnost (volitelné)</label>
+              <input type="text" id="elec-new-room" placeholder="např. Ložnice / Koupelna">
+              <button type="button" class="btn" id="btn-elec-create-circuit" style="width:100%;margin-top:8px">Vytvořit okruh</button>
             </div>
+            <p class="hint" id="elec-active-hint"></p>
             <label>Typ bodu</label>
             <div class="row seg" id="elec-type">
               <button type="button" data-v="socket" class="active">Zásuvka</button>
@@ -559,13 +568,14 @@
             </div>
             <label>Výška bodu: <strong id="elec-h-val">30</strong> cm</label>
             <input type="range" id="elec-h" min="10" max="220" value="30" step="1">
-            <button type="button" class="btn" id="btn-elec-point" style="width:100%;margin:8px 0">+ Bod</button>
+            <button type="button" class="btn" id="btn-elec-point" style="width:100%;margin:8px 0">+ Bod do aktivního okruhu</button>
             <p class="hint" id="elec-mode-hint"></p>
             <div id="elec-list"></div>
           </div>
 
           <div id="elec-elev-tools" hidden>
-            <p class="hint">Body z půdorysu u stěny. Trasy kabelů kresli zde (3 typy).</p>
+            <p class="hint">Aktivní okruh určuje výchozí kabel. Trasy: ortogonální snap (pravé úhly), náhled k kurzoru + výška.</p>
+            <p class="hint" id="elec-active-hint-elev"></p>
             <label>Stěna</label>
             <div class="row seg" id="elev-wall">
               <button type="button" data-v="north" class="active">Sever</button>
@@ -573,7 +583,7 @@
               <button type="button" data-v="west">Západ</button>
               <button type="button" data-v="east">Východ</button>
             </div>
-            <label>Filtr okruhů</label>
+            <label>Filtr typů okruhů</label>
             <div class="elec-filters">
               <label class="chk"><input type="checkbox" id="filt-data" checked> Datové</label>
               <label class="chk"><input type="checkbox" id="filt-lights" checked> Světla</label>
@@ -585,8 +595,9 @@
               <button type="button" data-v="cyky15">CYKY 1,5</button>
               <button type="button" data-v="cyky25" class="active">CYKY 2,5</button>
             </div>
+            <label class="chk" style="margin:6px 0"><input type="checkbox" id="elec-ortho" checked> Ortogonální snap (pravé úhly / stejná výška)</label>
             <div class="row" style="margin:8px 0">
-              <button type="button" class="btn" id="btn-elec-run">+ Trasa</button>
+              <button type="button" class="btn" id="btn-elec-run">+ Trasa v aktivním okruhu</button>
               <button type="button" class="btn" id="btn-elec-run-finish" hidden>Ukončit</button>
             </div>
             <p class="hint" id="elec-elev-hint"></p>
@@ -634,7 +645,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.4.0";
+  const APP_VERSION = "3.5.0";
   const APP_BUILD = 28;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -733,19 +744,19 @@
     return nx;
   }
 
-  const STORAGE_KEY = "chata-kamyk-planner-variants-v8";
+  const STORAGE_KEY = "chata-kamyk-planner-variants-v9";
   const FURN_MIN = 20;
   const ELEC_TYPES = ["socket", "switch", "light", "panel"];
   const ELEC_LABELS = { socket: "Zásuvka", switch: "Vypínač", light: "Světlo", panel: "Rozvaděč" };
   const ELEC_DEFAULT_H = { socket: 30, switch: 120, light: 210, panel: 150 };
   const ELEC_COLORS = { socket: "#2980b9", switch: "#8e44ad", light: "#f39c12", panel: "#c0392b" };
-  const ELEC_CIRCUITS = ["data", "lights", "sockets"];
-  const ELEC_CIRCUIT_LABELS = { data: "Datové", lights: "Světla", sockets: "Zásuvky" };
-  const TYPE_TO_CIRCUIT = { socket: "sockets", switch: "lights", light: "lights", panel: "sockets" };
+  const ELEC_KINDS = ["data", "lights", "sockets"];
+  const ELEC_KIND_LABELS = { data: "Datové", lights: "Světla", sockets: "Zásuvky" };
+  const KIND_TO_CABLE = { data: "slaboproud", lights: "cyky15", sockets: "cyky25" };
+  const KIND_TO_POINT = { data: "panel", lights: "switch", sockets: "socket" };
   const CABLE_TYPES = ["slaboproud", "cyky15", "cyky25"];
   const CABLE_LABELS = { slaboproud: "Slaboproud", cyky15: "CYKY 1,5", cyky25: "CYKY 2,5" };
   const CABLE_COLORS = { slaboproud: "#8e44ad", cyky15: "#f39c12", cyky25: "#2980b9" };
-  const CABLE_TO_CIRCUIT = { slaboproud: "data", cyky15: "lights", cyky25: "sockets" };
   const ELEC_WALL_PROX = 45;
 
   const state = {
@@ -791,18 +802,22 @@
     doorOpeningH: 200,
     doorLeafH: 190,
     elecStep: "plan", // plan | elev
-    elecCircuit: "sockets",
+    elecCircuits: [], // { id, name, kind, room }
+    elecActiveCircuitId: null,
+    elecNewKind: "sockets",
     elecFilter: { data: true, lights: true, sockets: true },
     elecCableType: "cyky25",
+    elecOrtho: true,
+    elecCursor: null, // elev preview { along, h }
     elecPoints: [],
-    elecRuns: [], // legacy plan polylines (optional)
-    elecElevRuns: [], // { id, wall, cableType, circuit, name, points: [{along,h}] }
+    elecRuns: [], // legacy
+    elecElevRuns: [], // { id, wall, cableType, circuitId, name, points: [{along,h}] }
     elecSelectedId: null,
-    elecSelectedKind: null, // "point" | "run" | "elev-run"
+    elecSelectedKind: null, // "point" | "run" | "elev-run" | "circuit"
     elecMode: null, // null | "point" | "run"
     elecType: "socket",
     elecH: 30,
-    elecRunDraft: null, // plan: [{x,y}] | elev: [{along,h}]
+    elecRunDraft: null, // elev: [{along,h}]
   };
 
   let furnIdSeq = 1;
@@ -916,21 +931,54 @@
     return state.elecPoints.find((p) => p.id === id);
   }
 
-  function findElecRun(id) {
-    return state.elecRuns.find((r) => r.id === id);
+  function findElecCircuit(id) {
+    return state.elecCircuits.find((c) => c.id === id);
   }
 
   function findElecElevRun(id) {
     return state.elecElevRuns.find((r) => r.id === id);
   }
 
+  function activeCircuit() {
+    return findElecCircuit(state.elecActiveCircuitId) || null;
+  }
+
   function elecAbs(pt) {
     return { x: absX(pt.x), y: INNER.y + pt.y };
   }
 
-  function circuitVisible(circuit) {
+  function kindVisible(kind) {
     if (!(state.tab === "electro" && state.elecStep === "elev")) return true;
-    return !!state.elecFilter[circuit];
+    return !!state.elecFilter[kind];
+  }
+
+  function pointKind(pt) {
+    const c = findElecCircuit(pt.circuitId);
+    return c?.kind || "sockets";
+  }
+
+  function circuitLabel(c) {
+    if (!c) return "—";
+    const room = c.room ? ` · ${c.room}` : "";
+    return `${ELEC_KIND_LABELS[c.kind]} / ${c.name}${room}`;
+  }
+
+  function createElecCircuit({ kind, name, room }) {
+    ensureElectroVisible();
+    const k = ELEC_KINDS.includes(kind) ? kind : "sockets";
+    const c = {
+      id: newElecId("c"),
+      kind: k,
+      name: (name && String(name).trim()) || "Okruh",
+      room: (room && String(room).trim()) || "",
+    };
+    state.elecCircuits.push(c);
+    state.elecActiveCircuitId = c.id;
+    state.elecCableType = KIND_TO_CABLE[k];
+    state.elecType = KIND_TO_POINT[k];
+    state.elecH = ELEC_DEFAULT_H[state.elecType] ?? 30;
+    if (state.elecType === "light") state.elecH = state.roomClearH;
+    return c;
   }
 
   /** Bod na elevaci stěny: { along, h } nebo null. */
@@ -964,14 +1012,23 @@
     clampElecXY(pt);
   }
 
-  function addElecPoint({ type, x, y, h, name, circuit }) {
+  function orthoSnapElev(prev, along, h) {
+    if (!state.elecOrtho || !prev) return { along, h };
+    const da = Math.abs(along - prev.along);
+    const dh = Math.abs(h - prev.h);
+    if (da >= dh) return { along, h: prev.h };
+    return { along: prev.along, h };
+  }
+
+  function addElecPoint({ type, x, y, h, name, circuitId }) {
+    const circ = findElecCircuit(circuitId || state.elecActiveCircuitId);
+    if (!circ) return null;
     ensureElectroVisible();
-    const t = ELEC_TYPES.includes(type) ? type : "socket";
-    const circ = ELEC_CIRCUITS.includes(circuit) ? circuit : (TYPE_TO_CIRCUIT[t] || state.elecCircuit);
+    const t = ELEC_TYPES.includes(type) ? type : KIND_TO_POINT[circ.kind];
     const pt = clampElecXY({
       id: newElecId("e"),
       type: t,
-      circuit: circ,
+      circuitId: circ.id,
       x: x ?? 50,
       y: y ?? 50,
       h: h ?? ELEC_DEFAULT_H[t] ?? 30,
@@ -987,39 +1044,34 @@
     const draft = state.elecRunDraft;
     if (!draft || draft.length < 2) {
       state.elecRunDraft = null;
+      state.elecCursor = null;
+      return null;
+    }
+    const circ = activeCircuit();
+    if (!circ) {
+      state.elecRunDraft = null;
       return null;
     }
     ensureElectroVisible();
-    if (state.elecStep === "elev") {
-      const cable = CABLE_TYPES.includes(state.elecCableType) ? state.elecCableType : "cyky25";
-      const run = {
-        id: newElecId("er"),
-        wall: state.elevWall,
-        cableType: cable,
-        circuit: CABLE_TO_CIRCUIT[cable],
-        name: "",
-        points: draft.map((p) => ({
-          along: Math.min(elevWallMeta(state.elevWall).len, Math.max(0, p.along)),
-          h: Math.min(state.roomClearH, Math.max(0, p.h)),
-        })),
-      };
-      state.elecElevRuns.push(run);
-      state.elecSelectedId = run.id;
-      state.elecSelectedKind = "elev-run";
-    } else {
-      const run = {
-        id: newElecId("r"),
-        circuit: state.elecCircuit,
-        name: "",
-        points: draft.map((p) => clampElecXY({ x: p.x, y: p.y })),
-      };
-      state.elecRuns.push(run);
-      state.elecSelectedId = run.id;
-      state.elecSelectedKind = "run";
-    }
+    const cable = CABLE_TYPES.includes(state.elecCableType) ? state.elecCableType : KIND_TO_CABLE[circ.kind];
+    const run = {
+      id: newElecId("er"),
+      wall: state.elevWall,
+      cableType: cable,
+      circuitId: circ.id,
+      name: "",
+      points: draft.map((p) => ({
+        along: Math.min(elevWallMeta(state.elevWall).len, Math.max(0, p.along)),
+        h: Math.min(state.roomClearH, Math.max(0, p.h)),
+      })),
+    };
+    state.elecElevRuns.push(run);
+    state.elecSelectedId = run.id;
+    state.elecSelectedKind = "elev-run";
     state.elecRunDraft = null;
+    state.elecCursor = null;
     state.elecMode = null;
-    return true;
+    return run;
   }
   function dist(a, b) {
     return Math.hypot(b.x - a.x, b.y - a.y);
@@ -1997,22 +2049,8 @@
       g.appendChild(el("path", { d, fill: "none", ...attrs }));
     };
 
-    for (const run of state.elecRuns) {
-      if (run.circuit && !circuitVisible(run.circuit)) continue;
-      const sel = state.elecSelectedKind === "run" && run.id === state.elecSelectedId;
-      drawPoly(run.points, {
-        class: "elec-run",
-        "data-elec": run.id,
-        "data-elec-kind": "run",
-        stroke: sel ? "#1f4e6b" : "#e67e22",
-        "stroke-width": sel ? 2.8 : 2,
-        "stroke-dasharray": "7,4",
-        "pointer-events": editable ? "stroke" : "none",
-      });
-    }
-
     for (const pt of state.elecPoints) {
-      if (!circuitVisible(pt.circuit || TYPE_TO_CIRCUIT[pt.type] || "sockets")) continue;
+      if (!kindVisible(pointKind(pt))) continue;
       const a = elecAbs(pt);
       const color = ELEC_COLORS[pt.type] || "#2980b9";
       const sel = state.elecSelectedKind === "point" && pt.id === state.elecSelectedId;
@@ -2058,100 +2096,133 @@
     if (!root) return;
     root.innerHTML = "";
 
-    const addDel = (li, onDel) => {
-      const meta = document.createElement("div");
-      meta.className = "elec-row";
-      const del = document.createElement("button");
-      del.type = "button";
-      del.className = "btn";
-      del.textContent = "Smazat";
-      del.addEventListener("click", (e) => {
-        e.stopPropagation();
-        onDel();
-        render();
-      });
-      meta.appendChild(del);
-      li.appendChild(meta);
-    };
+    if (!state.elecCircuits.length) {
+      const p = document.createElement("p");
+      p.className = "hint";
+      p.textContent = "Zatím žádný okruh — vytvoř např. Zásuvky / Ložnice.";
+      root.appendChild(p);
+      return;
+    }
 
-    for (const circ of ELEC_CIRCUITS) {
-      const folder = document.createElement("details");
-      folder.className = "elec-folder";
-      folder.open = true;
-      const sum = document.createElement("summary");
-      const pts = state.elecPoints.filter((p) => (p.circuit || TYPE_TO_CIRCUIT[p.type]) === circ);
-      sum.textContent = `${ELEC_CIRCUIT_LABELS[circ]} (${pts.length})`;
-      folder.appendChild(sum);
-      const ul = document.createElement("ul");
-      ul.className = "elec-list";
-      pts.forEach((pt) => {
-        const li = document.createElement("li");
-        if (state.elecSelectedKind === "point" && pt.id === state.elecSelectedId) li.classList.add("selected");
-        const row1 = document.createElement("div");
-        row1.className = "elec-row";
-        const sel = document.createElement("select");
-        ELEC_TYPES.forEach((t) => {
-          const o = document.createElement("option");
-          o.value = t;
-          o.textContent = ELEC_LABELS[t];
-          if (t === pt.type) o.selected = true;
-          sel.appendChild(o);
+    for (const kind of ELEC_KINDS) {
+      const circuits = state.elecCircuits.filter((c) => c.kind === kind);
+      if (!circuits.length) continue;
+      const kindFolder = document.createElement("details");
+      kindFolder.className = "elec-folder";
+      kindFolder.open = true;
+      const kindSum = document.createElement("summary");
+      kindSum.textContent = `${ELEC_KIND_LABELS[kind]} (${circuits.length} okruhů)`;
+      kindFolder.appendChild(kindSum);
+
+      circuits.forEach((circ) => {
+        const folder = document.createElement("details");
+        folder.className = "elec-folder";
+        folder.open = circ.id === state.elecActiveCircuitId;
+        folder.style.margin = "6px 8px";
+        const sum = document.createElement("summary");
+        const pts = state.elecPoints.filter((p) => p.circuitId === circ.id);
+        const runs = state.elecElevRuns.filter((r) => r.circuitId === circ.id);
+        const active = circ.id === state.elecActiveCircuitId ? " ●" : "";
+        sum.textContent = `${circ.name}${circ.room ? ` (${circ.room})` : ""} · ${pts.length} bodů · ${runs.length} tras${active}`;
+        sum.addEventListener("click", () => {
+          state.elecActiveCircuitId = circ.id;
+          state.elecCableType = KIND_TO_CABLE[circ.kind];
+          state.elecType = KIND_TO_POINT[circ.kind];
+          state.elecH = ELEC_DEFAULT_H[state.elecType] ?? 30;
+          // re-render after details toggle so hints/seg buttons catch up
+          queueMicrotask(() => render());
         });
-        sel.addEventListener("click", (e) => e.stopPropagation());
-        sel.addEventListener("change", () => {
-          pt.type = sel.value;
+        folder.appendChild(sum);
+
+        const tools = document.createElement("div");
+        tools.className = "elec-row";
+        tools.style.padding = "0 8px 6px";
+        const actBtn = document.createElement("button");
+        actBtn.type = "button";
+        actBtn.className = "btn";
+        actBtn.textContent = circ.id === state.elecActiveCircuitId ? "Aktivní" : "Aktivovat";
+        actBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          state.elecActiveCircuitId = circ.id;
+          state.elecCableType = KIND_TO_CABLE[circ.kind];
+          state.elecType = KIND_TO_POINT[circ.kind];
+          state.elecH = ELEC_DEFAULT_H[state.elecType] ?? 30;
           render();
         });
-        const circSel = document.createElement("select");
-        ELEC_CIRCUITS.forEach((c) => {
-          const o = document.createElement("option");
-          o.value = c;
-          o.textContent = ELEC_CIRCUIT_LABELS[c];
-          if (c === (pt.circuit || circ)) o.selected = true;
-          circSel.appendChild(o);
-        });
-        circSel.addEventListener("click", (e) => e.stopPropagation());
-        circSel.addEventListener("change", () => {
-          pt.circuit = circSel.value;
-          render();
-        });
-        const hInp = document.createElement("input");
-        hInp.type = "number";
-        hInp.min = "10";
-        hInp.max = "220";
-        hInp.value = String(Math.round(pt.h));
-        hInp.addEventListener("click", (e) => e.stopPropagation());
-        hInp.addEventListener("change", () => {
-          pt.h = Math.min(220, Math.max(10, Number(hInp.value) || 30));
-          render();
-        });
-        const name = document.createElement("input");
-        name.type = "text";
-        name.placeholder = "popis";
-        name.value = pt.name || "";
-        name.addEventListener("click", (e) => e.stopPropagation());
-        name.addEventListener("change", () => {
-          pt.name = name.value.trim();
-          render();
-        });
-        row1.append(sel, circSel, hInp, document.createTextNode("cm"), name);
-        li.appendChild(row1);
-        addDel(li, () => {
-          state.elecPoints = state.elecPoints.filter((p) => p.id !== pt.id);
-          if (state.elecSelectedId === pt.id) {
-            state.elecSelectedId = null;
-            state.elecSelectedKind = null;
+        const delC = document.createElement("button");
+        delC.type = "button";
+        delC.className = "btn";
+        delC.textContent = "Smazat okruh";
+        delC.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (!confirm(`Smazat okruh „${circ.name}“ včetně bodů a tras?`)) return;
+          state.elecPoints = state.elecPoints.filter((p) => p.circuitId !== circ.id);
+          state.elecElevRuns = state.elecElevRuns.filter((r) => r.circuitId !== circ.id);
+          state.elecCircuits = state.elecCircuits.filter((c) => c.id !== circ.id);
+          if (state.elecActiveCircuitId === circ.id) {
+            state.elecActiveCircuitId = state.elecCircuits[0]?.id || null;
           }
-        });
-        li.addEventListener("click", () => {
-          state.elecSelectedId = pt.id;
-          state.elecSelectedKind = "point";
           render();
         });
-        ul.appendChild(li);
+        tools.append(actBtn, delC);
+        folder.appendChild(tools);
+
+        const ul = document.createElement("ul");
+        ul.className = "elec-list";
+        pts.forEach((pt) => {
+          const li = document.createElement("li");
+          if (state.elecSelectedKind === "point" && pt.id === state.elecSelectedId) li.classList.add("selected");
+          const row1 = document.createElement("div");
+          row1.className = "elec-row";
+          const sel = document.createElement("select");
+          ELEC_TYPES.forEach((t) => {
+            const o = document.createElement("option");
+            o.value = t;
+            o.textContent = ELEC_LABELS[t];
+            if (t === pt.type) o.selected = true;
+            sel.appendChild(o);
+          });
+          sel.addEventListener("click", (e) => e.stopPropagation());
+          sel.addEventListener("change", () => { pt.type = sel.value; render(); });
+          const hInp = document.createElement("input");
+          hInp.type = "number";
+          hInp.min = "10";
+          hInp.max = "220";
+          hInp.value = String(Math.round(pt.h));
+          hInp.addEventListener("click", (e) => e.stopPropagation());
+          hInp.addEventListener("change", () => {
+            pt.h = Math.min(220, Math.max(10, Number(hInp.value) || 30));
+            render();
+          });
+          const name = document.createElement("input");
+          name.type = "text";
+          name.placeholder = "popis";
+          name.value = pt.name || "";
+          name.addEventListener("click", (e) => e.stopPropagation());
+          name.addEventListener("change", () => { pt.name = name.value.trim(); render(); });
+          const del = document.createElement("button");
+          del.type = "button";
+          del.className = "btn";
+          del.textContent = "Smazat";
+          del.addEventListener("click", (e) => {
+            e.stopPropagation();
+            state.elecPoints = state.elecPoints.filter((p) => p.id !== pt.id);
+            render();
+          });
+          row1.append(sel, hInp, document.createTextNode("cm"), name, del);
+          li.appendChild(row1);
+          li.addEventListener("click", () => {
+            state.elecActiveCircuitId = circ.id;
+            state.elecSelectedId = pt.id;
+            state.elecSelectedKind = "point";
+            render();
+          });
+          ul.appendChild(li);
+        });
+        folder.appendChild(ul);
+        kindFolder.appendChild(folder);
       });
-      folder.appendChild(ul);
-      root.appendChild(folder);
+      root.appendChild(kindFolder);
     }
   }
 
@@ -2162,22 +2233,14 @@
     state.elecElevRuns
       .filter((r) => r.wall === state.elevWall)
       .forEach((run, idx) => {
-        if (!circuitVisible(run.circuit || CABLE_TO_CIRCUIT[run.cableType])) return;
+        const circ = findElecCircuit(run.circuitId);
+        if (circ && !kindVisible(circ.kind)) return;
         const li = document.createElement("li");
         if (state.elecSelectedKind === "elev-run" && run.id === state.elecSelectedId) li.classList.add("selected");
         const row = document.createElement("div");
         row.className = "elec-row";
         const lab = document.createElement("span");
-        lab.textContent = `${CABLE_LABELS[run.cableType] || run.cableType} · ${run.points.length} bodů`;
-        const name = document.createElement("input");
-        name.type = "text";
-        name.placeholder = `Trasa ${idx + 1}`;
-        name.value = run.name || "";
-        name.addEventListener("click", (e) => e.stopPropagation());
-        name.addEventListener("change", () => {
-          run.name = name.value.trim();
-          render();
-        });
+        lab.textContent = `${CABLE_LABELS[run.cableType] || run.cableType} · ${circ ? circ.name : "?"} · ${run.points.length}b`;
         const del = document.createElement("button");
         del.type = "button";
         del.className = "btn";
@@ -2187,11 +2250,12 @@
           state.elecElevRuns = state.elecElevRuns.filter((r) => r.id !== run.id);
           render();
         });
-        row.append(lab, name, del);
+        row.append(lab, del);
         li.appendChild(row);
         li.addEventListener("click", () => {
           state.elecSelectedId = run.id;
           state.elecSelectedKind = "elev-run";
+          if (run.circuitId) state.elecActiveCircuitId = run.circuitId;
           render();
         });
         ul.appendChild(li);
@@ -2204,41 +2268,65 @@
 
     for (const run of state.elecElevRuns) {
       if (run.wall !== wall) continue;
-      if (!circuitVisible(run.circuit || CABLE_TO_CIRCUIT[run.cableType])) continue;
+      const circ = findElecCircuit(run.circuitId);
+      if (circ && !kindVisible(circ.kind)) continue;
       const sel = state.elecSelectedKind === "elev-run" && run.id === state.elecSelectedId;
       const color = CABLE_COLORS[run.cableType] || "#e67e22";
-      const d = run.points.map((p, i) => {
-        const x = p.along;
-        const y = yFromFloor(p.h, roomH);
-        return `${i ? "L" : "M"}${x},${y}`;
-      }).join(" ");
+      const pts = run.points.map((p) => ({
+        x: p.along,
+        y: yFromFloor(p.h, roomH),
+      }));
+      const d = pts.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" ");
       g.appendChild(el("path", {
         class: "elec-run",
         "data-elec": run.id,
         "data-elec-kind": "elev-run",
         d, fill: "none",
         stroke: sel ? "#111" : color,
-        "stroke-width": sel ? 2.8 : 2.2,
-        "stroke-dasharray": run.cableType === "slaboproud" ? "2,3" : "8,4",
+        "stroke-width": sel ? 1.8 : 1.15,
+        "stroke-dasharray": run.cableType === "slaboproud" ? "2,2" : "5,3",
         "pointer-events": editable ? "stroke" : "none",
       }));
+      if (pts.length >= 2) {
+        const mid = pts[Math.floor(pts.length / 2)];
+        const t = el("text", {
+          x: mid.x + 4, y: mid.y - 4,
+          fill: color, "font-size": 7.5, "font-family": PLAN_FONT,
+          "pointer-events": "none",
+        });
+        const circName = circ ? circ.name : "";
+        t.textContent = `${CABLE_LABELS[run.cableType]}${circName ? ` · ${circName}` : ""}`;
+        g.appendChild(t);
+      }
     }
 
+    // draft + rubber-band preview
     if (state.elecRunDraft && state.elecStep === "elev" && state.elecRunDraft.length) {
       const color = CABLE_COLORS[state.elecCableType] || "#e67e22";
-      const d = state.elecRunDraft.map((p, i) => {
+      const draftPts = [...state.elecRunDraft];
+      if (state.elecCursor) draftPts.push(state.elecCursor);
+      const d = draftPts.map((p, i) => {
         const y = yFromFloor(p.h, roomH);
         return `${i ? "L" : "M"}${p.along},${y}`;
       }).join(" ");
       g.appendChild(el("path", {
-        d, fill: "none", stroke: color, "stroke-width": 2, "stroke-dasharray": "3,3",
+        d, fill: "none", stroke: color, "stroke-width": 1.1, "stroke-dasharray": "3,2",
         "pointer-events": "none",
       }));
+      const last = state.elecRunDraft[state.elecRunDraft.length - 1];
+      const tip = state.elecCursor || last;
+      const ht = el("text", {
+        x: tip.along + 6, y: yFromFloor(tip.h, roomH) - 6,
+        fill: color, "font-size": 8, "font-family": PLAN_FONT,
+        "pointer-events": "none",
+      });
+      const sameH = state.elecRunDraft.length && Math.abs(tip.h - last.h) < 0.5;
+      ht.textContent = `h=${Math.round(tip.h)} cm${sameH ? " · vodorovně" : ""}`;
+      g.appendChild(ht);
     }
 
     for (const pt of state.elecPoints) {
-      const circ = pt.circuit || TYPE_TO_CIRCUIT[pt.type] || "sockets";
-      if (!circuitVisible(circ)) continue;
+      if (!kindVisible(pointKind(pt))) continue;
       const on = elecPointOnWall(pt, wall);
       if (!on) continue;
       const color = ELEC_COLORS[pt.type] || "#2980b9";
@@ -2344,8 +2432,10 @@
       );
       if (hits && level === "ok") level = "warn";
     }
-    if (state.elecPoints.length || state.elecRuns.length) {
-      msgs.push(`Elektro: ${state.elecPoints.length} bodů · ${state.elecRuns.length} tras`);
+    if (state.elecCircuits.length || state.elecPoints.length || state.elecElevRuns.length) {
+      msgs.push(
+        `Elektro: ${state.elecCircuits.length} okruhů · ${state.elecPoints.length} bodů · ${state.elecElevRuns.length} tras`
+      );
     }
     elStatus.className = "status " + level;
     elStatus.innerHTML = msgs.join("<br>");
@@ -2432,20 +2522,29 @@
     if (finishBtn) {
       finishBtn.hidden = !(state.elecMode === "run" && state.elecRunDraft && state.elecRunDraft.length >= 2);
     }
+    const act = activeCircuit();
+    const actTxt = act ? `Aktivní okruh: ${circuitLabel(act)}` : "Nejdřív vytvoř a aktivuj okruh (+ Nový okruh).";
+    const ah = document.getElementById("elec-active-hint");
+    const ahe = document.getElementById("elec-active-hint-elev");
+    if (ah) ah.textContent = actTxt;
+    if (ahe) ahe.textContent = actTxt;
     const elecHint = document.getElementById("elec-mode-hint");
     if (elecHint) {
-      if (state.elecMode === "point") elecHint.textContent = "Klikni jednou do půdorysu — bod se umístí a můžeš ho dorovnat.";
-      else elecHint.textContent = `${state.elecPoints.length} bodů ve složkách Datové / Světla / Zásuvky.`;
+      if (!act) elecHint.textContent = "Bez aktivního okruhu nejde přidávat body.";
+      else if (state.elecMode === "point") elecHint.textContent = "Klikni jednou do půdorysu — bod do aktivního okruhu, pak dorovnej.";
+      else elecHint.textContent = `${state.elecCircuits.length} okruhů · ${state.elecPoints.length} bodů.`;
     }
     const elevHint = document.getElementById("elec-elev-hint");
     if (elevHint) {
-      if (state.elecMode === "run") {
+      if (!act) elevHint.textContent = "Vyber aktivní okruh na kroku 1.";
+      else if (state.elecMode === "run") {
         const n = state.elecRunDraft?.length || 0;
+        const ch = state.elecCursor ? ` · kurzor h=${Math.round(state.elecCursor.h)}` : "";
         elevHint.textContent = n
-          ? `Trasa ${CABLE_LABELS[state.elecCableType]}: ${n} bodů · další klik / Ukončit / dvojklik`
-          : `Klikni první bod trasy (${CABLE_LABELS[state.elecCableType]})…`;
+          ? `${CABLE_LABELS[state.elecCableType]}: ${n} bodů${ch} · ortho ${state.elecOrtho ? "zap" : "vyp"} · Ukončit / dvojklik`
+          : `První bod trasy (${CABLE_LABELS[state.elecCableType]}, okruh ${act.name})…`;
       } else {
-        elevHint.textContent = "Přetahuj body na stěně · + Trasa kreslí kabel.";
+        elevHint.textContent = "+ Trasa v aktivním okruhu · náhled k kurzoru · pravé úhly.";
       }
     }
     const elecHLab = document.getElementById("elec-h-val");
@@ -2457,8 +2556,8 @@
     document.querySelectorAll("#elec-type button").forEach((b) => {
       b.classList.toggle("active", b.dataset.v === state.elecType);
     });
-    document.querySelectorAll("#elec-circuit button").forEach((b) => {
-      b.classList.toggle("active", b.dataset.v === state.elecCircuit);
+    document.querySelectorAll("#elec-new-kind button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.v === state.elecNewKind);
     });
     document.querySelectorAll("#elec-step button").forEach((b) => {
       b.classList.toggle("active", b.dataset.v === state.elecStep);
@@ -2469,7 +2568,9 @@
     document.querySelectorAll("#elev-wall button").forEach((b) => {
       b.classList.toggle("active", b.dataset.v === state.elevWall);
     });
-    for (const c of ELEC_CIRCUITS) {
+    const orthoCb = document.getElementById("elec-ortho");
+    if (orthoCb) orthoCb.checked = !!state.elecOrtho;
+    for (const c of ELEC_KINDS) {
       const cb = document.getElementById(`filt-${c}`);
       if (cb) cb.checked = !!state.elecFilter[c];
     }
@@ -2631,21 +2732,28 @@
           return;
         }
         if (state.elecMode === "point") {
+          if (!activeCircuit()) {
+            alert("Nejdřív vytvoř a aktivuj okruh.");
+            state.elecMode = null;
+            render();
+            return;
+          }
           const cx = Math.min(CLEAR.w, Math.max(0, p.x - INNER.x));
           const cy = Math.min(CLEAR.h, Math.max(0, p.y - INNER.y));
-          addElecPoint({
+          const pt = addElecPoint({
             type: state.elecType,
-            circuit: state.elecCircuit,
             x: cx, y: cy, h: state.elecH,
           });
           state.elecMode = null;
-          state.drag = {
-            type: "elec-move",
-            elecId: state.elecSelectedId,
-            start: p,
-            origX: cx,
-            origY: cy,
-          };
+          if (pt) {
+            state.drag = {
+              type: "elec-move",
+              elecId: pt.id,
+              start: p,
+              origX: cx,
+              origY: cy,
+            };
+          }
           evt.preventDefault();
           render();
           return;
@@ -2663,6 +2771,7 @@
             const pt = findElecPoint(id);
             const on = pt && elecPointOnWall(pt, state.elevWall);
             if (pt && on) {
+              if (pt.circuitId) state.elecActiveCircuitId = pt.circuitId;
               state.drag = {
                 type: "elec-elev-move",
                 elecId: id,
@@ -2678,15 +2787,24 @@
           return;
         }
         if (state.elecMode === "run") {
-          const along = Math.min(elevWallMeta(state.elevWall).len, Math.max(0, p.x));
-          const h = Math.min(state.roomClearH, Math.max(0, state.roomClearH - p.y));
+          if (!activeCircuit()) {
+            alert("Nejdřív aktivuj okruh na kroku 1.");
+            state.elecMode = null;
+            render();
+            return;
+          }
+          let along = Math.min(elevWallMeta(state.elevWall).len, Math.max(0, p.x));
+          let h = Math.min(state.roomClearH, Math.max(0, state.roomClearH - p.y));
           if (!state.elecRunDraft) state.elecRunDraft = [];
+          const prev = state.elecRunDraft[state.elecRunDraft.length - 1];
+          ({ along, h } = orthoSnapElev(prev, along, h));
           if (evt.detail >= 2 && state.elecRunDraft.length >= 1) {
             state.elecRunDraft.push({ along, h });
             finishElecRunDraft();
           } else {
             state.elecRunDraft.push({ along, h });
           }
+          state.elecCursor = null;
           evt.preventDefault();
           render();
           return;
@@ -2744,6 +2862,21 @@
       }
       return;
     }
+    if (state.tab === "electro" && state.elecStep === "elev" && state.elecMode === "run") {
+      let along = Math.min(elevWallMeta(state.elevWall).len, Math.max(0, p.x));
+      let h = Math.min(state.roomClearH, Math.max(0, state.roomClearH - p.y));
+      const prev = state.elecRunDraft?.[state.elecRunDraft.length - 1];
+      ({ along, h } = orthoSnapElev(prev, along, h));
+      state.elecCursor = { along, h };
+      if (!hoverRaf) {
+        hoverRaf = requestAnimationFrame(() => {
+          hoverRaf = 0;
+          render();
+        });
+      }
+      return;
+    }
+    if (state.elecCursor) state.elecCursor = null;
     if (state.tab === "cabin" && !state.measureMode) {
       state.hoverCm = p;
       if (!hoverRaf) {
@@ -2942,9 +3075,10 @@
   bindSeg("elec-step", "elecStep", (v) => v, () => {
     state.elecMode = null;
     state.elecRunDraft = null;
+    state.elecCursor = null;
   });
-  bindSeg("elec-circuit", "elecCircuit");
   bindSeg("elec-cable", "elecCableType");
+  bindSeg("elec-new-kind", "elecNewKind");
 
   document.querySelectorAll("#tabs [data-tab]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -2958,6 +3092,7 @@
       state.furnDraw = null;
       state.elecMode = null;
       state.elecRunDraft = null;
+      state.elecCursor = null;
       state.drag = null;
       state.measureMode = false;
       document.getElementById("btn-measure")?.classList.remove("active");
@@ -2969,20 +3104,45 @@
     });
   });
 
+  document.getElementById("btn-elec-new-circuit").addEventListener("click", () => {
+    const form = document.getElementById("elec-new-circuit-form");
+    form.hidden = !form.hidden;
+  });
+  document.getElementById("btn-elec-create-circuit").addEventListener("click", () => {
+    createElecCircuit({
+      kind: state.elecNewKind,
+      name: document.getElementById("elec-new-name").value,
+      room: document.getElementById("elec-new-room").value,
+    });
+    document.getElementById("elec-new-circuit-form").hidden = true;
+    render();
+  });
   document.getElementById("btn-elec-point").addEventListener("click", () => {
     state.elecStep = "plan";
+    if (!activeCircuit()) {
+      alert("Nejdřív vytvoř okruh (+ Nový okruh).");
+      return;
+    }
     state.elecMode = state.elecMode === "point" ? null : "point";
     state.elecRunDraft = null;
     render();
   });
   document.getElementById("btn-elec-run").addEventListener("click", () => {
     state.elecStep = "elev";
+    if (!activeCircuit()) {
+      alert("Nejdřív aktivuj okruh na kroku 1.");
+      render();
+      return;
+    }
     if (state.elecMode === "run") {
       finishElecRunDraft();
       state.elecMode = null;
     } else {
       state.elecMode = "run";
       state.elecRunDraft = [];
+      state.elecCursor = null;
+      const act = activeCircuit();
+      if (act) state.elecCableType = KIND_TO_CABLE[act.kind];
     }
     render();
   });
@@ -2998,19 +3158,19 @@
     const btn = e.target.closest("button[data-v]");
     if (!btn) return;
     state.elecType = btn.dataset.v;
-    state.elecCircuit = TYPE_TO_CIRCUIT[state.elecType] || state.elecCircuit;
     state.elecH = ELEC_DEFAULT_H[state.elecType] ?? 30;
     if (state.elecType === "light") state.elecH = state.roomClearH;
     document.querySelectorAll("#elec-type button").forEach((b) => {
       b.classList.toggle("active", b === btn);
     });
-    document.querySelectorAll("#elec-circuit button").forEach((b) => {
-      b.classList.toggle("active", b.dataset.v === state.elecCircuit);
-    });
     document.getElementById("elec-h").value = String(Math.round(state.elecH));
     document.getElementById("elec-h-val").textContent = String(Math.round(state.elecH));
   });
-  for (const c of ELEC_CIRCUITS) {
+  document.getElementById("elec-ortho")?.addEventListener("change", (e) => {
+    state.elecOrtho = e.target.checked;
+    render();
+  });
+  for (const c of ELEC_KINDS) {
     document.getElementById(`filt-${c}`)?.addEventListener("change", (e) => {
       state.elecFilter[c] = e.target.checked;
       render();
@@ -3062,7 +3222,8 @@
   function snapshot() {
     const {
       measureMode, measureA, measureB, measureCursor, hoverCm, drag,
-      furnMode, furnDraw, elecMode, elecRunDraft, elecSelectedId, elecSelectedKind,
+      furnMode, furnDraw, elecMode, elecRunDraft, elecCursor,
+      elecSelectedId, elecSelectedKind,
       ...rest
     } = state;
     return {
@@ -3070,12 +3231,16 @@
       furnitureLayers: state.furnitureLayers.map((l) => ({
         id: l.id, name: l.name, x: l.x, y: l.y, w: l.w, d: l.d,
       })),
+      elecCircuits: state.elecCircuits.map((c) => ({
+        id: c.id, kind: c.kind, name: c.name || "", room: c.room || "",
+      })),
+      elecActiveCircuitId: state.elecActiveCircuitId,
       elecPoints: state.elecPoints.map((p) => ({
-        id: p.id, type: p.type, circuit: p.circuit, x: p.x, y: p.y, h: p.h, name: p.name || "",
+        id: p.id, type: p.type, circuitId: p.circuitId, x: p.x, y: p.y, h: p.h, name: p.name || "",
       })),
       elecRuns: state.elecRuns.map((r) => ({
         id: r.id,
-        circuit: r.circuit || null,
+        circuitId: r.circuitId || null,
         name: r.name || "",
         points: r.points.map((p) => ({ x: p.x, y: p.y })),
       })),
@@ -3083,7 +3248,7 @@
         id: r.id,
         wall: r.wall,
         cableType: r.cableType,
-        circuit: r.circuit,
+        circuitId: r.circuitId,
         name: r.name || "",
         points: r.points.map((p) => ({ along: p.along, h: p.h })),
       })),
@@ -3105,14 +3270,52 @@
       d: Number(l.d) || 120,
     }));
   }
-  function normalizeElecPoints(raw) {
+  function normalizeElecCircuits(raw) {
     if (!Array.isArray(raw)) return [];
+    return raw.map((c, i) => ({
+      id: typeof c.id === "string" ? c.id : newElecId("c"),
+      kind: ELEC_KINDS.includes(c.kind) ? c.kind : "sockets",
+      name: (c.name && String(c.name).trim()) || `Okruh ${i + 1}`,
+      room: (c.room && String(c.room).trim()) || "",
+    }));
+  }
+
+  /** Legacy v3.4: circuit = kind string. v3.5+: named folders + circuitId. */
+  function ensureKindCircuit(circuits, kindMap, kind) {
+    const k = ELEC_KINDS.includes(kind) ? kind : "sockets";
+    if (kindMap[k]) return kindMap[k];
+    const existing = circuits.find((c) => c.kind === k);
+    if (existing) {
+      kindMap[k] = existing.id;
+      return existing.id;
+    }
+    const c = {
+      id: newElecId("c"),
+      kind: k,
+      name: "Migrace",
+      room: "",
+    };
+    circuits.push(c);
+    kindMap[k] = c.id;
+    return c.id;
+  }
+
+  function normalizeElecPoints(raw, circuits) {
+    if (!Array.isArray(raw)) return [];
+    const kindMap = {};
+    const ids = new Set(circuits.map((c) => c.id));
     return raw.map((p) => {
       const type = ELEC_TYPES.includes(p.type) ? p.type : "socket";
+      let circuitId = typeof p.circuitId === "string" ? p.circuitId : null;
+      if (!circuitId || !ids.has(circuitId)) {
+        const legacyKind = ELEC_KINDS.includes(p.circuit) ? p.circuit
+          : (type === "light" || type === "switch" ? "lights" : type === "panel" ? "data" : "sockets");
+        circuitId = ensureKindCircuit(circuits, kindMap, legacyKind);
+      }
       return clampElecXY({
         id: typeof p.id === "string" ? p.id : newElecId("e"),
         type,
-        circuit: ELEC_CIRCUITS.includes(p.circuit) ? p.circuit : (TYPE_TO_CIRCUIT[type] || "sockets"),
+        circuitId,
         x: Number(p.x) || 0,
         y: Number(p.y) || 0,
         h: Number(p.h) || ELEC_DEFAULT_H.socket,
@@ -3120,26 +3323,42 @@
       });
     });
   }
-  function normalizeElecRuns(raw) {
+  function normalizeElecRuns(raw, circuits) {
     if (!Array.isArray(raw)) return [];
-    return raw.map((r) => ({
-      id: typeof r.id === "string" ? r.id : newElecId("r"),
-      circuit: ELEC_CIRCUITS.includes(r.circuit) ? r.circuit : null,
-      name: (r.name && String(r.name).trim()) || "",
-      points: Array.isArray(r.points)
-        ? r.points.map((p) => clampElecXY({ x: Number(p.x) || 0, y: Number(p.y) || 0 }))
-        : [],
-    })).filter((r) => r.points.length >= 2);
+    const kindMap = {};
+    const ids = new Set(circuits.map((c) => c.id));
+    return raw.map((r) => {
+      let circuitId = typeof r.circuitId === "string" ? r.circuitId : null;
+      if ((!circuitId || !ids.has(circuitId)) && ELEC_KINDS.includes(r.circuit)) {
+        circuitId = ensureKindCircuit(circuits, kindMap, r.circuit);
+      }
+      return {
+        id: typeof r.id === "string" ? r.id : newElecId("r"),
+        circuitId: circuitId && ids.has(circuitId) ? circuitId : (circuitId || null),
+        name: (r.name && String(r.name).trim()) || "",
+        points: Array.isArray(r.points)
+          ? r.points.map((p) => clampElecXY({ x: Number(p.x) || 0, y: Number(p.y) || 0 }))
+          : [],
+      };
+    }).filter((r) => r.points.length >= 2);
   }
-  function normalizeElecElevRuns(raw) {
+  function normalizeElecElevRuns(raw, circuits) {
     if (!Array.isArray(raw)) return [];
+    const kindMap = {};
+    const ids = new Set(circuits.map((c) => c.id));
+    const cableToKind = { slaboproud: "data", cyky15: "lights", cyky25: "sockets" };
     return raw.map((r) => {
       const cable = CABLE_TYPES.includes(r.cableType) ? r.cableType : "cyky25";
+      let circuitId = typeof r.circuitId === "string" ? r.circuitId : null;
+      if (!circuitId || !ids.has(circuitId)) {
+        const legacyKind = ELEC_KINDS.includes(r.circuit) ? r.circuit : (cableToKind[cable] || "sockets");
+        circuitId = ensureKindCircuit(circuits, kindMap, legacyKind);
+      }
       return {
         id: typeof r.id === "string" ? r.id : newElecId("er"),
         wall: ["north", "south", "west", "east"].includes(r.wall) ? r.wall : "north",
         cableType: cable,
-        circuit: ELEC_CIRCUITS.includes(r.circuit) ? r.circuit : CABLE_TO_CIRCUIT[cable],
+        circuitId,
         name: (r.name && String(r.name).trim()) || "",
         points: Array.isArray(r.points)
           ? r.points.map((p) => ({ along: Number(p.along) || 0, h: Number(p.h) || 0 }))
@@ -3152,7 +3371,9 @@
     const {
       tab, measureMode, measureA, measureB, measureCursor, hoverCm, drag,
       furnMode, furnDraw, furnitureLayers,
-      elecMode, elecRunDraft, elecSelectedId, elecSelectedKind, elecPoints, elecRuns, elecElevRuns,
+      elecMode, elecRunDraft, elecCursor, elecSelectedId, elecSelectedKind,
+      elecCircuits, elecPoints, elecRuns, elecElevRuns,
+      elecCircuit, // legacy global filter kind — ignore
       savedAt, appVersion, appBuild, appCommit, ...rest
     } = data;
     Object.assign(state, rest);
@@ -3163,15 +3384,23 @@
     state.furnSelectedId = state.furnitureLayers[0]?.id || null;
     state.furnMode = null;
     state.furnDraw = null;
-    state.elecPoints = normalizeElecPoints(elecPoints);
-    state.elecRuns = normalizeElecRuns(elecRuns);
-    state.elecElevRuns = normalizeElecElevRuns(elecElevRuns);
+    const circuits = normalizeElecCircuits(elecCircuits);
+    state.elecPoints = normalizeElecPoints(elecPoints, circuits);
+    state.elecRuns = normalizeElecRuns(elecRuns, circuits);
+    state.elecElevRuns = normalizeElecElevRuns(elecElevRuns, circuits);
+    state.elecCircuits = circuits;
+    if (!findElecCircuit(state.elecActiveCircuitId)) {
+      state.elecActiveCircuitId = circuits[0]?.id || null;
+    }
     state.elecSelectedId = null;
     state.elecSelectedKind = null;
     state.elecMode = null;
     state.elecRunDraft = null;
+    state.elecCursor = null;
+    delete state.elecCircuit;
     if (!state.elecType) state.elecType = "socket";
-    if (!state.elecCircuit) state.elecCircuit = "sockets";
+    if (!state.elecNewKind) state.elecNewKind = "sockets";
+    if (state.elecOrtho == null) state.elecOrtho = true;
     if (!state.elecStep) state.elecStep = "plan";
     if (!state.elecCableType) state.elecCableType = "cyky25";
     if (!state.elecFilter) state.elecFilter = { data: true, lights: true, sockets: true };
