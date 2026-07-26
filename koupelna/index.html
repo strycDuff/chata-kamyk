@@ -3,103 +3,200 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Půdorys chaty — návrh koupelny · Chata Kamyk</title>
+<title>Plánovač půdorysu · Chata Kamyk</title>
 <link rel="stylesheet" href="../assets/site.css">
 <style>
   :root {
-    --ink: #111;
+    --ink: #1a1f24;
     --muted: #5a6570;
-    --bg: #f7f5f1;
+    --bg: #f4f1eb;
     --panel: #fff;
     --line: #c9d0d6;
-    --wall: #111;
-    --window: #2a6fad;
-    --door: #e07a2f;
+    --wall: #222;
+    --sdk: #8a9096;
+    --window: #6eb6e0;
+    --door: #c4783a;
     --dim: #c0392b;
-    --bath-fill: #e8f1f8;
+    --dim-soft: #3d7ea6;
     --ok: #1b5e3b;
     --warn: #b86b00;
     --bad: #b00020;
-    --collision: rgba(176, 0, 32, 0.28);
-    --collision-stroke: #b00020;
+    --bath: #e8eef2;
+    --kitchen: #2f8f5b;
+    --bed: #d9782c;
+    --safe: rgba(46, 140, 90, 0.18);
+    --safe-stroke: #2e8c5a;
+    --warn-fill: rgba(200, 120, 0, 0.18);
+    --accent: #1f4e6b;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+    font-family: "IBM Plex Sans", "Segoe UI", Helvetica, Arial, sans-serif;
     background: var(--bg);
     color: var(--ink);
     min-height: 100vh;
   }
-  header {
-    padding: 16px 20px 8px;
+  .app {
+    display: grid;
+    grid-template-rows: auto auto 1fr;
+    min-height: calc(100vh - 49px);
+  }
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 14px;
+    background: var(--panel);
     border-bottom: 1px solid var(--line);
-    background: var(--panel);
   }
-  header h1 { margin: 0 0 4px; font-size: 1.25rem; }
-  header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
-  .layout {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: minmax(320px, 1fr) auto;
-    gap: 12px;
-    padding: 12px;
-    max-width: 1400px;
-    margin: 0 auto;
-  }
-  .card {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    padding: 10px;
-    min-height: 0;
-  }
-  .card h2 {
-    margin: 0 0 8px;
-    font-size: 0.95rem;
-    color: var(--muted);
-    font-weight: 600;
-  }
-  .svg-wrap {
-    width: 100%;
-    overflow: auto;
-    background:
-      linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px) 0 0 / 20px 20px,
-      linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px) 0 0 / 20px 20px,
-      #fafafa;
-  }
-  .svg-wrap svg { display: block; width: 100%; height: auto; }
-  .panel {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 14px;
-  }
-  .panel section {
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    padding: 10px 12px;
-    background: #fbfcfd;
-  }
-  .panel h3 { margin: 0 0 8px; font-size: 0.95rem; }
-  label { display: block; font-size: 0.85rem; margin: 8px 0 4px; color: var(--muted); }
-  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  button, .seg button {
+  .tabs { display: flex; gap: 6px; }
+  .tabs button, .btn, .icon-btn {
     font: inherit;
     border: 1px solid var(--line);
     background: #fff;
-    padding: 6px 10px;
+    padding: 7px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--ink);
+  }
+  .tabs button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .icon-btn {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .toolbar .spacer { flex: 1; }
+  .toolbar label.chk {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 0.88rem;
+    color: var(--muted);
+  }
+  .main {
+    display: grid;
+    grid-template-columns: 1fr minmax(280px, 340px);
+    min-height: 0;
+  }
+  .canvas-wrap {
+    min-height: 0;
+    overflow: auto;
+    padding: 12px;
+    background:
+      linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px) 0 0 / 24px 24px,
+      linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px) 0 0 / 24px 24px,
+      #faf8f5;
+  }
+  .canvas-wrap svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: calc(100vh - 160px);
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    cursor: crosshair;
+  }
+  .canvas-wrap svg.measuring { cursor: crosshair; }
+  .canvas-wrap .handle { cursor: ew-resize; }
+  .canvas-wrap .handle-ns { cursor: ns-resize; }
+  .side {
+    border-left: 1px solid var(--line);
+    background: var(--panel);
+    overflow: auto;
+    padding: 12px 14px 24px;
+  }
+  .side h1 {
+    margin: 0 0 4px;
+    font-size: 1.05rem;
+    color: var(--accent);
+  }
+  .side .sub {
+    margin: 0 0 14px;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .side section {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    background: #fbfcfd;
+  }
+  .side h3 {
+    margin: 0 0 8px;
+    font-size: 0.92rem;
+  }
+  label { display: block; font-size: 0.82rem; margin: 8px 0 4px; color: var(--muted); }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .seg button {
+    font: inherit;
+    border: 1px solid var(--line);
+    background: #fff;
+    padding: 5px 9px;
     border-radius: 3px;
     cursor: pointer;
   }
   .seg button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
   input[type="range"] { width: 100%; }
-  .status { grid-column: 1 / -1; padding: 10px 12px; border-radius: 4px; font-size: 0.9rem; }
+  input[type="text"] {
+    width: 100%;
+    font: inherit;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+  }
+  .status {
+    padding: 9px 10px;
+    border-radius: 4px;
+    font-size: 0.86rem;
+    margin-bottom: 10px;
+  }
   .status.ok { background: #e8f6ee; color: var(--ok); }
   .status.warn { background: #fff4e5; color: var(--warn); }
   .status.bad { background: #fde8ec; color: var(--bad); }
-  @media (max-width: 900px) {
-    .layout { grid-template-columns: 1fr; }
+  .hint { font-size: 0.78rem; color: var(--muted); margin-top: 6px; }
+  .variant-list {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    max-height: 140px;
+    overflow: auto;
+  }
+  .variant-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.85rem;
+  }
+  .variant-list button {
+    font: inherit;
+    font-size: 0.75rem;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 3px;
+    padding: 2px 6px;
+    cursor: pointer;
+  }
+  @media (max-width: 960px) {
+    .main { grid-template-columns: 1fr; }
+    .side { border-left: none; border-top: 1px solid var(--line); }
   }
 </style>
 </head>
@@ -107,601 +204,1140 @@
   <nav class="site-nav" aria-label="Hlavní navigace">
     <a class="brand" href="../">Chata Kamyk</a>
     <a href="../">Přehled</a>
-    <a class="active" href="./">Koupelna</a>
+    <a class="active" href="./">Plánovač</a>
     <a href="../smarthome/">SmartHome</a>
   </nav>
-  <header>
-    <h1>Půdorys chaty — návrh koupelny</h1>
-    <p>Interaktivní prototyp · rozměry v cm</p>
-  </header>
-  <div class="layout">
-    <div class="card">
-      <h2>Celá chata (906 × 333 cm)</h2>
-      <div class="svg-wrap" id="cabin-wrap"></div>
+
+  <div class="app">
+    <div class="toolbar">
+      <div class="tabs" id="tabs">
+        <button type="button" data-tab="cabin" class="active">1 · Půdorys</button>
+        <button type="button" data-tab="bath">2 · Koupelna</button>
+      </div>
+      <button type="button" class="icon-btn" id="btn-measure" title="Měřit vzdálenost" aria-label="Měřit vzdálenost">📏</button>
+      <button type="button" class="icon-btn" id="btn-measure-reset" title="Reset měření" aria-label="Reset měření">↺</button>
+      <span class="hint" id="measure-hint"></span>
+      <div class="spacer"></div>
+      <label class="chk"><input type="checkbox" id="show-sofa" checked> Gauč</label>
+      <label class="chk"><input type="checkbox" id="show-bed" checked> Postel</label>
+      <label class="chk"><input type="checkbox" id="show-dims" checked> Kóty</label>
+      <button type="button" class="btn" id="btn-export">Export SVG</button>
     </div>
-    <div class="card">
-      <h2>Detail koupelny</h2>
-      <div class="svg-wrap" id="bath-wrap"></div>
-    </div>
-    <div class="card panel" id="controls">
-      <div class="status ok" id="status">Načítání…</div>
-      <section id="sec-door">
-        <h3>Dveře koupelny</h3>
-        <label>Šířka</label>
-        <div class="row seg" id="door-width">
-          <button type="button" data-v="60">60</button>
-          <button type="button" data-v="70" class="active">70</button>
-          <button type="button" data-v="80">80</button>
+
+    <div class="main">
+      <div class="canvas-wrap" id="canvas-wrap"></div>
+      <aside class="side" id="side">
+        <h1 id="side-title">Půdorys chaty</h1>
+        <p class="sub" id="side-sub">Táhni příčky · safe zóny jsou jen vizuální</p>
+        <div class="status ok" id="status">—</div>
+
+        <div id="panel-cabin">
+          <section>
+            <h3>Koupelna (vnější)</h3>
+            <label>Levý okraj od Z: <strong id="bath-left-val">569</strong> cm</label>
+            <input type="range" id="bath-left" min="480" max="650" value="569" step="1">
+            <label>Šířka V–Z: <strong id="bath-w-val">125</strong> cm</label>
+            <input type="range" id="bath-w" min="110" max="180" value="125" step="1">
+            <label>Hloubka S–J: <strong id="bath-d-val">230</strong> cm</label>
+            <input type="range" id="bath-d" min="180" max="260" value="230" step="1">
+            <p class="hint" id="bath-clear-hint">Světlá šířka: 100 cm</p>
+          </section>
+          <section>
+            <h3>Postel (u východní stěny)</h3>
+            <div class="row seg" id="bed-variant">
+              <button type="button" data-v="160" class="active">160 cm</button>
+              <button type="button" data-v="140">140 cm</button>
+            </div>
+            <p class="hint" id="bed-hint">—</p>
+          </section>
+          <section>
+            <h3>TV příčka</h3>
+            <label>Levý líc od Z: <strong id="tv-x-val">324</strong> cm</label>
+            <input type="range" id="tv-x" min="300" max="420" value="324" step="1">
+            <label>Délka na jih: <strong id="tv-len-val">140</strong> cm</label>
+            <input type="range" id="tv-len" min="100" max="180" value="140" step="1">
+            <label>Náhled TV</label>
+            <div class="row seg" id="tv-variant">
+              <button type="button" data-v="50">50"</button>
+              <button type="button" data-v="55" class="active">55"</button>
+              <button type="button" data-v="65">65"</button>
+            </div>
+            <p class="hint" id="tv-hint">—</p>
+          </section>
+          <section>
+            <h3>Průchod kuchyň ↔ koupelna</h3>
+            <p class="hint" id="pass-hint">PR linky → JL koupelny</p>
+          </section>
         </div>
-        <label>Odstup od severu: <strong id="door-offset-val">90</strong> cm</label>
-        <input type="range" id="door-offset" min="65" max="140" value="90" step="1">
-        <label>Typ posuvu</label>
-        <div class="row seg" id="door-type">
-          <button type="button" data-v="A" class="active">A · po stěně zvenku → jih</button>
-          <button type="button" data-v="B">B · pouzdro</button>
+
+        <div id="panel-bath" hidden>
+          <section>
+            <h3>Dveře</h3>
+            <label>Šířka</label>
+            <div class="row seg" id="door-width">
+              <button type="button" data-v="60">60</button>
+              <button type="button" data-v="70" class="active">70</button>
+              <button type="button" data-v="80">80</button>
+            </div>
+            <label>Odstup od severu: <strong id="door-offset-val">90</strong> cm</label>
+            <input type="range" id="door-offset" min="65" max="140" value="90" step="1">
+            <label>Typ</label>
+            <div class="row seg" id="door-type">
+              <button type="button" data-v="A" class="active">A · zvenku → jih</button>
+              <button type="button" data-v="B">B · pouzdro</button>
+            </div>
+            <div id="pocket-dir-wrap" hidden>
+              <label>Směr pouzdra</label>
+              <div class="row seg" id="pocket-dir">
+                <button type="button" data-v="north">Sever</button>
+                <button type="button" data-v="south" class="active">Jih</button>
+              </div>
+            </div>
+          </section>
+          <section>
+            <h3>Sprcha</h3>
+            <div class="row seg" id="shower-preset">
+              <button type="button" data-v="80x80">80×80</button>
+              <button type="button" data-v="90x90">90×90</button>
+              <button type="button" data-v="100x80" class="active">100×80</button>
+              <button type="button" data-v="120x80">120×80</button>
+              <button type="button" data-v="full">Plná šířka</button>
+            </div>
+            <label><input type="checkbox" id="shower-rotate"> Otočit 90°</label>
+            <div id="full-depth-wrap" hidden>
+              <label>Hloubka plné šířky</label>
+              <div class="row seg" id="shower-full-depth">
+                <button type="button" data-v="70">70</button>
+                <button type="button" data-v="80" class="active">80</button>
+                <button type="button" data-v="90">90</button>
+              </div>
+            </div>
+          </section>
+          <section>
+            <h3>Umyvadlo (malé)</h3>
+            <label>Šířka: <strong id="sink-w-val">40</strong> cm</label>
+            <input type="range" id="sink-w" min="30" max="50" value="40" step="1">
+            <label>Hloubka: <strong id="sink-d-val">30</strong> cm</label>
+            <input type="range" id="sink-d" min="25" max="40" value="30" step="1">
+            <label>Odstup od severu: <strong id="sink-off-val">70</strong> cm</label>
+            <input type="range" id="sink-offset" min="0" max="180" value="70" step="1">
+          </section>
         </div>
-        <div id="pocket-dir-wrap" hidden>
-          <label>Směr pouzdra</label>
-          <div class="row seg" id="pocket-dir">
-            <button type="button" data-v="north">Sever</button>
-            <button type="button" data-v="south" class="active">Jih</button>
+
+        <section>
+          <h3>Varianty (lokálně)</h3>
+          <label>Název</label>
+          <input type="text" id="variant-name" placeholder="např. Postel 140 + koupelna širší">
+          <div class="row" style="margin-top:8px">
+            <button type="button" class="btn" id="btn-save-variant">Uložit</button>
           </div>
-        </div>
-      </section>
-      <section id="sec-shower">
-        <h3>Sprchový kout</h3>
-        <label>Vanička</label>
-        <div class="row seg" id="shower-preset">
-          <button type="button" data-v="80x80">80×80</button>
-          <button type="button" data-v="90x90">90×90</button>
-          <button type="button" data-v="100x80" class="active">100×80</button>
-          <button type="button" data-v="120x80">120×80</button>
-          <button type="button" data-v="full">Plná šířka</button>
-        </div>
-        <label><input type="checkbox" id="shower-rotate"> Otočit 90°</label>
-        <div id="full-depth-wrap" hidden>
-          <label>Hloubka plné šířky</label>
-          <div class="row seg" id="shower-full-depth">
-            <button type="button" data-v="70">70</button>
-            <button type="button" data-v="80" class="active">80</button>
-            <button type="button" data-v="90">90</button>
-          </div>
-        </div>
-      </section>
-      <section id="sec-sink">
-        <h3>Umyvadlo (východní stěna)</h3>
-        <label>Šířka podél stěny: <strong id="sink-w-val">60</strong> cm</label>
-        <input type="range" id="sink-w" min="40" max="80" value="60" step="1">
-        <label>Hloubka: <strong id="sink-d-val">45</strong> cm</label>
-        <input type="range" id="sink-d" min="30" max="55" value="45" step="1">
-        <label>Odstup od severu: <strong id="sink-off-val">70</strong> cm</label>
-        <input type="range" id="sink-offset" min="0" max="180" value="70" step="1">
-      </section>
-      <section id="sec-view">
-        <h3>Zobrazení</h3>
-        <label><input type="checkbox" id="show-dims" checked> Zobrazit kóty</label>
-      </section>
-      <p style="grid-column:1/-1;margin:0;font-size:0.8rem;color:var(--muted)">
-        Legenda: černá = stěny/příčky · modrá = okna · oranžová = dveře/posuv · červená = kóty/kolize
-      </p>
+          <ul class="variant-list" id="variant-list"></ul>
+        </section>
+      </aside>
     </div>
   </div>
-  <script>
-const WALL = 5 + 1.8 + 12 + 4 + 1.12; // 23.92
-const PART = 12.5;
-const CABIN = { w: 906, h: 333 };
 
-const NORTH_SEGS = [
-  { t: "wall", l: 220 }, { t: "win", l: 96.5 }, { t: "wall", l: 120 },
-  { t: "win", l: 90.5 }, { t: "wall", l: 99 }, { t: "win", l: 56.5 },
-  { t: "wall", l: 224 },
-];
-const SOUTH_SEGS = [
-  { t: "wall", l: 204 }, { t: "door", l: 103 }, { t: "wall", l: 79 },
-  { t: "win", l: 87 }, { t: "wall", l: 434.5 },
-];
-const WEST_SEGS = [
-  { t: "wall", l: 56 }, { t: "win", l: 83 }, { t: "wall", l: 50 },
-  { t: "win", l: 83 }, { t: "wall", l: 61 },
-];
-const EAST_SEGS = [
-  { t: "wall", l: 124 }, { t: "win", l: 85 }, { t: "wall", l: 124 },
-];
+<script>
+(() => {
+  const WALL = 5 + 1.8 + 12 + 4 + 1.12; // 23.92
+  const PART = 12.5;
+  const CABIN = { w: 906, h: 333 };
+  const BED_LEN = 200; // E–W into room
+  const MIN_BED_PASS = 60; // visual safe gap bath↔bed foot
+  const PASS_TARGET = 105;
 
-/** Bathroom outer box: left outer partition edge at 569 from cabin left outer. */
-function bathOuterBox() {
-  return { x: 569, y: WALL, w: 125, d: 230 };
-}
+  const NORTH_SEGS = [
+    { t: "wall", l: 220 }, { t: "win", l: 96.5 }, { t: "wall", l: 120 },
+    { t: "win", l: 90.5 }, { t: "wall", l: 99 }, { t: "win", l: 56.5 },
+    { t: "wall", l: 224 },
+  ];
+  const SOUTH_SEGS = [
+    { t: "wall", l: 204 }, { t: "door", l: 103 }, { t: "wall", l: 79 },
+    { t: "win", l: 87 }, { t: "wall", l: 434.5 },
+  ];
+  const WEST_SEGS = [
+    { t: "wall", l: 56 }, { t: "win", l: 83 }, { t: "wall", l: 50 },
+    { t: "win", l: 83 }, { t: "wall", l: 61 },
+  ];
+  const EAST_SEGS = [
+    { t: "wall", l: 124 }, { t: "win", l: 85 }, { t: "wall", l: 124 },
+  ];
 
-/** Clear interior of bathroom (cm). Origin: cabin left-top outer. */
-function bathInnerBox() {
-  const o = bathOuterBox();
-  return {
-    x: o.x + PART,
-    y: o.y,
-    w: o.w - 2 * PART,
-    d: o.d - PART,
+  const TV_WIDTHS = { 50: 112, 55: 123, 65: 145 };
+
+  const STORAGE_KEY = "chata-kamyk-planner-variants-v2";
+
+  const state = {
+    tab: "cabin",
+    bathLeft: 569,
+    bathW: 125,
+    bathD: 230,
+    tvX: 324,
+    tvLen: 140,
+    bedVariant: 160,
+    tvVariant: 55,
+    showSofa: true,
+    showBed: true,
+    showDims: true,
+    doorWidth: 70,
+    doorOffset: 90,
+    doorType: "A",
+    pocketDir: "south",
+    showerPreset: "100x80",
+    showerRotate: false,
+    showerFullDepth: 80,
+    sinkW: 40,
+    sinkD: 30,
+    sinkOffset: 70,
+    measureMode: false,
+    measureA: null,
+    measureB: null,
+    measureCursor: null,
+    hoverCm: null,
+    drag: null,
   };
-}
 
-/** WC box in cabin coords. Axis of bowl 65 cm from west partition inner face. */
-function wcBox() {
-  const bi = bathInnerBox();
-  const w = 37, d = 63;
-  const axisFromWestInner = 65;
-  const x = bi.x + axisFromWestInner - w / 2;
-  const y = bi.y;
-  return { x, y, w, d };
-}
+  const ns = "http://www.w3.org/2000/svg";
 
-function aabbOverlap(a, b) {
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.d && a.y + a.d > b.y;
-}
-
-/** Door opening in west partition (cabin coords). */
-function doorOpeningBox() {
-  const o = bathOuterBox();
-  const bi = bathInnerBox();
-  return {
-    x: o.x,
-    y: bi.y + state.doorOffset,
-    w: PART,
-    d: state.doorWidth,
-  };
-}
-
-/**
- * Type A: leaf slides south along OUTSIDE (west) face of west partition.
- * Parked leaf occupies [opening.south … opening.south + doorWidth] along Y, west of partition.
- */
-function doorSlideZoneA() {
-  const op = doorOpeningBox();
-  return {
-    x: op.x - 4,
-    y: op.y + op.d,
-    w: 4,
-    d: state.doorWidth,
-  };
-}
-
-/**
- * Type B: pocket inside west partition, north or south of opening.
- */
-function doorPocketZoneB() {
-  const op = doorOpeningBox();
-  const y = state.pocketDir === "north"
-    ? op.y - state.doorWidth
-    : op.y + op.d;
-  return { x: op.x, y, w: PART, d: state.doorWidth };
-}
-
-function doorTravelBox() {
-  return state.doorType === "A" ? doorSlideZoneA() : doorPocketZoneB();
-}
-
-function showerSize() {
-  if (state.showerPreset === "full") {
-    return { w: 100, d: state.showerFullDepth };
+  function el(name, attrs = {}, children = []) {
+    const node = document.createElementNS(ns, name);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v === false || v == null) continue;
+      if (k === "textContent") node.textContent = v;
+      else node.setAttribute(k, String(v));
+    }
+    for (const c of children) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    return node;
   }
-  const [a, b] = state.showerPreset.split("x").map(Number);
-  return state.showerRotate ? { w: b, d: a } : { w: a, d: b };
-}
 
-function showerBox() {
-  const bi = bathInnerBox();
-  const { w, d } = showerSize();
-  const x = state.showerPreset === "full" ? bi.x : bi.x + bi.w - w;
-  const y = bi.y + bi.d - d;
-  return { x, y, w, d };
-}
-
-function showerClearanceBox() {
-  const s = showerBox();
-  return { x: s.x, y: s.y - 10, w: s.w, d: 10 };
-}
-
-function sinkBox() {
-  const bi = bathInnerBox();
-  const w = state.sinkD;
-  const d = state.sinkW;
-  return {
-    x: bi.x + bi.w - w,
-    y: bi.y + state.sinkOffset,
-    w,
-    d,
-  };
-}
-
-function showerFits() {
-  const bi = bathInnerBox();
-  const s = showerBox();
-  return s.w <= bi.w + 1e-9 && s.d <= bi.d + 1e-9 && s.x >= bi.x - 1e-9;
-}
-
-/**
- * Checks fixed collision rules (spec §7) and returns both the human-readable
- * issues (for the status panel) and per-entity conflict flags (for highlighting).
- */
-function detectCollisions() {
-  const bi = bathInnerBox();
-  const o = bathOuterBox();
-  const wc = wcBox();
-  // North "keep clear" band for door swept-path checks (spec §5/§7): the
-  // opening/pocket physically sits INSIDE the west partition (x in
-  // [o.x, bi.x]), so this zone must span the full outer footprint —
-  // not just bi.x.. — otherwise it can never overlap the door boxes at all.
-  const wcZone = { x: o.x, y: bi.y, w: o.w, d: 63 };
-  const sh = showerBox();
-  const shClear = showerClearanceBox();
-  const sk = sinkBox();
-  const travel = doorTravelBox();
-  const op = doorOpeningBox();
-
-  const issues = [];
-  const conflicts = { door: false, wc: false, shower: false, sink: false };
-
-  if (!showerFits()) {
-    issues.push({ level: "bad", msg: "Sprcha se nevejde do světlého prostoru koupelny." });
-    conflicts.shower = true;
+  function aabbOverlap(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.d && a.y + a.d > b.y;
   }
-  if (aabbOverlap(travel, wcZone) || aabbOverlap(op, wcZone)) {
-    issues.push({ level: "bad", msg: "Posuv/otvor dveří koliduje se zónou WC (63 cm od severu)." });
-    conflicts.door = true;
-    conflicts.wc = true;
+  function dist(a, b) {
+    return Math.hypot(b.x - a.x, b.y - a.y);
   }
-  if (aabbOverlap(travel, sh) || aabbOverlap(travel, shClear)) {
-    issues.push({ level: "bad", msg: "Posuv dveří koliduje se sprchou." });
-    conflicts.door = true;
-    conflicts.shower = true;
+  function round1(n) {
+    return Math.round(n * 10) / 10;
   }
-  if (aabbOverlap(sh, wc) || aabbOverlap(shClear, wc)) {
-    issues.push({ level: "warn", msg: "Sprcha / zóna otevírání zasahuje do WC." });
-    conflicts.shower = true;
-    conflicts.wc = true;
-  }
-  if (aabbOverlap(sh, sk) || aabbOverlap(shClear, sk)) {
-    issues.push({ level: "warn", msg: "Sprcha koliduje s umyvadlem." });
-    conflicts.shower = true;
-    conflicts.sink = true;
-  }
-  if (aabbOverlap(sk, wc)) {
-    issues.push({ level: "warn", msg: "Umyvadlo koliduje s WC." });
-    conflicts.sink = true;
-    conflicts.wc = true;
-  }
-  return { issues, conflicts };
-}
 
-function updateStatus(issues) {
-  const elStatus = document.getElementById("status");
-  if (!issues.length) {
-    elStatus.className = "status ok";
-    elStatus.textContent = "Bez kolizí — rozvržení vypadá průchodně.";
+  function bathOuter() {
+    return { x: state.bathLeft, y: WALL, w: state.bathW, d: state.bathD };
+  }
+  function bathInner() {
+    const o = bathOuter();
+    return { x: o.x + PART, y: o.y, w: o.w - 2 * PART, d: o.d - PART };
+  }
+  function kitchenBox() {
+    const y1 = CABIN.h - WALL - 60;
+    return { x: 313, y: y1, w: 160, d: 60 };
+  }
+  function sofaPolylines() {
+    // L sofa approx as two rects from inner NW
+    const x0 = WALL, y0 = WALL;
+    return {
+      west: { x: x0, y: y0, w: 95, d: 240 },
+      north: { x: x0, y: y0, w: 160, d: 90 },
+    };
+  }
+  function bedBox() {
+    const eastInner = CABIN.w - WALL;
+    const w = BED_LEN; // into room (E–W)
+    const d = state.bedVariant; // along wall (N–S)
+    const x = eastInner - w;
+    const y = WALL + (CABIN.h - 2 * WALL - d) / 2;
+    return { x, y, w, d };
+  }
+  function bedGap() {
+    const o = bathOuter();
+    const bed = bedBox();
+    return bed.x - (o.x + o.w);
+  }
+  function kitchenBathPassage() {
+    const k = kitchenBox();
+    const o = bathOuter();
+    const a = { x: k.x + k.w, y: k.y }; // PR (NE) of kitchen
+    const b = { x: o.x, y: o.y + o.d }; // JL (SW) of bathroom
+    return { a, b, len: dist(a, b) };
+  }
+  function tvBox() {
+    return { x: state.tvX, y: WALL, w: PART, d: state.tvLen };
+  }
+  function tvClearWidth() {
+    return state.tvLen - 2 * 8; // ~8 cm margin each side aesthetic default band
+  }
+  function tvFits(inch) {
+    const need = TV_WIDTHS[inch];
+    const margin = (state.tvLen - need) / 2;
+    return { need, margin, ok: margin >= 5, tight: margin >= 0 && margin < 5, overflow: margin < 0 };
+  }
+
+  function wcBox() {
+    const bi = bathInner();
+    const w = 37, d = 63;
+    return { x: bi.x + 65 - w / 2, y: bi.y, w, d };
+  }
+  function doorOpeningBox() {
+    const o = bathOuter();
+    const bi = bathInner();
+    return { x: o.x, y: bi.y + state.doorOffset, w: PART, d: state.doorWidth };
+  }
+  function doorTravelBox() {
+    const op = doorOpeningBox();
+    if (state.doorType === "A") {
+      return { x: op.x - 4, y: op.y + op.d, w: 4, d: state.doorWidth };
+    }
+    const y = state.pocketDir === "north" ? op.y - state.doorWidth : op.y + op.d;
+    return { x: op.x, y, w: PART, d: state.doorWidth };
+  }
+  function showerSize() {
+    if (state.showerPreset === "full") return { w: bathInner().w, d: state.showerFullDepth };
+    const [a, b] = state.showerPreset.split("x").map(Number);
+    return state.showerRotate ? { w: b, d: a } : { w: a, d: b };
+  }
+  function showerBox() {
+    const bi = bathInner();
+    const { w, d } = showerSize();
+    const x = state.showerPreset === "full" ? bi.x : bi.x + bi.w - w;
+    return { x, y: bi.y + bi.d - d, w, d };
+  }
+  function showerClearanceBox() {
+    const s = showerBox();
+    return { x: s.x, y: s.y - 10, w: s.w, d: 10 };
+  }
+  function sinkBox() {
+    const bi = bathInner();
+    return {
+      x: bi.x + bi.w - state.sinkD,
+      y: bi.y + state.sinkOffset,
+      w: state.sinkD,
+      d: state.sinkW,
+    };
+  }
+  function showerFits() {
+    const bi = bathInner();
+    const s = showerBox();
+    return s.w <= bi.w + 1e-6 && s.d <= bi.d + 1e-6 && s.x >= bi.x - 1e-6;
+  }
+  function clampSink() {
+    const bi = bathInner();
+    const maxOff = Math.max(0, bi.d - state.sinkW);
+    state.sinkOffset = Math.min(Math.max(0, state.sinkOffset), maxOff);
+    const input = document.getElementById("sink-offset");
+    if (input) {
+      input.max = String(maxOff);
+      input.value = String(state.sinkOffset);
+      document.getElementById("sink-off-val").textContent = String(state.sinkOffset);
+    }
+  }
+
+  function detectBathCollisions() {
+    const issues = [];
+    const bi = bathInner();
+    const wc = wcBox();
+    const wcZone = { x: bathOuter().x, y: bi.y, w: bathOuter().w, d: 63 };
+    const sh = showerBox();
+    const shClear = showerClearanceBox();
+    const sk = sinkBox();
+    const travel = doorTravelBox();
+    const op = doorOpeningBox();
+    if (!showerFits()) issues.push({ level: "bad", msg: "Sprcha se nevejde do světlého prostoru." });
+    if (aabbOverlap(travel, wcZone) || aabbOverlap(op, wc)) {
+      issues.push({ level: "bad", msg: "Posuv/otvor dveří koliduje se zónou WC." });
+    }
+    if (aabbOverlap(travel, sh) || aabbOverlap(travel, shClear)) {
+      issues.push({ level: "bad", msg: "Posuv dveří koliduje se sprchou." });
+    }
+    if (aabbOverlap(sh, wc) || aabbOverlap(shClear, wc)) {
+      issues.push({ level: "warn", msg: "Sprcha / zóna otevírání zasahuje do WC." });
+    }
+    if (aabbOverlap(sh, sk) || aabbOverlap(shClear, sk)) {
+      issues.push({ level: "warn", msg: "Sprcha koliduje s umyvadlem." });
+    }
+    if (aabbOverlap(sk, wc)) issues.push({ level: "warn", msg: "Umyvadlo koliduje s WC." });
     return issues;
   }
-  const bad = issues.some((i) => i.level === "bad");
-  elStatus.className = "status " + (bad ? "bad" : "warn");
-  elStatus.innerHTML = issues.map((i) => i.msg).join("<br>");
-  return issues;
-}
 
-const state = {
-  doorWidth: 70,
-  doorOffset: 90, // north inner → north edge of opening
-  doorType: "A", // A | B
-  pocketDir: "south", // for type B: north | south
-  showerPreset: "100x80", // or "full"
-  showerRotate: false,
-  showerFullDepth: 80,
-  sinkW: 60, // along east wall (S–J)
-  sinkD: 45, // into room (V–Z toward west)
-  sinkOffset: 70, // north edge from north inner (keeps default clear of 100×80 shower)
-  showDims: true,
-};
+  function dimV(g, y1, y2, x, label, color = "var(--dim)") {
+    if (Math.abs(y2 - y1) < 1) return;
+    const mid = (y1 + y2) / 2;
+    g.appendChild(el("line", { x1: x, y1, x2: x, y2, stroke: color, "stroke-width": 1 }));
+    g.appendChild(el("line", { x1: x - 3, y1, x2: x + 3, y2: y1, stroke: color, "stroke-width": 1 }));
+    g.appendChild(el("line", { x1: x - 3, y1: y2, x2: x + 3, y2, stroke: color, "stroke-width": 1 }));
+    const t = el("text", {
+      x: x + 5, y: mid, fill: color, "font-size": 11,
+      "dominant-baseline": "middle",
+    });
+    t.textContent = label;
+    g.appendChild(t);
+  }
+  function dimH(g, x1, x2, y, label, color = "var(--dim)") {
+    if (Math.abs(x2 - x1) < 1) return;
+    const mid = (x1 + x2) / 2;
+    g.appendChild(el("line", { x1, y1: y, x2, y2: y, stroke: color, "stroke-width": 1 }));
+    g.appendChild(el("line", { x1, y1: y - 3, x2: x1, y2: y + 3, stroke: color, "stroke-width": 1 }));
+    g.appendChild(el("line", { x1: x2, y1: y - 3, x2, y2: y + 3, stroke: color, "stroke-width": 1 }));
+    const t = el("text", {
+      x: mid, y: y - 5, fill: color, "font-size": 11, "text-anchor": "middle",
+    });
+    t.textContent = label;
+    g.appendChild(t);
+  }
 
-function el(name, attrs, children = []) {
-  const ns = "http://www.w3.org/2000/svg";
-  const node = document.createElementNS(ns, name);
-  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
-  for (const c of children) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
-  return node;
-}
+  function drawCabinShell(g) {
+    g.appendChild(el("rect", {
+      x: 0, y: 0, width: CABIN.w, height: CABIN.h,
+      fill: "#fff", stroke: "var(--wall)", "stroke-width": 2,
+    }));
+    g.appendChild(el("path", {
+      d: `M0,0 H${CABIN.w} V${CABIN.h} H0 Z M${WALL},${WALL} V${CABIN.h - WALL} H${CABIN.w - WALL} V${WALL} Z`,
+      fill: "#2a2e32", "fill-rule": "evenodd",
+    }));
+  }
 
-function wallStrokeAttrs() {
-  return { fill: "none", stroke: "var(--wall)", "stroke-width": WALL };
-}
-
-/** Horizontal dimension line with end ticks, centered label above. */
-function dimH(g, x1, x2, y, label) {
-  const mid = (x1 + x2) / 2;
-  g.appendChild(el("line", { x1, y1: y, x2, y2: y, stroke: "var(--dim)", "stroke-width": 1 }));
-  g.appendChild(el("line", { x1, y1: y - 3, x2: x1, y2: y + 3, stroke: "var(--dim)", "stroke-width": 1 }));
-  g.appendChild(el("line", { x1: x2, y1: y - 3, x2, y2: y + 3, stroke: "var(--dim)", "stroke-width": 1 }));
-  const t = el("text", { x: mid, y: y - 5, fill: "var(--dim)", "font-size": 11, "text-anchor": "middle" });
-  t.textContent = label;
-  g.appendChild(t);
-}
-/** Vertical dimension line, label to the right, vertically centered. */
-function dimV(g, y1, y2, x, label) {
-  const mid = (y1 + y2) / 2;
-  g.appendChild(el("line", { x1: x, y1, x2: x, y2, stroke: "var(--dim)", "stroke-width": 1 }));
-  g.appendChild(el("line", { x1: x - 3, y1, x2: x + 3, y2: y1, stroke: "var(--dim)", "stroke-width": 1 }));
-  g.appendChild(el("line", { x1: x - 3, y1: y2, x2: x + 3, y2, stroke: "var(--dim)", "stroke-width": 1 }));
-  const t = el("text", { x: x + 4, y: mid, fill: "var(--dim)", "font-size": 11, "dominant-baseline": "middle" });
-  t.textContent = label;
-  g.appendChild(t);
-}
-
-/** Draw outer cabin rectangle with wall thickness as inset fill ring. */
-function drawCabinShell(g) {
-  g.appendChild(el("rect", { x: 0, y: 0, width: CABIN.w, height: CABIN.h, fill: "#fff", stroke: "var(--wall)", "stroke-width": 2 }));
-  g.appendChild(el("path", {
-    d: `M0,0 H${CABIN.w} V${CABIN.h} H0 Z M${WALL},${WALL} V${CABIN.h - WALL} H${CABIN.w - WALL} V${WALL} Z`,
-    fill: "#222", "fill-rule": "evenodd",
-  }));
-}
-
-function drawOpeningsOnSide(g, side, segs) {
-  let cursor = 0;
-  for (const seg of segs) {
-    if (seg.t === "win" || seg.t === "door") {
-      let x, y, w, h;
-      if (side === "north") { x = cursor; y = 0; w = seg.l; h = WALL; }
-      if (side === "south") { x = cursor; y = CABIN.h - WALL; w = seg.l; h = WALL; }
-      if (side === "west")  { x = 0; y = cursor; w = WALL; h = seg.l; }
-      if (side === "east")  { x = CABIN.w - WALL; y = cursor; w = WALL; h = seg.l; }
-      const fill = seg.t === "win" ? "var(--window)" : "var(--door)";
-      g.appendChild(el("rect", { x, y, width: w, height: h, fill, stroke: "none" }));
-      if (seg.t === "door" && side === "south") {
-        g.appendChild(el("path", {
-          d: `M${x},${y + h} A${w},${w} 0 0 0 ${x + w},${y + h + w}`,
-          fill: "none", stroke: "var(--door)", "stroke-width": 2, "stroke-dasharray": "6 4", opacity: 0.8,
+  function drawOpenings(g, side, segs) {
+    let cursor = 0;
+    for (const seg of segs) {
+      if (seg.t === "win" || seg.t === "door") {
+        let x, y, w, h;
+        if (side === "north") { x = cursor; y = 0; w = seg.l; h = WALL; }
+        if (side === "south") { x = cursor; y = CABIN.h - WALL; w = seg.l; h = WALL; }
+        if (side === "west") { x = 0; y = cursor; w = WALL; h = seg.l; }
+        if (side === "east") { x = CABIN.w - WALL; y = cursor; w = WALL; h = seg.l; }
+        g.appendChild(el("rect", {
+          x, y, width: w, height: h,
+          fill: seg.t === "win" ? "var(--window)" : "var(--door)",
         }));
+        if (seg.t === "door" && side === "south") {
+          g.appendChild(el("path", {
+            d: `M${x},${y + h} A${w},${w} 0 0 0 ${x + w},${y + h + w}`,
+            fill: "none", stroke: "var(--door)", "stroke-width": 2,
+            "stroke-dasharray": "6 4", opacity: 0.85,
+          }));
+        }
+      }
+      cursor += seg.l;
+    }
+  }
+
+  function drawBathroomMass(g, { interactive = false } = {}) {
+    const o = bathOuter();
+    const bi = bathInner();
+    g.appendChild(el("rect", {
+      x: o.x, y: o.y, width: o.w, height: o.d,
+      fill: "var(--bath)", stroke: "#555", "stroke-width": 1.2,
+    }));
+    g.appendChild(el("rect", { x: o.x, y: o.y, width: PART, height: o.d, fill: "var(--sdk)" }));
+    g.appendChild(el("rect", { x: o.x + o.w - PART, y: o.y, width: PART, height: o.d, fill: "var(--sdk)" }));
+    g.appendChild(el("rect", { x: o.x, y: o.y + o.d - PART, width: o.w, height: PART, fill: "var(--sdk)" }));
+    g.appendChild(el("rect", {
+      x: bi.x, y: bi.y, width: bi.w, height: bi.d, fill: "#f7fafc",
+    }));
+    const label = el("text", {
+      x: bi.x + bi.w / 2, y: bi.y + 18, fill: "var(--muted)",
+      "font-size": 12, "text-anchor": "middle",
+    });
+    label.textContent = "KOUPELNA";
+    g.appendChild(label);
+
+    if (interactive) {
+      // drag handles
+      g.appendChild(el("rect", {
+        class: "handle", "data-drag": "bath-east",
+        x: o.x + o.w - 4, y: o.y, width: 8, height: o.d,
+        fill: "rgba(31,78,107,0.35)", stroke: "var(--accent)", "stroke-width": 1,
+      }));
+      g.appendChild(el("rect", {
+        class: "handle", "data-drag": "bath-west",
+        x: o.x - 4, y: o.y, width: 8, height: o.d,
+        fill: "rgba(31,78,107,0.25)", stroke: "var(--accent)", "stroke-width": 1,
+      }));
+      g.appendChild(el("rect", {
+        class: "handle-ns", "data-drag": "bath-south",
+        x: o.x, y: o.y + o.d - 4, width: o.w, height: 8,
+        fill: "rgba(31,78,107,0.25)", stroke: "var(--accent)", "stroke-width": 1,
+      }));
+    }
+  }
+
+  function drawFurnitureCabin(g) {
+    if (state.showSofa) {
+      const s = sofaPolylines();
+      g.appendChild(el("rect", {
+        x: s.west.x, y: s.west.y, width: s.west.w, height: s.west.d,
+        fill: "#d5d8dc", stroke: "#666", "stroke-width": 1.2, rx: 4,
+      }));
+      g.appendChild(el("rect", {
+        x: s.north.x, y: s.north.y, width: s.north.w, height: s.north.d,
+        fill: "#d5d8dc", stroke: "#666", "stroke-width": 1.2, rx: 4,
+      }));
+      const t = el("text", {
+        x: s.north.x + 12, y: s.north.y + 22, fill: "#444", "font-size": 11,
+      });
+      t.textContent = "Gauč 240 / 160";
+      g.appendChild(t);
+    }
+
+    // Kitchen
+    const k = kitchenBox();
+    g.appendChild(el("rect", {
+      x: k.x, y: k.y, width: k.w, height: k.d,
+      fill: "rgba(47,143,91,0.12)", stroke: "var(--kitchen)", "stroke-width": 2,
+    }));
+    const kt = el("text", {
+      x: k.x + k.w / 2, y: k.y + k.d / 2, fill: "var(--kitchen)",
+      "font-size": 12, "text-anchor": "middle", "dominant-baseline": "middle",
+    });
+    kt.textContent = "Kuchyň 160";
+    g.appendChild(kt);
+
+    // Passage
+    const pass = kitchenBathPassage();
+    const ok = pass.len >= PASS_TARGET - 0.5;
+    g.appendChild(el("line", {
+      x1: pass.a.x, y1: pass.a.y, x2: pass.b.x, y2: pass.b.y,
+      stroke: ok ? "var(--kitchen)" : "var(--bad)",
+      "stroke-width": 1.5, "stroke-dasharray": "5 4",
+    }));
+    const pt = el("text", {
+      x: (pass.a.x + pass.b.x) / 2 + 8,
+      y: (pass.a.y + pass.b.y) / 2 - 6,
+      fill: ok ? "var(--kitchen)" : "var(--bad)",
+      "font-size": 11,
+    });
+    pt.textContent = `Průchod ${round1(pass.len)} cm`;
+    g.appendChild(pt);
+
+    // TV partition
+    const tv = tvBox();
+    const fit = tvFits(state.tvVariant);
+    g.appendChild(el("rect", {
+      x: tv.x, y: tv.y, width: tv.w, height: tv.d,
+      fill: "var(--sdk)", stroke: "#555", "stroke-width": 1,
+    }));
+    // TV on west face
+    const tvScreenW = Math.min(TV_WIDTHS[state.tvVariant], tv.d);
+    const tvY = tv.y + (tv.d - tvScreenW) / 2;
+    g.appendChild(el("rect", {
+      x: tv.x - 6, y: tvY, width: 6, height: tvScreenW,
+      fill: fit.overflow ? "var(--bad)" : "#222",
+    }));
+    g.appendChild(el("rect", {
+      class: "handle", "data-drag": "tv-x",
+      x: tv.x - 5, y: tv.y, width: PART + 10, height: tv.d,
+      fill: "rgba(31,78,107,0.12)", stroke: "var(--accent)", "stroke-width": 1,
+    }));
+    g.appendChild(el("rect", {
+      class: "handle-ns", "data-drag": "tv-len",
+      x: tv.x - 2, y: tv.y + tv.d - 5, width: PART + 4, height: 10,
+      fill: "rgba(31,78,107,0.35)",
+    }));
+
+    // TV safe zone band on partition length
+    const zoneColor = fit.overflow ? "var(--warn-fill)" : fit.tight ? "var(--warn-fill)" : "var(--safe)";
+    g.appendChild(el("rect", {
+      x: tv.x - 18, y: tv.y + Math.max(0, (tv.d - TV_WIDTHS[state.tvVariant]) / 2),
+      width: 14, height: TV_WIDTHS[state.tvVariant],
+      fill: zoneColor, stroke: fit.ok ? "var(--safe-stroke)" : "var(--warn)",
+      "stroke-width": 1, "stroke-dasharray": "3 2",
+    }));
+
+    if (state.showBed) {
+      const bed = bedBox();
+      const gap = bedGap();
+      const safe = gap >= MIN_BED_PASS;
+      // safe zone hatch between bath and bed
+      const o = bathOuter();
+      g.appendChild(el("rect", {
+        x: o.x + o.w, y: WALL,
+        width: Math.max(0, bed.x - (o.x + o.w)),
+        height: CABIN.h - 2 * WALL,
+        fill: safe ? "var(--safe)" : "var(--warn-fill)",
+        stroke: "none",
+      }));
+      g.appendChild(el("rect", {
+        x: bed.x, y: bed.y, width: bed.w, height: bed.d,
+        fill: "rgba(217,120,44,0.12)", stroke: "var(--bed)", "stroke-width": 2,
+      }));
+      const bt = el("text", {
+        x: bed.x + bed.w / 2, y: bed.y + bed.d / 2,
+        fill: "var(--bed)", "font-size": 12, "text-anchor": "middle",
+        "dominant-baseline": "middle",
+      });
+      bt.textContent = `Postel ${state.bedVariant}`;
+      g.appendChild(bt);
+      if (state.showDims) {
+        dimH(g, o.x + o.w, bed.x, bed.y - 12, `${round1(gap)}`, safe ? "var(--safe-stroke)" : "var(--bad)");
       }
     }
-    cursor += seg.l;
   }
-}
 
-function drawBathroomShell(g, { highlight = false } = {}) {
-  const o = bathOuterBox();
-  const bi = bathInnerBox();
-  g.appendChild(el("rect", {
-    x: o.x, y: o.y, width: o.w, height: o.d,
-    fill: highlight ? "var(--bath-fill)" : "#eef3f7",
-    stroke: "var(--wall)", "stroke-width": 1.5,
-  }));
-  g.appendChild(el("rect", { x: o.x, y: o.y, width: PART, height: o.d, fill: "#333" }));
-  g.appendChild(el("rect", { x: o.x + o.w - PART, y: o.y, width: PART, height: o.d, fill: "#333" }));
-  g.appendChild(el("rect", { x: o.x, y: o.y + o.d - PART, width: o.w, height: PART, fill: "#333" }));
-  g.appendChild(el("rect", {
-    x: bi.x, y: bi.y, width: bi.w, height: bi.d,
-    fill: highlight ? "#f3f9fc" : "#fff", stroke: "none",
-  }));
-}
+  function drawBathFixtures(g, { detail = false } = {}) {
+    const wc = wcBox();
+    const sh = showerBox();
+    const shClear = showerClearanceBox();
+    const sk = sinkBox();
+    const op = doorOpeningBox();
+    const travel = doorTravelBox();
+    const issues = detail ? detectBathCollisions() : [];
+    const conflict = (key) => issues.some(() => false); // simplified: color by overlap checks below
 
-/** Punch opening, closed-leaf glyph and travel zone for the bathroom door. */
-function drawDoor(g, { collision = false } = {}) {
-  const op = doorOpeningBox();
-  g.appendChild(el("rect", {
-    x: op.x - 0.5, y: op.y, width: PART + 1, height: op.d,
-    fill: "#f3f9fc",
-  }));
-  g.appendChild(el("rect", {
-    x: op.x + 2, y: op.y, width: PART - 4, height: op.d,
-    fill: collision ? "var(--collision-stroke)" : "var(--door)", opacity: 0.85,
-  }));
-  const travel = doorTravelBox();
-  g.appendChild(el("rect", {
-    x: travel.x, y: travel.y, width: travel.w, height: travel.d,
-    fill: collision ? "var(--collision)" : "var(--door)",
-    opacity: collision ? 0.6 : 0.35,
-    stroke: collision ? "var(--collision-stroke)" : "var(--door)", "stroke-width": 1,
-    "stroke-dasharray": "4 3",
-  }));
-}
+    const badTravel = detail && (aabbOverlap(travel, { x: bathOuter().x, y: bathInner().y, w: bathOuter().w, d: 63 })
+      || aabbOverlap(travel, sh));
+    const badShower = detail && !showerFits();
 
-/** WC bowl + tank footprint (north-west corner of the bathroom). */
-function drawWc(g, { collision = false } = {}) {
-  const wc = wcBox();
-  const fill = collision ? "var(--collision)" : "#dfe7ee";
-  const stroke = collision ? "var(--collision-stroke)" : "var(--wall)";
-  g.appendChild(el("rect", {
-    x: wc.x, y: wc.y, width: wc.w, height: wc.d,
-    fill, stroke, "stroke-width": 1.5,
-  }));
-  g.appendChild(el("ellipse", {
-    cx: wc.x + wc.w / 2, cy: wc.y + wc.d * 0.55, rx: wc.w * 0.28, ry: wc.d * 0.28,
-    fill: "#fff", stroke, "stroke-width": 1.2,
-  }));
-}
+    g.appendChild(el("rect", {
+      x: op.x - 0.5, y: op.y, width: PART + 1, height: op.d, fill: "#f7fafc",
+    }));
+    g.appendChild(el("rect", {
+      x: op.x + 2, y: op.y, width: PART - 4, height: op.d,
+      fill: "var(--door)", opacity: 0.9,
+    }));
+    g.appendChild(el("rect", {
+      x: travel.x, y: travel.y, width: travel.w, height: travel.d,
+      fill: badTravel ? "rgba(176,0,32,0.35)" : "var(--door)",
+      opacity: 0.35, stroke: "var(--door)", "stroke-width": 1, "stroke-dasharray": "4 3",
+    }));
 
-/** Shower tray + north clearance zone and east-wall sink basin. */
-function drawShowerAndSink(g, { showerConflict = false, sinkConflict = false } = {}) {
-  const fits = showerFits();
-  const showerBad = !fits || showerConflict;
-  const fill = showerBad ? "var(--collision)" : "#cfeaea";
-  const stroke = showerBad ? "var(--collision-stroke)" : "#2a8f8f";
+    g.appendChild(el("rect", {
+      x: shClear.x, y: shClear.y, width: shClear.w, height: shClear.d,
+      fill: "rgba(47,143,91,0.12)", stroke: "var(--kitchen)", "stroke-dasharray": "3 2",
+    }));
+    g.appendChild(el("rect", {
+      x: sh.x, y: sh.y, width: sh.w, height: sh.d,
+      fill: badShower ? "rgba(176,0,32,0.25)" : "rgba(110,182,224,0.35)",
+      stroke: badShower ? "var(--bad)" : "#2a6fad", "stroke-width": 1.5,
+    }));
 
-  const clr = showerClearanceBox();
-  g.appendChild(el("rect", {
-    x: clr.x, y: clr.y, width: clr.w, height: clr.d,
-    fill: "none", stroke, "stroke-width": 1, "stroke-dasharray": "4 3", opacity: 0.85,
-  }));
+    g.appendChild(el("rect", {
+      x: wc.x, y: wc.y, width: wc.w, height: wc.d,
+      fill: "#dfe7ee", stroke: "#333", "stroke-width": 1.2,
+    }));
+    g.appendChild(el("ellipse", {
+      cx: wc.x + wc.w / 2, cy: wc.y + wc.d * 0.55,
+      rx: wc.w * 0.28, ry: wc.d * 0.28,
+      fill: "#fff", stroke: "#333", "stroke-width": 1,
+    }));
 
-  const s = showerBox();
-  g.appendChild(el("rect", {
-    x: s.x, y: s.y, width: s.w, height: s.d,
-    fill, stroke, "stroke-width": 1.5,
-  }));
-  g.appendChild(el("circle", {
-    cx: s.x + s.w / 2, cy: s.y + s.d / 2, r: Math.max(2, Math.min(s.w, s.d) * 0.06),
-    fill: "none", stroke, "stroke-width": 1,
-  }));
-
-  const sinkFill = sinkConflict ? "var(--collision)" : "#dfe7ee";
-  const sinkStroke = sinkConflict ? "var(--collision-stroke)" : "var(--wall)";
-  const sink = sinkBox();
-  g.appendChild(el("rect", {
-    x: sink.x, y: sink.y, width: sink.w, height: sink.d,
-    fill: sinkFill, stroke: sinkStroke, "stroke-width": 1.5,
-  }));
-  g.appendChild(el("ellipse", {
-    cx: sink.x + sink.w * 0.55, cy: sink.y + sink.d / 2, rx: sink.w * 0.32, ry: sink.d * 0.32,
-    fill: "#fff", stroke: sinkStroke, "stroke-width": 1,
-  }));
-}
-
-function renderCabin(conflicts) {
-  const wrap = document.getElementById("cabin-wrap");
-  wrap.innerHTML = "";
-  const pad = 40;
-  const svg = el("svg", {
-    viewBox: `${-pad} ${-pad} ${CABIN.w + pad * 2} ${CABIN.h + pad * 2}`,
-    role: "img", "aria-label": "Půdorys chaty",
-  });
-  const g = el("g", {});
-  drawCabinShell(g);
-  drawOpeningsOnSide(g, "north", NORTH_SEGS);
-  drawOpeningsOnSide(g, "south", SOUTH_SEGS);
-  drawOpeningsOnSide(g, "west", WEST_SEGS);
-  drawOpeningsOnSide(g, "east", EAST_SEGS);
-  drawBathroomShell(g, { highlight: true });
-  drawDoor(g, { collision: conflicts.door });
-  drawShowerAndSink(g, { showerConflict: conflicts.shower, sinkConflict: conflicts.sink });
-  svg.appendChild(g);
-  wrap.appendChild(svg);
-}
-
-/** Dynamic dimension lines shown when state.showDims is on (Task 6 §3). */
-function drawBathDims(g) {
-  const bi = bathInnerBox();
-  const o = bathOuterBox();
-  const op = doorOpeningBox();
-  const wc = wcBox();
-  const shClear = showerClearanceBox();
-  const sink = sinkBox();
-
-  const doorDimX = o.x - 10;
-  dimV(g, bi.y, op.y, doorDimX, `${state.doorOffset}`);
-  dimV(g, op.y, op.y + op.d, doorDimX - 14, `${state.doorWidth}`);
-
-  const passageX = bi.x + 6;
-  const passageGap = Math.max(0, shClear.y - (wc.y + wc.d));
-  dimV(g, wc.y + wc.d, shClear.y, passageX, passageGap.toFixed(0));
-
-  const sinkDimX = o.x + o.w + 10;
-  dimV(g, bi.y, sink.y, sinkDimX, `${state.sinkOffset}`);
-  const gapToShower = Math.max(0, shClear.y - (sink.y + sink.d));
-  dimV(g, sink.y + sink.d, shClear.y, sinkDimX, gapToShower.toFixed(0));
-}
-
-function renderBath(conflicts) {
-  const wrap = document.getElementById("bath-wrap");
-  wrap.innerHTML = "";
-  const o = bathOuterBox();
-  const pad = 30;
-  const svg = el("svg", {
-    viewBox: `${o.x - pad} ${o.y - pad} ${o.w + pad * 2} ${o.d + pad * 2}`,
-    role: "img", "aria-label": "Detail koupelny",
-  });
-  const g = el("g", {});
-  g.appendChild(el("rect", {
-    x: o.x - 20, y: o.y - WALL, width: o.w + 40, height: WALL, fill: "#222",
-  }));
-  drawBathroomShell(g, { highlight: true });
-  drawDoor(g, { collision: conflicts.door });
-  drawWc(g, { collision: conflicts.wc });
-  drawShowerAndSink(g, { showerConflict: conflicts.shower, sinkConflict: conflicts.sink });
-  if (state.showDims) drawBathDims(g);
-  svg.appendChild(g);
-  wrap.appendChild(svg);
-}
-
-function render() {
-  const { issues, conflicts } = detectCollisions();
-  renderCabin(conflicts);
-  renderBath(conflicts);
-  updateStatus(issues);
-}
-
-/** Keep the sink inside bathInnerBox() when its width or the shared offset slider change. */
-function clampSink() {
-  const bi = bathInnerBox();
-  const maxOff = Math.max(0, bi.d - state.sinkW);
-  state.sinkOffset = Math.min(Math.max(0, state.sinkOffset), maxOff);
-  const input = document.getElementById("sink-offset");
-  if (input) {
-    input.max = String(maxOff);
-    input.value = String(state.sinkOffset);
-    document.getElementById("sink-off-val").textContent = String(state.sinkOffset);
+    g.appendChild(el("rect", {
+      x: sk.x, y: sk.y, width: sk.w, height: sk.d,
+      fill: "#eef2f5", stroke: "#444", "stroke-width": 1.2,
+    }));
   }
-}
 
-function bindSeg(id, key, map = (v) => v) {
-  const root = document.getElementById(id);
-  root.addEventListener("click", (e) => {
-    const btn = e.target.closest("button[data-v]");
-    if (!btn) return;
-    root.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
-    state[key] = map(btn.dataset.v);
-    if (key === "doorType") {
-      document.getElementById("pocket-dir-wrap").hidden = state.doorType !== "B";
+  function drawMeasure(g) {
+    if (!state.measureA) return;
+    const a = state.measureA;
+    const b = state.measureB || state.measureCursor;
+    if (!b) {
+      g.appendChild(el("circle", { cx: a.x, cy: a.y, r: 3, fill: "var(--dim)" }));
+      return;
     }
-    if (key === "showerPreset") {
-      document.getElementById("full-depth-wrap").hidden = state.showerPreset !== "full";
+    g.appendChild(el("line", {
+      x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+      stroke: "var(--dim)", "stroke-width": 1.5, "stroke-dasharray": "4 3",
+    }));
+    g.appendChild(el("circle", { cx: a.x, cy: a.y, r: 3, fill: "var(--dim)" }));
+    g.appendChild(el("circle", { cx: b.x, cy: b.y, r: 3, fill: "var(--dim)" }));
+    const t = el("text", {
+      x: (a.x + b.x) / 2 + 8, y: (a.y + b.y) / 2 - 6,
+      fill: "var(--dim)", "font-size": 12, "font-weight": 600,
+    });
+    t.textContent = `${round1(dist(a, b))} cm`;
+    g.appendChild(t);
+  }
+
+  function drawHoverDims(g) {
+    if (state.tab !== "cabin" || !state.hoverCm || state.measureMode) return;
+    const p = state.hoverCm;
+    dimH(g, 0, p.x, p.y - 10, `${round1(p.x)}`, "var(--dim-soft)");
+    dimH(g, p.x, CABIN.w, p.y + 14, `${round1(CABIN.w - p.x)}`, "var(--dim-soft)");
+    dimV(g, 0, p.y, p.x + 10, `${round1(p.y)}`, "var(--dim-soft)");
+    dimV(g, p.y, CABIN.h, p.x - 14, `${round1(CABIN.h - p.y)}`, "var(--dim-soft)");
+  }
+
+  function renderCabinView() {
+    const pad = 50;
+    const svg = el("svg", {
+      viewBox: `${-pad} ${-pad} ${CABIN.w + pad * 2} ${CABIN.h + pad * 2 + 40}`,
+      id: "plan-svg",
+      class: state.measureMode ? "measuring" : "",
+    });
+    const g = el("g", { id: "plan-root" });
+    drawCabinShell(g);
+    drawOpenings(g, "north", NORTH_SEGS);
+    drawOpenings(g, "south", SOUTH_SEGS);
+    drawOpenings(g, "west", WEST_SEGS);
+    drawOpenings(g, "east", EAST_SEGS);
+    drawBathroomMass(g, { interactive: true });
+    drawBathFixtures(g, { detail: false });
+    drawFurnitureCabin(g);
+
+    if (state.showDims) {
+      dimH(g, 0, CABIN.w, -28, `${CABIN.w}`, "var(--dim)");
+      dimV(g, 0, CABIN.h, -28, `${CABIN.h}`, "var(--dim)");
+      const o = bathOuter();
+      const bi = bathInner();
+      dimH(g, o.x, o.x + o.w, o.y - 14, `${round1(o.w)}`, "var(--dim)");
+      dimH(g, bi.x, bi.x + bi.w, bi.y + bi.d + 16, `světlá ${round1(bi.w)}`, "var(--dim-soft)");
     }
-    render();
-  });
-}
-bindSeg("door-width", "doorWidth", Number);
-bindSeg("door-type", "doorType");
-bindSeg("pocket-dir", "pocketDir");
-const doorOffset = document.getElementById("door-offset");
-doorOffset.addEventListener("input", () => {
-  state.doorOffset = Number(doorOffset.value);
-  document.getElementById("door-offset-val").textContent = String(state.doorOffset);
-  render();
-});
 
-bindSeg("shower-preset", "showerPreset");
-bindSeg("shower-full-depth", "showerFullDepth", Number);
+    drawHoverDims(g);
+    drawMeasure(g);
 
-const showerRotate = document.getElementById("shower-rotate");
-showerRotate.addEventListener("change", () => {
-  state.showerRotate = showerRotate.checked;
-  render();
-});
+    // room labels
+    const living = el("text", { x: 140, y: 160, fill: "var(--muted)", "font-size": 14 });
+    living.textContent = "OBÝVÁK";
+    g.appendChild(living);
+    const bedL = el("text", {
+      x: CABIN.w - WALL - 100, y: 60, fill: "var(--muted)", "font-size": 14, "text-anchor": "middle",
+    });
+    bedL.textContent = "LOŽNICE";
+    g.appendChild(bedL);
 
-function bindRange(id, key, labelId) {
-  const input = document.getElementById(id);
-  input.addEventListener("input", () => {
-    state[key] = Number(input.value);
-    if (labelId) document.getElementById(labelId).textContent = String(state[key]);
-    render();
-  });
-}
-function bindRangeWithClamp(id, key, labelId) {
-  const input = document.getElementById(id);
-  input.addEventListener("input", () => {
-    state[key] = Number(input.value);
-    if (labelId) document.getElementById(labelId).textContent = String(state[key]);
+    svg.appendChild(g);
+    return svg;
+  }
+
+  function renderBathView() {
+    const o = bathOuter();
+    const pad = 40;
+    const svg = el("svg", {
+      viewBox: `${o.x - pad} ${o.y - WALL - 10} ${o.w + pad * 2} ${o.d + WALL + pad * 2}`,
+      id: "plan-svg",
+      class: state.measureMode ? "measuring" : "",
+    });
+    const g = el("g", { id: "plan-root" });
+    g.appendChild(el("rect", {
+      x: o.x - 30, y: o.y - WALL, width: o.w + 60, height: WALL, fill: "#2a2e32",
+    }));
+    drawBathroomMass(g, { interactive: false });
+    drawBathFixtures(g, { detail: true });
+
+    if (state.showDims) {
+      const bi = bathInner();
+      const op = doorOpeningBox();
+      dimV(g, bi.y, op.y, o.x - 12, `${state.doorOffset}`);
+      dimV(g, op.y, op.y + op.d, o.x - 12, `${state.doorWidth}`);
+      const wc = wcBox();
+      const sh = showerBox();
+      dimV(g, wc.y + wc.d, sh.y, bi.x + 8, `${round1(sh.y - (wc.y + wc.d))}`);
+    }
+    drawMeasure(g);
+    svg.appendChild(g);
+    return svg;
+  }
+
+  function updateStatus() {
+    const elStatus = document.getElementById("status");
+    const msgs = [];
+    let level = "ok";
+
+    if (state.tab === "cabin") {
+      const bi = bathInner();
+      const gap = bedGap();
+      const pass = kitchenBathPassage();
+      const fit = tvFits(state.tvVariant);
+      msgs.push(`Koupelna světlá ${round1(bi.w)} × ${round1(bi.d)} cm`);
+      msgs.push(`Průchod kuchyň↔koupelna ${round1(pass.len)} cm (cíl ${PASS_TARGET})`);
+      if (pass.len < PASS_TARGET - 0.5) level = "warn";
+      if (state.showBed) {
+        msgs.push(`Mezera koupelna↔postel ${round1(gap)} cm (safe ≥ ${MIN_BED_PASS})`);
+        if (gap < MIN_BED_PASS) level = "warn";
+        if (gap < 40) level = "bad";
+      }
+      if (fit.overflow) {
+        msgs.push(`TV ${state.tvVariant}" přesahuje příčku (${fit.need} cm > ${state.tvLen} cm)`);
+        level = level === "bad" ? "bad" : "warn";
+      } else if (fit.tight) {
+        msgs.push(`TV ${state.tvVariant}" těsně (okraj ${round1(fit.margin)} cm)`);
+        if (level === "ok") level = "warn";
+      } else {
+        msgs.push(`TV ${state.tvVariant}" OK (okraj ~${round1(fit.margin)} cm)`);
+      }
+    } else {
+      const issues = detectBathCollisions();
+      if (!issues.length) msgs.push("Bez kolizí v koupelně.");
+      else {
+        issues.forEach((i) => msgs.push(i.msg));
+        if (issues.some((i) => i.level === "bad")) level = "bad";
+        else level = "warn";
+      }
+    }
+
+    elStatus.className = "status " + level;
+    elStatus.innerHTML = msgs.join("<br>");
+  }
+
+  function syncSideHints() {
+    const bi = bathInner();
+    document.getElementById("bath-clear-hint").textContent =
+      `Světlá šířka: ${round1(bi.w)} cm · světlá hloubka: ${round1(bi.d)} cm`;
+    const gap = bedGap();
+    document.getElementById("bed-hint").textContent =
+      `Postel doražená na východ · mezera k příčce ${round1(gap)} cm`;
+    const fit = tvFits(state.tvVariant);
+    document.getElementById("tv-hint").textContent = fit.overflow
+      ? `${state.tvVariant}" = ${fit.need} cm — přesah ${round1(-fit.margin)} cm / strana`
+      : `${state.tvVariant}" = ${fit.need} cm — okraj ~${round1(fit.margin)} cm / strana (safe ≥ 5)`;
+    const pass = kitchenBathPassage();
+    document.getElementById("pass-hint").textContent =
+      `PR linky → JL koupelny: ${round1(pass.len)} cm (cíl ${PASS_TARGET} cm)`;
+  }
+
+  let hoverRaf = 0;
+
+  function render() {
     clampSink();
+    const wrap = document.getElementById("canvas-wrap");
+    wrap.innerHTML = "";
+    const svg = state.tab === "cabin" ? renderCabinView() : renderBathView();
+    wrap.appendChild(svg);
+    updateStatus();
+    syncSideHints();
+    document.getElementById("panel-cabin").hidden = state.tab !== "cabin";
+    document.getElementById("panel-bath").hidden = state.tab !== "bath";
+    document.getElementById("side-title").textContent =
+      state.tab === "cabin" ? "Půdorys chaty" : "Detail koupelny";
+    document.getElementById("side-sub").textContent =
+      state.tab === "cabin"
+        ? "Táhni šedé úchyty příček · safe zóny jen vizuálně"
+        : "Rozměry místnosti zděděné z tabu Půdorys";
+  }
+
+  function svgPoint(svg, evt) {
+    const pt = svg.createSVGPoint();
+    pt.x = evt.clientX;
+    pt.y = evt.clientY;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return { x: 0, y: 0 };
+    const p = pt.matrixTransform(ctm.inverse());
+    return { x: p.x, y: p.y };
+  }
+
+  function currentSvg() {
+    return document.getElementById("plan-svg");
+  }
+
+  function onDrag(p) {
+    const d = state.drag;
+    if (!d) return;
+    const dx = p.x - d.start.x;
+    const dy = p.y - d.start.y;
+    if (d.type === "bath-east") {
+      state.bathW = Math.min(180, Math.max(110, d.bathW + dx));
+    } else if (d.type === "bath-west") {
+      const newLeft = Math.min(650, Math.max(480, d.bathLeft + dx));
+      const right = d.bathLeft + d.bathW;
+      state.bathLeft = newLeft;
+      state.bathW = Math.min(180, Math.max(110, right - newLeft));
+    } else if (d.type === "bath-south") {
+      state.bathD = Math.min(260, Math.max(180, d.bathD + dy));
+    } else if (d.type === "tv-x") {
+      state.tvX = Math.min(420, Math.max(300, d.tvX + dx));
+    } else if (d.type === "tv-len") {
+      state.tvLen = Math.min(180, Math.max(100, d.tvLen + dy));
+    }
+    syncSlidersFromState();
+    render();
+  }
+
+  const wrapEl = document.getElementById("canvas-wrap");
+  wrapEl.addEventListener("mousedown", (evt) => {
+    const svg = currentSvg();
+    if (!svg) return;
+    const target = evt.target.closest("[data-drag]");
+    if (target && state.tab === "cabin" && !state.measureMode) {
+      state.drag = {
+        type: target.getAttribute("data-drag"),
+        start: svgPoint(svg, evt),
+        bathLeft: state.bathLeft,
+        bathW: state.bathW,
+        bathD: state.bathD,
+        tvX: state.tvX,
+        tvLen: state.tvLen,
+      };
+      evt.preventDefault();
+      return;
+    }
+    if (state.measureMode) {
+      const p = svgPoint(svg, evt);
+      if (!state.measureA) {
+        state.measureA = p;
+        state.measureB = null;
+        state.measureCursor = p;
+        document.getElementById("measure-hint").textContent = "Klikni bod B…";
+      } else if (!state.measureB) {
+        state.measureB = p;
+        state.measureCursor = null;
+        state.measureMode = false;
+        document.getElementById("btn-measure").classList.remove("active");
+        document.getElementById("measure-hint").textContent =
+          `Naměřeno: ${round1(dist(state.measureA, state.measureB))} cm`;
+      }
+      render();
+    }
+  });
+
+  wrapEl.addEventListener("mousemove", (evt) => {
+    const svg = currentSvg();
+    if (!svg) return;
+    const p = svgPoint(svg, evt);
+    if (state.drag) {
+      onDrag(p);
+      return;
+    }
+    if (state.measureMode && state.measureA && !state.measureB) {
+      state.measureCursor = p;
+      if (!hoverRaf) {
+        hoverRaf = requestAnimationFrame(() => {
+          hoverRaf = 0;
+          render();
+        });
+      }
+      return;
+    }
+    if (state.tab === "cabin" && !state.measureMode) {
+      state.hoverCm = p;
+      if (!hoverRaf) {
+        hoverRaf = requestAnimationFrame(() => {
+          hoverRaf = 0;
+          render();
+        });
+      }
+    }
+  });
+
+  wrapEl.addEventListener("mouseleave", () => {
+    if (!state.drag && state.hoverCm) {
+      state.hoverCm = null;
+      render();
+    }
+  });
+
+  window.addEventListener("mouseup", () => {
+    if (state.drag) {
+      state.drag = null;
+      syncSlidersFromState();
+      render();
+    }
+  });
+
+  function syncSlidersFromState() {
+    const map = [
+      ["bath-left", "bathLeft", "bath-left-val"],
+      ["bath-w", "bathW", "bath-w-val"],
+      ["bath-d", "bathD", "bath-d-val"],
+      ["tv-x", "tvX", "tv-x-val"],
+      ["tv-len", "tvLen", "tv-len-val"],
+      ["door-offset", "doorOffset", "door-offset-val"],
+      ["sink-w", "sinkW", "sink-w-val"],
+      ["sink-d", "sinkD", "sink-d-val"],
+      ["sink-offset", "sinkOffset", "sink-off-val"],
+    ];
+    for (const [id, key, lab] of map) {
+      const input = document.getElementById(id);
+      if (!input) continue;
+      input.value = String(Math.round(state[key]));
+      document.getElementById(lab).textContent = String(Math.round(state[key]));
+    }
+  }
+
+  function bindSeg(id, key, mapFn = (v) => v, after) {
+    const root = document.getElementById(id);
+    if (!root) return;
+    root.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-v]");
+      if (!btn) return;
+      root.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
+      state[key] = mapFn(btn.dataset.v);
+      if (after) after();
+      render();
+    });
+  }
+
+  function bindRange(id, key, lab) {
+    const input = document.getElementById(id);
+    input.addEventListener("input", () => {
+      state[key] = Number(input.value);
+      document.getElementById(lab).textContent = String(state[key]);
+      if (key === "doorType") {}
+      if (key.startsWith("sink") || key === "sinkW") clampSink();
+      render();
+    });
+  }
+
+  // Tabs
+  document.getElementById("tabs").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-tab]");
+    if (!btn) return;
+    state.tab = btn.dataset.tab;
+    document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b === btn));
+    state.hoverCm = null;
     render();
   });
-}
-bindRangeWithClamp("sink-w", "sinkW", "sink-w-val");
-bindRange("sink-d", "sinkD", "sink-d-val");
-bindRangeWithClamp("sink-offset", "sinkOffset", "sink-off-val");
 
-const showDims = document.getElementById("show-dims");
-showDims.addEventListener("change", () => {
-  state.showDims = showDims.checked;
+  document.getElementById("btn-measure").addEventListener("click", () => {
+    state.measureMode = !state.measureMode;
+    document.getElementById("btn-measure").classList.toggle("active", state.measureMode);
+    document.getElementById("measure-hint").textContent = state.measureMode
+      ? "Klikni bod A…"
+      : "";
+    if (state.measureMode) {
+      state.measureA = null;
+      state.measureB = null;
+      state.measureCursor = null;
+    }
+    render();
+  });
+  document.getElementById("btn-measure-reset").addEventListener("click", () => {
+    state.measureMode = false;
+    state.measureA = null;
+    state.measureB = null;
+    state.measureCursor = null;
+    document.getElementById("btn-measure").classList.remove("active");
+    document.getElementById("measure-hint").textContent = "";
+    render();
+  });
+
+  document.getElementById("show-sofa").addEventListener("change", (e) => {
+    state.showSofa = e.target.checked; render();
+  });
+  document.getElementById("show-bed").addEventListener("change", (e) => {
+    state.showBed = e.target.checked; render();
+  });
+  document.getElementById("show-dims").addEventListener("change", (e) => {
+    state.showDims = e.target.checked; render();
+  });
+
+  bindRange("bath-left", "bathLeft", "bath-left-val");
+  bindRange("bath-w", "bathW", "bath-w-val");
+  bindRange("bath-d", "bathD", "bath-d-val");
+  bindRange("tv-x", "tvX", "tv-x-val");
+  bindRange("tv-len", "tvLen", "tv-len-val");
+  bindSeg("bed-variant", "bedVariant", Number);
+  bindSeg("tv-variant", "tvVariant", Number);
+
+  bindSeg("door-width", "doorWidth", Number);
+  bindRange("door-offset", "doorOffset", "door-offset-val");
+  bindSeg("door-type", "doorType", (v) => v, () => {
+    document.getElementById("pocket-dir-wrap").hidden = state.doorType !== "B";
+  });
+  bindSeg("pocket-dir", "pocketDir");
+  bindSeg("shower-preset", "showerPreset", (v) => v, () => {
+    document.getElementById("full-depth-wrap").hidden = state.showerPreset !== "full";
+  });
+  bindSeg("shower-full-depth", "showerFullDepth", Number);
+  document.getElementById("shower-rotate").addEventListener("change", (e) => {
+    state.showerRotate = e.target.checked; render();
+  });
+  bindRange("sink-w", "sinkW", "sink-w-val");
+  bindRange("sink-d", "sinkD", "sink-d-val");
+  bindRange("sink-offset", "sinkOffset", "sink-off-val");
+
+  // Variants
+  function loadVariants() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
+    catch { return []; }
+  }
+  function saveVariants(list) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  }
+  function snapshot() {
+    const {
+      tab, measureMode, measureA, measureB, measureCursor, hoverCm, drag, ...rest
+    } = state;
+    return { ...rest, savedAt: Date.now() };
+  }
+  function applySnapshot(data) {
+    Object.assign(state, data);
+    state.measureMode = false;
+    state.measureA = null;
+    state.measureB = null;
+    state.drag = null;
+    syncSlidersFromState();
+    document.getElementById("show-sofa").checked = state.showSofa;
+    document.getElementById("show-bed").checked = state.showBed;
+    document.getElementById("show-dims").checked = state.showDims;
+    document.getElementById("shower-rotate").checked = state.showerRotate;
+    document.getElementById("pocket-dir-wrap").hidden = state.doorType !== "B";
+    document.getElementById("full-depth-wrap").hidden = state.showerPreset !== "full";
+    // sync seg buttons
+    for (const [id, key] of [
+      ["bed-variant", "bedVariant"], ["tv-variant", "tvVariant"],
+      ["door-width", "doorWidth"], ["door-type", "doorType"], ["pocket-dir", "pocketDir"],
+      ["shower-preset", "showerPreset"], ["shower-full-depth", "showerFullDepth"],
+    ]) {
+      const root = document.getElementById(id);
+      if (!root) continue;
+      root.querySelectorAll("button").forEach((b) => {
+        b.classList.toggle("active", String(b.dataset.v) === String(state[key]));
+      });
+    }
+    document.querySelectorAll("#tabs button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.tab === state.tab);
+    });
+    renderVariants();
+    render();
+  }
+  function renderVariants() {
+    const ul = document.getElementById("variant-list");
+    const list = loadVariants();
+    ul.innerHTML = "";
+    list.forEach((v, idx) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span>${v.name}</span>`;
+      const actions = document.createElement("span");
+      const loadBtn = document.createElement("button");
+      loadBtn.textContent = "Načíst";
+      loadBtn.onclick = () => applySnapshot(v.data);
+      const delBtn = document.createElement("button");
+      delBtn.textContent = "Smazat";
+      delBtn.onclick = () => {
+        const next = loadVariants().filter((_, i) => i !== idx);
+        saveVariants(next);
+        renderVariants();
+      };
+      actions.append(loadBtn, delBtn);
+      li.appendChild(actions);
+      ul.appendChild(li);
+    });
+  }
+  document.getElementById("btn-save-variant").addEventListener("click", () => {
+    const name = document.getElementById("variant-name").value.trim() || `Varianta ${new Date().toLocaleString("cs")}`;
+    const list = loadVariants();
+    list.unshift({ name, data: snapshot() });
+    saveVariants(list.slice(0, 30));
+    document.getElementById("variant-name").value = "";
+    renderVariants();
+  });
+
+  // Export SVG
+  document.getElementById("btn-export").addEventListener("click", () => {
+    const svg = document.getElementById("plan-svg");
+    if (!svg) return;
+    const clone = svg.cloneNode(true);
+    // strip interactive handles from export
+    clone.querySelectorAll("[data-drag]").forEach((n) => n.remove());
+    if (!state.showSofa) {
+      /* already not drawn */
+    }
+    const serializer = new XMLSerializer();
+    let src = serializer.serializeToString(clone);
+    if (!src.includes("xmlns=")) {
+      src = src.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+    }
+    const blob = new Blob([src], { type: "image/svg+xml;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `chata-kamyk-${state.tab}-${Date.now()}.svg`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  syncSlidersFromState();
+  renderVariants();
   render();
-});
-
-clampSink();
-render();
-  </script>
+})();
+</script>
 </body>
 </html>
