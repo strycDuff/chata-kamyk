@@ -63,8 +63,7 @@
     background: var(--panel);
     border-bottom: 1px solid var(--line);
   }
-  .tabs { display: flex; gap: 6px; }
-  .tabs button, .btn, .icon-btn {
+  .btn, .icon-btn {
     font: inherit;
     border: 1px solid var(--line);
     background: #fff;
@@ -72,11 +71,6 @@
     border-radius: 4px;
     cursor: pointer;
     color: var(--ink);
-  }
-  .tabs button.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
   }
   .icon-btn {
     width: 38px;
@@ -92,6 +86,11 @@
     color: #fff;
   }
   .toolbar .spacer { flex: 1; }
+  .toolbar-title {
+    font-size: 0.95rem;
+    color: var(--accent);
+    margin-right: 4px;
+  }
   .toolbar label.chk {
     display: inline-flex;
     gap: 6px;
@@ -268,10 +267,7 @@
 
   <div class="app">
     <div class="toolbar">
-      <div class="tabs" id="tabs">
-        <button type="button" data-tab="cabin" class="active">1 · Půdorys</button>
-        <button type="button" data-tab="bath">2 · Koupelna</button>
-      </div>
+      <strong class="toolbar-title">Plánovač</strong>
       <button type="button" class="icon-btn" id="btn-measure" title="Měřit vzdálenost" aria-label="Měřit vzdálenost">📏</button>
       <button type="button" class="icon-btn" id="btn-measure-reset" title="Reset měření" aria-label="Reset měření">↺</button>
       <span class="hint" id="measure-hint"></span>
@@ -287,131 +283,125 @@
     <div class="main">
       <div class="canvas-wrap" id="canvas-wrap"></div>
       <aside class="side" id="side">
-        <h1 id="side-title">Půdorys chaty</h1>
-        <p class="sub" id="side-sub">Táhni příčky · safe zóny jsou jen vizuální</p>
+        <h1>Plánovač</h1>
+        <p class="sub">Táhni příčky · sekce vpravo rozbal dle potřeby</p>
         <div class="legend" id="legend">
-          Světlost místností: <strong>906 × 333 cm</strong> (od SDK)<br>
-          Obvodová stěna: <strong>23,92 cm</strong> (v půdorysu zjednodušeně) · SDK příčky: <strong>12,5 cm</strong>
+          Světlost: <strong>906 × 333 cm</strong> (od SDK)<br>
+          Obvod: <strong>23,92 cm</strong> (v půdorysu zjednodušeně) · SDK: <strong>12,5 cm</strong>
         </div>
         <div class="status ok" id="status">—</div>
 
-        <div id="panel-cabin">
-          <details class="side-block" open>
-            <summary>Koupelna</summary>
-            <div class="side-block-body">
-              <label>Levý okraj od vnitřního Z: <strong id="bath-left-val">569</strong> cm</label>
-              <input type="range" id="bath-left" min="480" max="650" value="569" step="1">
-              <label>Šířka V–Z: <strong id="bath-w-val">125</strong> cm</label>
-              <input type="range" id="bath-w" min="110" max="400" value="125" step="1">
-              <label>Hloubka S–J: <strong id="bath-d-val">230</strong> cm</label>
-              <input type="range" id="bath-d" min="180" max="260" value="230" step="1">
-              <p class="hint" id="bath-clear-hint">Světlá šířka: 100 cm</p>
-              <button type="button" class="btn" id="btn-bath-reset" style="margin-top:8px;width:100%">Reset koupelny na výchozí</button>
+        <details class="side-block">
+          <summary>Koupelna · příčky</summary>
+          <div class="side-block-body">
+            <label>Levý okraj od vnitřního Z: <strong id="bath-left-val">569</strong> cm</label>
+            <input type="range" id="bath-left" min="480" max="650" value="569" step="1">
+            <label>Šířka V–Z: <strong id="bath-w-val">125</strong> cm</label>
+            <input type="range" id="bath-w" min="110" max="400" value="125" step="1">
+            <label>Hloubka S–J: <strong id="bath-d-val">230</strong> cm</label>
+            <input type="range" id="bath-d" min="180" max="260" value="230" step="1">
+            <p class="hint" id="bath-clear-hint">Světlá šířka: 100 cm</p>
+            <button type="button" class="btn" id="btn-bath-reset" style="margin-top:8px;width:100%">Reset koupelny na výchozí</button>
+          </div>
+        </details>
+        <details class="side-block">
+          <summary>Koupelna · dveře</summary>
+          <div class="side-block-body">
+            <label>Šířka</label>
+            <div class="row seg" id="door-width">
+              <button type="button" data-v="60">60</button>
+              <button type="button" data-v="70" class="active">70</button>
+              <button type="button" data-v="80">80</button>
             </div>
-          </details>
-          <details class="side-block" open>
-            <summary>Kuchyň</summary>
-            <div class="side-block-body">
-              <label>Levý okraj od vnitřního Z: <strong id="kitchen-left-val">313</strong> cm</label>
-              <input type="range" id="kitchen-left" min="307" max="806" value="313" step="1">
-              <label>Délka V–Z: <strong id="kitchen-len-val">160</strong> cm</label>
-              <input type="range" id="kitchen-len" min="100" max="280" value="160" step="1">
-              <p class="hint">Hloubka od jihu: 60 cm · hard stop u vstupních dveří</p>
-              <p class="hint" id="pass-hint">PR linky → JL koupelny</p>
+            <label>Odstup od severu: <strong id="door-offset-val">90</strong> cm</label>
+            <input type="range" id="door-offset" min="65" max="140" value="90" step="1">
+            <label>Typ</label>
+            <div class="row seg" id="door-type">
+              <button type="button" data-v="A" class="active">A · zvenku → jih</button>
+              <button type="button" data-v="B">B · pouzdro</button>
             </div>
-          </details>
-          <details class="side-block">
-            <summary>Postel</summary>
-            <div class="side-block-body">
-              <label>Matrace (šířka)</label>
-              <div class="row seg" id="bed-variant">
-                <button type="button" data-v="160" class="active">160 cm</button>
-                <button type="button" data-v="140">140 cm</button>
-              </div>
-              <label>Offset rámu na stranu: <strong id="bed-frame-val">2.5</strong> cm</label>
-              <input type="range" id="bed-frame" min="0" max="5" value="2.5" step="0.5">
-              <p class="hint">Vnější půdorys = matrace + 2× offset (délka matrace 200 cm)</p>
-              <p class="hint" id="bed-hint">—</p>
-            </div>
-          </details>
-          <details class="side-block">
-            <summary>TV příčka</summary>
-            <div class="side-block-body">
-              <label>Levý líc od vnitřního Z: <strong id="tv-x-val">324</strong> cm</label>
-              <input type="range" id="tv-x" min="280" max="420" value="324" step="1">
-              <label>Délka na jih: <strong id="tv-len-val">140</strong> cm</label>
-              <input type="range" id="tv-len" min="100" max="180" value="140" step="1">
-              <label>Náhled TV</label>
-              <div class="row seg" id="tv-variant">
-                <button type="button" data-v="50">50"</button>
-                <button type="button" data-v="55" class="active">55"</button>
-                <button type="button" data-v="65">65"</button>
-              </div>
-              <p class="hint" id="tv-hint">—</p>
-            </div>
-          </details>
-        </div>
-
-        <div id="panel-bath" hidden>
-          <details class="side-block" open>
-            <summary>Dveře</summary>
-            <div class="side-block-body">
-              <label>Šířka</label>
-              <div class="row seg" id="door-width">
-                <button type="button" data-v="60">60</button>
-                <button type="button" data-v="70" class="active">70</button>
-                <button type="button" data-v="80">80</button>
-              </div>
-              <label>Odstup od severu: <strong id="door-offset-val">90</strong> cm</label>
-              <input type="range" id="door-offset" min="65" max="140" value="90" step="1">
-              <label>Typ</label>
-              <div class="row seg" id="door-type">
-                <button type="button" data-v="A" class="active">A · zvenku → jih</button>
-                <button type="button" data-v="B">B · pouzdro</button>
-              </div>
-              <div id="pocket-dir-wrap" hidden>
-                <label>Směr pouzdra</label>
-                <div class="row seg" id="pocket-dir">
-                  <button type="button" data-v="north">Sever</button>
-                  <button type="button" data-v="south" class="active">Jih</button>
-                </div>
+            <div id="pocket-dir-wrap" hidden>
+              <label>Směr pouzdra</label>
+              <div class="row seg" id="pocket-dir">
+                <button type="button" data-v="north">Sever</button>
+                <button type="button" data-v="south" class="active">Jih</button>
               </div>
             </div>
-          </details>
-          <details class="side-block" open>
-            <summary>Sprcha</summary>
-            <div class="side-block-body">
-              <div class="row seg" id="shower-preset">
-                <button type="button" data-v="80x80">80×80</button>
-                <button type="button" data-v="90x90">90×90</button>
-                <button type="button" data-v="100x80" class="active">100×80</button>
-                <button type="button" data-v="120x80">120×80</button>
-                <button type="button" data-v="full">Plná šířka</button>
-              </div>
-              <label><input type="checkbox" id="shower-rotate"> Otočit 90°</label>
-              <div id="full-depth-wrap" hidden>
-                <label>Hloubka plné šířky</label>
-                <div class="row seg" id="shower-full-depth">
-                  <button type="button" data-v="70">70</button>
-                  <button type="button" data-v="80" class="active">80</button>
-                  <button type="button" data-v="90">90</button>
-                </div>
+          </div>
+        </details>
+        <details class="side-block">
+          <summary>Koupelna · sprcha</summary>
+          <div class="side-block-body">
+            <div class="row seg" id="shower-preset">
+              <button type="button" data-v="80x80">80×80</button>
+              <button type="button" data-v="90x90">90×90</button>
+              <button type="button" data-v="100x80" class="active">100×80</button>
+              <button type="button" data-v="120x80">120×80</button>
+              <button type="button" data-v="full">Plná šířka</button>
+            </div>
+            <label><input type="checkbox" id="shower-rotate"> Otočit 90°</label>
+            <div id="full-depth-wrap" hidden>
+              <label>Hloubka plné šířky</label>
+              <div class="row seg" id="shower-full-depth">
+                <button type="button" data-v="70">70</button>
+                <button type="button" data-v="80" class="active">80</button>
+                <button type="button" data-v="90">90</button>
               </div>
             </div>
-          </details>
-          <details class="side-block">
-            <summary>Umyvadlo</summary>
-            <div class="side-block-body">
-              <label>Šířka: <strong id="sink-w-val">40</strong> cm</label>
-              <input type="range" id="sink-w" min="30" max="50" value="40" step="1">
-              <label>Hloubka: <strong id="sink-d-val">30</strong> cm</label>
-              <input type="range" id="sink-d" min="25" max="40" value="30" step="1">
-              <label>Odstup od severu: <strong id="sink-off-val">70</strong> cm</label>
-              <input type="range" id="sink-offset" min="0" max="180" value="70" step="1">
+          </div>
+        </details>
+        <details class="side-block">
+          <summary>Koupelna · umyvadlo</summary>
+          <div class="side-block-body">
+            <label>Šířka: <strong id="sink-w-val">40</strong> cm</label>
+            <input type="range" id="sink-w" min="30" max="50" value="40" step="1">
+            <label>Hloubka: <strong id="sink-d-val">30</strong> cm</label>
+            <input type="range" id="sink-d" min="25" max="40" value="30" step="1">
+            <label>Odstup od severu: <strong id="sink-off-val">70</strong> cm</label>
+            <input type="range" id="sink-offset" min="0" max="180" value="70" step="1">
+          </div>
+        </details>
+        <details class="side-block">
+          <summary>Kuchyň</summary>
+          <div class="side-block-body">
+            <label>Levý okraj od vnitřního Z: <strong id="kitchen-left-val">313</strong> cm</label>
+            <input type="range" id="kitchen-left" min="307" max="806" value="313" step="1">
+            <label>Délka V–Z: <strong id="kitchen-len-val">160</strong> cm</label>
+            <input type="range" id="kitchen-len" min="100" max="280" value="160" step="1">
+            <p class="hint">Hloubka od jihu: 60 cm · hard stop u vstupních dveří</p>
+            <p class="hint" id="pass-hint">PR linky → JL koupelny</p>
+          </div>
+        </details>
+        <details class="side-block">
+          <summary>Postel</summary>
+          <div class="side-block-body">
+            <label>Matrace (šířka)</label>
+            <div class="row seg" id="bed-variant">
+              <button type="button" data-v="160" class="active">160 cm</button>
+              <button type="button" data-v="140">140 cm</button>
             </div>
-          </details>
-        </div>
-
+            <label>Offset rámu na stranu: <strong id="bed-frame-val">2.5</strong> cm</label>
+            <input type="range" id="bed-frame" min="0" max="5" value="2.5" step="0.5">
+            <p class="hint">Vnější půdorys = matrace + 2× offset (délka matrace 200 cm)</p>
+            <p class="hint" id="bed-hint">—</p>
+          </div>
+        </details>
+        <details class="side-block">
+          <summary>TV příčka</summary>
+          <div class="side-block-body">
+            <label>Levý líc od vnitřního Z: <strong id="tv-x-val">324</strong> cm</label>
+            <input type="range" id="tv-x" min="280" max="420" value="324" step="1">
+            <label>Délka na jih: <strong id="tv-len-val">140</strong> cm</label>
+            <input type="range" id="tv-len" min="100" max="180" value="140" step="1">
+            <label>Náhled TV</label>
+            <div class="row seg" id="tv-variant">
+              <button type="button" data-v="50">50"</button>
+              <button type="button" data-v="55" class="active">55"</button>
+              <button type="button" data-v="65">65"</button>
+            </div>
+            <p class="hint" id="tv-hint">—</p>
+          </div>
+        </details>
         <details class="side-block">
           <summary>Varianty</summary>
           <div class="side-block-body">
@@ -512,7 +502,6 @@
   const STORAGE_KEY = "chata-kamyk-planner-variants-v5";
 
   const state = {
-    tab: "cabin",
     bathLeft: BATH_DEFAULTS.bathLeft,
     bathW: BATH_DEFAULTS.bathW,
     bathD: BATH_DEFAULTS.bathD,
@@ -1167,7 +1156,7 @@
   }
 
   function drawHoverDims(g) {
-    if (state.tab !== "cabin" || !state.hoverCm || state.measureMode) return;
+    if (!state.hoverCm || state.measureMode) return;
     const p = state.hoverCm;
     // lokální odstupy uvnitř světlosti — bez celkových „mimo obraz“ kót
     const x0 = INNER.x, x1 = INNER.x + INNER.w;
@@ -1194,7 +1183,7 @@
     drawOpenings(g, "west", WEST_SEGS);
     drawOpenings(g, "east", EAST_SEGS);
     drawBathroomMass(g, { interactive: true });
-    drawBathFixtures(g, { detail: false });
+    drawBathFixtures(g, { detail: true });
     drawFurnitureCabin(g);
 
     if (state.showDims) {
@@ -1212,82 +1201,39 @@
     return svg;
   }
 
-  function renderBathView() {
-    const o = bathOuter();
-    const pad = 48;
-    const svg = el("svg", {
-      viewBox: `${o.x - pad} ${o.y - WALL - 16} ${o.w + pad * 2} ${o.d + WALL + pad * 2}`,
-      id: "plan-svg",
-      class: state.measureMode ? "measuring" : "",
-    });
-    const g = el("g", { id: "plan-root" });
-    g.appendChild(el("rect", {
-      x: o.x - 30, y: o.y - WALL, width: o.w + 60, height: WALL,
-      fill: "#f8f9fa", stroke: "#111111", "stroke-width": 2,
-    }));
-    // naznačení okna nad koupelnou
-    g.appendChild(el("rect", {
-      x: o.x + 20, y: o.y - WALL + 1, width: Math.max(40, o.w - 40), height: WALL - 2,
-      fill: "#ffffff", stroke: "#00a8ff", "stroke-width": 3,
-    }));
-    drawBathroomMass(g, { interactive: false });
-    drawBathFixtures(g, { detail: true });
-
-    if (state.showDims) {
-      const bi = bathInner();
-      const op = doorOpeningBox();
-      dimV(g, bi.y, op.y, o.x - 14, `${state.doorOffset}`, "var(--dim)");
-      dimV(g, op.y, op.y + op.d, o.x - 14, `${state.doorWidth}`, "var(--dim)");
-      const wc = wcBox();
-      const sh = showerBox();
-      if (sh.y > wc.y + wc.d) {
-        dimV(g, wc.y + wc.d, sh.y, bi.x + bi.w + 12, `${round1(sh.y - (wc.y + wc.d))}`, "var(--dim-soft)");
-      }
-      dimH(g, bi.x, bi.x + bi.w, o.y + o.d + 12, `${round1(bi.w)}`, "var(--dim-soft)");
-    }
-    drawMeasure(g);
-    svg.appendChild(g);
-    return svg;
-  }
-
   function updateStatus() {
     const elStatus = document.getElementById("status");
     const msgs = [];
     let level = "ok";
-
-    if (state.tab === "cabin") {
-      const bi = bathInner();
-      const gap = bedGap();
-      const pass = kitchenBathPassage();
-      const fit = tvFits(state.tvVariant);
-      msgs.push(`Koupelna světlá ${round1(bi.w)} × ${round1(bi.d)} cm`);
-      msgs.push(`Průchod kuchyň↔koupelna ${round1(pass.len)} cm (>${PASS_COMFORT} komfort · ${PASS_TIGHT}–${PASS_COMFORT} těsně · <${PASS_TIGHT} nekomfort)`);
-      if (pass.len < PASS_TIGHT) level = "bad";
-      else if (pass.len <= PASS_COMFORT) level = "warn";
-      if (state.showBed) {
-        msgs.push(`Mezera koupelna↔postel ${round1(gap)} cm (safe ≥ ${MIN_BED_PASS})`);
-        if (gap < MIN_BED_PASS) level = "warn";
-        if (gap < 40) level = "bad";
-      }
-      if (fit.overflow) {
-        msgs.push(`TV ${state.tvVariant}" přesahuje příčku (${fit.need} cm > ${state.tvLen} cm)`);
-        level = level === "bad" ? "bad" : "warn";
-      } else if (fit.tight) {
-        msgs.push(`TV ${state.tvVariant}" těsně (okraj ${round1(fit.margin)} cm)`);
-        if (level === "ok") level = "warn";
-      } else {
-        msgs.push(`TV ${state.tvVariant}" OK (okraj ~${round1(fit.margin)} cm)`);
-      }
-    } else {
-      const issues = detectBathCollisions();
-      if (!issues.length) msgs.push("Bez kolizí v koupelně.");
-      else {
-        issues.forEach((i) => msgs.push(i.msg));
-        if (issues.some((i) => i.level === "bad")) level = "bad";
-        else level = "warn";
-      }
+    const bi = bathInner();
+    const gap = bedGap();
+    const pass = kitchenBathPassage();
+    const fit = tvFits(state.tvVariant);
+    msgs.push(`Koupelna světlá ${round1(bi.w)} × ${round1(bi.d)} cm`);
+    msgs.push(`Průchod kuchyň↔koupelna ${round1(pass.len)} cm (>${PASS_COMFORT} komfort · ${PASS_TIGHT}–${PASS_COMFORT} těsně · <${PASS_TIGHT} nekomfort)`);
+    if (pass.len < PASS_TIGHT) level = "bad";
+    else if (pass.len <= PASS_COMFORT) level = "warn";
+    if (state.showBed) {
+      msgs.push(`Mezera koupelna↔postel ${round1(gap)} cm (safe ≥ ${MIN_BED_PASS})`);
+      if (gap < MIN_BED_PASS) level = "warn";
+      if (gap < 40) level = "bad";
     }
-
+    if (fit.overflow) {
+      msgs.push(`TV ${state.tvVariant}" přesahuje příčku (${fit.need} cm > ${state.tvLen} cm)`);
+      level = level === "bad" ? "bad" : "warn";
+    } else if (fit.tight) {
+      msgs.push(`TV ${state.tvVariant}" těsně (okraj ${round1(fit.margin)} cm)`);
+      if (level === "ok") level = "warn";
+    } else {
+      msgs.push(`TV ${state.tvVariant}" OK (okraj ~${round1(fit.margin)} cm)`);
+    }
+    const issues = detectBathCollisions();
+    if (!issues.length) msgs.push("Koupelna: bez kolizí.");
+    else {
+      issues.forEach((i) => msgs.push(i.msg));
+      if (issues.some((i) => i.level === "bad")) level = "bad";
+      else if (level === "ok") level = "warn";
+    }
     elStatus.className = "status " + level;
     elStatus.innerHTML = msgs.join("<br>");
   }
@@ -1317,24 +1263,14 @@
     clampKitchen();
     const wrap = document.getElementById("canvas-wrap");
     wrap.innerHTML = "";
-    const svg = state.tab === "cabin" ? renderCabinView() : renderBathView();
-    wrap.appendChild(svg);
+    wrap.appendChild(renderCabinView());
     updateStatus();
     syncSideHints();
-    document.getElementById("panel-cabin").hidden = state.tab !== "cabin";
-    document.getElementById("panel-bath").hidden = state.tab !== "bath";
-    document.getElementById("side-title").textContent =
-      state.tab === "cabin" ? "Půdorys chaty" : "Detail koupelny";
-    document.getElementById("side-sub").textContent =
-      state.tab === "cabin"
-        ? "Táhni šedé úchyty příček · safe zóny jen vizuálně"
-        : "Rozměry místnosti zděděné z tabu Půdorys";
     const legend = document.getElementById("legend");
     if (legend) {
-      const bi = bathInner();
-      legend.innerHTML = state.tab === "cabin"
-        ? `Světlost chaty: <strong>${CLEAR.w} × ${CLEAR.h} cm</strong> (od SDK)<br>Obvodová stěna: <strong>${String(WALL_REAL).replace(".", ",")} cm</strong> (v půdorysu zjednodušeně) · SDK příčky: <strong>12,5 cm</strong>`
-        : `Koupelna světlá: <strong>${round1(bi.w)} × ${round1(bi.d)} cm</strong><br>WC fixní · příčky z tabu Půdorys`;
+      legend.innerHTML =
+        `Světlost: <strong>${CLEAR.w} × ${CLEAR.h} cm</strong> (od SDK)<br>` +
+        `Obvod: <strong>${String(WALL_REAL).replace(".", ",")} cm</strong> (v půdorysu zjednodušeně) · SDK: <strong>12,5 cm</strong>`;
     }
   }
 
@@ -1386,7 +1322,7 @@
     const svg = currentSvg();
     if (!svg) return;
     const target = evt.target.closest("[data-drag]");
-    if (target && state.tab === "cabin" && !state.measureMode) {
+    if (target && !state.measureMode) {
       state.drag = {
         type: target.getAttribute("data-drag"),
         start: svgPoint(svg, evt),
@@ -1436,7 +1372,7 @@
       }
       return;
     }
-    if (state.tab === "cabin" && !state.measureMode) {
+    if (!state.measureMode) {
       state.hoverCm = p;
       if (!hoverRaf) {
         hoverRaf = requestAnimationFrame(() => {
@@ -1529,16 +1465,6 @@
     });
   }
 
-  // Tabs
-  document.getElementById("tabs").addEventListener("click", (e) => {
-    const btn = e.target.closest("button[data-tab]");
-    if (!btn) return;
-    state.tab = btn.dataset.tab;
-    document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b === btn));
-    state.hoverCm = null;
-    render();
-  });
-
   document.getElementById("btn-measure").addEventListener("click", () => {
     state.measureMode = !state.measureMode;
     document.getElementById("btn-measure").classList.toggle("active", state.measureMode);
@@ -1615,7 +1541,7 @@
   }
   function snapshot() {
     const {
-      tab, measureMode, measureA, measureB, measureCursor, hoverCm, drag, ...rest
+      measureMode, measureA, measureB, measureCursor, hoverCm, drag, ...rest
     } = state;
     return { ...rest, savedAt: Date.now() };
   }
@@ -1625,7 +1551,6 @@
       tab, measureMode, measureA, measureB, measureCursor, hoverCm, drag, savedAt, ...rest
     } = data;
     Object.assign(state, rest);
-    if (tab === "cabin" || tab === "bath") state.tab = tab;
     if (state.kitchenLeft == null) state.kitchenLeft = 313;
     if (state.kitchenLen == null) state.kitchenLen = 160;
     if (state.bedFrameOffset == null) state.bedFrameOffset = 2.5;
@@ -1653,9 +1578,6 @@
         b.classList.toggle("active", String(b.dataset.v) === String(state[key]));
       });
     }
-    document.querySelectorAll("#tabs button").forEach((b) => {
-      b.classList.toggle("active", b.dataset.tab === state.tab);
-    });
     renderVariants();
     render();
   }
@@ -1739,7 +1661,7 @@
     const blob = new Blob([src], { type: "image/svg+xml;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `chata-kamyk-${state.tab}-${Date.now()}.svg`;
+    a.download = `chata-kamyk-${Date.now()}.svg`;
     a.click();
     URL.revokeObjectURL(a.href);
   });
