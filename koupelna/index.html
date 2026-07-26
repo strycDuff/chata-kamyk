@@ -443,12 +443,16 @@
     };
   }
   function bedBox() {
-    // Doraženo na východní vnitřní stěnu: kratší (140/160) V–Z, delší 200 S–J
+    // Pravý horní roh postele = pravý horní roh světlé místnosti (SV roh)
+    // kratší (140/160) V–Z, delší 200 S–J
     const w = state.bedVariant;
     const d = BED_LEN;
-    const x = INNER.x + INNER.w - w;
-    const y = INNER.y + (INNER.h - d) / 2;
-    return { x, y, w, d };
+    return {
+      x: INNER.x + INNER.w - w,
+      y: INNER.y,
+      w,
+      d,
+    };
   }
   function bedGap() {
     const o = bathOuter();
@@ -474,10 +478,18 @@
     return { need, margin, ok: margin >= 5, tight: margin >= 0 && margin < 5, overflow: margin < 0 };
   }
 
-  function wcBox() {
-    const bi = bathInner();
+  /** WC je fixní v absolutních souřadnicích (příčky se hýbou kolem něj).
+   *  Výchozí návrh: osa 65 cm od vnitřního líce západní příčky při bathLeft=569. */
+  const WC_FIXED = (() => {
     const w = 37, d = 63;
-    return { x: bi.x + 65 - w / 2, y: bi.y, w, d };
+    const axisFromWestInner = 65;
+    const defaultBathLeft = 569;
+    const x = defaultBathLeft + PART + axisFromWestInner - w / 2; // 628
+    const y = INNER.y; // severní vnitřní líc
+    return { x, y, w, d };
+  })();
+  function wcBox() {
+    return { ...WC_FIXED };
   }
   function doorOpeningBox() {
     const o = bathOuter();
@@ -537,8 +549,8 @@
     const issues = [];
     const bi = bathInner();
     const wc = wcBox();
-    // Zóna průchodu u WC (světlý prostor), ne pouzdro ve příčce
-    const wcPassage = { x: bi.x, y: bi.y, w: bi.w, d: 63 };
+    // Zóna průchodu u fixního WC (podle jeho boxu), ne pouzdro ve příčce
+    const wcPassage = { x: wc.x, y: wc.y, w: wc.w, d: wc.d };
     const sh = showerBox();
     const shClear = showerClearanceBox();
     const sk = sinkBox();
@@ -546,9 +558,12 @@
     // Průchod dveřmi = pás otvoru ve světlém prostoru (ne pouzdro / posuv ve stěně)
     const openingPassage = { x: bi.x, y: op.y, w: 8, d: op.d };
 
+    if (!aabbOverlap(wc, bi)) {
+      issues.push({ level: "bad", msg: "Fixní WC je mimo světlý prostor koupelny (posuň příčky)." });
+    }
     if (!showerFits()) issues.push({ level: "bad", msg: "Sprcha se nevejde do světlého prostoru." });
-    if (aabbOverlap(openingPassage, wcPassage) || aabbOverlap(op, wc)) {
-      issues.push({ level: "bad", msg: "Průchod dveří koliduje s prostorem WC (63 cm od severu)." });
+    if (aabbOverlap(openingPassage, wcPassage) || aabbOverlap(openingPassage, wc)) {
+      issues.push({ level: "bad", msg: "Průchod dveří koliduje s prostorem WC." });
     }
     if (aabbOverlap(openingPassage, sh) || aabbOverlap(openingPassage, shClear)) {
       issues.push({ level: "bad", msg: "Průchod dveří koliduje se sprchou." });
@@ -1002,7 +1017,7 @@
       `Světlá šířka: ${round1(bi.w)} cm · světlá hloubka: ${round1(bi.d)} cm`;
     const gap = bedGap();
     document.getElementById("bed-hint").textContent =
-      `Postel ${state.bedVariant} (V–Z) × ${BED_LEN} (S–J) u východu · mezera k příčce ${round1(gap)} cm`;
+      `Postel ${state.bedVariant}×${BED_LEN} v SV rohu · mezera k příčce ${round1(gap)} cm · WC fixní`;
     const fit = tvFits(state.tvVariant);
     document.getElementById("tv-hint").textContent = fit.overflow
       ? `${state.tvVariant}" = ${fit.need} cm — přesah ${round1(-fit.margin)} cm / strana`
