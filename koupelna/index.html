@@ -341,9 +341,12 @@
 (() => {
   const WALL = 5 + 1.8 + 12 + 4 + 1.12; // 23.92
   const PART = 12.5;
-  const CABIN = { w: 906, h: 333 };
-  const BED_LEN = 200; // E–W into room
-  const MIN_BED_PASS = 60; // visual safe gap bath↔bed foot
+  /** 906×333 = světlost (od SDK k SDK). Vnější = světlost + 2× stěna. */
+  const CLEAR = { w: 906, h: 333 };
+  const OUTER = { w: CLEAR.w + 2 * WALL, h: CLEAR.h + 2 * WALL };
+  const INNER = { x: WALL, y: WALL, w: CLEAR.w, h: CLEAR.h };
+  const BED_LEN = 200; // delší strana S–J
+  const MIN_BED_PASS = 60; // visual safe gap bath↔bed (západní hrana postele)
   const PASS_TARGET = 105;
 
   const NORTH_SEGS = [
@@ -421,30 +424,30 @@
   }
 
   function bathOuter() {
-    return { x: state.bathLeft, y: WALL, w: state.bathW, d: state.bathD };
+    // bathLeft = od západního vnějšího okraje; sever = vnitřní líc severní stěny
+    return { x: state.bathLeft, y: INNER.y, w: state.bathW, d: state.bathD };
   }
   function bathInner() {
     const o = bathOuter();
     return { x: o.x + PART, y: o.y, w: o.w - 2 * PART, d: o.d - PART };
   }
   function kitchenBox() {
-    const y1 = CABIN.h - WALL - 60;
+    const y1 = INNER.y + INNER.h - 60;
     return { x: 313, y: y1, w: 160, d: 60 };
   }
   function sofaPolylines() {
-    // L sofa approx as two rects from inner NW
-    const x0 = WALL, y0 = WALL;
+    const x0 = INNER.x, y0 = INNER.y;
     return {
       west: { x: x0, y: y0, w: 95, d: 240 },
       north: { x: x0, y: y0, w: 160, d: 90 },
     };
   }
   function bedBox() {
-    const eastInner = CABIN.w - WALL;
-    const w = BED_LEN; // into room (E–W)
-    const d = state.bedVariant; // along wall (N–S)
-    const x = eastInner - w;
-    const y = WALL + (CABIN.h - 2 * WALL - d) / 2;
+    // Doraženo na východní vnitřní stěnu: kratší (140/160) V–Z, delší 200 S–J
+    const w = state.bedVariant;
+    const d = BED_LEN;
+    const x = INNER.x + INNER.w - w;
+    const y = INNER.y + (INNER.h - d) / 2;
     return { x, y, w, d };
   }
   function bedGap() {
@@ -460,7 +463,7 @@
     return { a, b, len: dist(a, b) };
   }
   function tvBox() {
-    return { x: state.tvX, y: WALL, w: PART, d: state.tvLen };
+    return { x: state.tvX, y: INNER.y, w: PART, d: state.tvLen };
   }
   function tvClearWidth() {
     return state.tvLen - 2 * 8; // ~8 cm margin each side aesthetic default band
@@ -534,18 +537,21 @@
     const issues = [];
     const bi = bathInner();
     const wc = wcBox();
-    const wcZone = { x: bathOuter().x, y: bi.y, w: bathOuter().w, d: 63 };
+    // Zóna průchodu u WC (světlý prostor), ne pouzdro ve příčce
+    const wcPassage = { x: bi.x, y: bi.y, w: bi.w, d: 63 };
     const sh = showerBox();
     const shClear = showerClearanceBox();
     const sk = sinkBox();
-    const travel = doorTravelBox();
     const op = doorOpeningBox();
+    // Průchod dveřmi = pás otvoru ve světlém prostoru (ne pouzdro / posuv ve stěně)
+    const openingPassage = { x: bi.x, y: op.y, w: 8, d: op.d };
+
     if (!showerFits()) issues.push({ level: "bad", msg: "Sprcha se nevejde do světlého prostoru." });
-    if (aabbOverlap(travel, wcZone) || aabbOverlap(op, wc)) {
-      issues.push({ level: "bad", msg: "Posuv/otvor dveří koliduje se zónou WC." });
+    if (aabbOverlap(openingPassage, wcPassage) || aabbOverlap(op, wc)) {
+      issues.push({ level: "bad", msg: "Průchod dveří koliduje s prostorem WC (63 cm od severu)." });
     }
-    if (aabbOverlap(travel, sh) || aabbOverlap(travel, shClear)) {
-      issues.push({ level: "bad", msg: "Posuv dveří koliduje se sprchou." });
+    if (aabbOverlap(openingPassage, sh) || aabbOverlap(openingPassage, shClear)) {
+      issues.push({ level: "bad", msg: "Průchod dveří koliduje se sprchou." });
     }
     if (aabbOverlap(sh, wc) || aabbOverlap(shClear, wc)) {
       issues.push({ level: "warn", msg: "Sprcha / zóna otevírání zasahuje do WC." });
@@ -557,52 +563,65 @@
     return issues;
   }
 
-  function dimV(g, y1, y2, x, label, color = "var(--dim)") {
+  function dimLabel(g, x, y, label, color, anchor = "middle") {
+    const padX = 4;
+    const approxW = Math.max(28, String(label).length * 6.2);
+    const bx = anchor === "middle" ? x - approxW / 2
+      : anchor === "start" ? x - 2
+      : x - approxW + 2;
+    g.appendChild(el("rect", {
+      x: bx, y: y - 9, width: approxW + padX, height: 14,
+      fill: "#fff", stroke: color, "stroke-width": 0.6, rx: 2, opacity: 0.95,
+    }));
+    const t = el("text", {
+      x, y: y + 1.5, fill: color, "font-size": 11,
+      "text-anchor": anchor, "dominant-baseline": "middle",
+    });
+    t.textContent = label;
+    g.appendChild(t);
+  }
+
+  function dimV(g, y1, y2, x, label, color = "var(--dim)", labelSide = "end") {
     if (Math.abs(y2 - y1) < 1) return;
     const mid = (y1 + y2) / 2;
     g.appendChild(el("line", { x1: x, y1, x2: x, y2, stroke: color, "stroke-width": 1 }));
     g.appendChild(el("line", { x1: x - 3, y1, x2: x + 3, y2: y1, stroke: color, "stroke-width": 1 }));
     g.appendChild(el("line", { x1: x - 3, y1: y2, x2: x + 3, y2, stroke: color, "stroke-width": 1 }));
-    const t = el("text", {
-      x: x + 5, y: mid, fill: color, "font-size": 11,
-      "dominant-baseline": "middle",
-    });
-    t.textContent = label;
-    g.appendChild(t);
+    const lx = labelSide === "start" ? x + 8 : x - 8;
+    const anchor = labelSide === "start" ? "start" : "end";
+    dimLabel(g, lx, mid, label, color, anchor);
   }
-  function dimH(g, x1, x2, y, label, color = "var(--dim)") {
+  function dimH(g, x1, x2, y, label, color = "var(--dim)", labelYOffset = -1) {
     if (Math.abs(x2 - x1) < 1) return;
     const mid = (x1 + x2) / 2;
     g.appendChild(el("line", { x1, y1: y, x2, y2: y, stroke: color, "stroke-width": 1 }));
     g.appendChild(el("line", { x1, y1: y - 3, x2: x1, y2: y + 3, stroke: color, "stroke-width": 1 }));
     g.appendChild(el("line", { x1: x2, y1: y - 3, x2, y2: y + 3, stroke: color, "stroke-width": 1 }));
-    const t = el("text", {
-      x: mid, y: y - 5, fill: color, "font-size": 11, "text-anchor": "middle",
-    });
-    t.textContent = label;
-    g.appendChild(t);
+    dimLabel(g, mid, y + labelYOffset, label, color, "middle");
   }
 
   function drawCabinShell(g) {
     g.appendChild(el("rect", {
-      x: 0, y: 0, width: CABIN.w, height: CABIN.h,
+      x: 0, y: 0, width: OUTER.w, height: OUTER.h,
       fill: "#fff", stroke: "var(--wall)", "stroke-width": 2,
     }));
     g.appendChild(el("path", {
-      d: `M0,0 H${CABIN.w} V${CABIN.h} H0 Z M${WALL},${WALL} V${CABIN.h - WALL} H${CABIN.w - WALL} V${WALL} Z`,
+      d: `M0,0 H${OUTER.w} V${OUTER.h} H0 Z M${INNER.x},${INNER.y} V${INNER.y + INNER.h} H${INNER.x + INNER.w} V${INNER.y} Z`,
       fill: "#2a2e32", "fill-rule": "evenodd",
     }));
   }
 
   function drawOpenings(g, side, segs) {
-    let cursor = 0;
+    // N/S kóty (313, 307, 569…) jsou od vnějšího Z okraje; segmenty ≈ světlost 906.
+    // W/E segmenty jdou podél světlé výšky od vnitřního severu.
+    let cursor = (side === "west" || side === "east") ? INNER.y : 0;
     for (const seg of segs) {
       if (seg.t === "win" || seg.t === "door") {
         let x, y, w, h;
         if (side === "north") { x = cursor; y = 0; w = seg.l; h = WALL; }
-        if (side === "south") { x = cursor; y = CABIN.h - WALL; w = seg.l; h = WALL; }
+        if (side === "south") { x = cursor; y = OUTER.h - WALL; w = seg.l; h = WALL; }
         if (side === "west") { x = 0; y = cursor; w = WALL; h = seg.l; }
-        if (side === "east") { x = CABIN.w - WALL; y = cursor; w = WALL; h = seg.l; }
+        if (side === "east") { x = OUTER.w - WALL; y = cursor; w = WALL; h = seg.l; }
         g.appendChild(el("rect", {
           x, y, width: w, height: h,
           fill: seg.t === "win" ? "var(--window)" : "var(--door)",
@@ -745,12 +764,11 @@
       const bed = bedBox();
       const gap = bedGap();
       const safe = gap >= MIN_BED_PASS;
-      // safe zone hatch between bath and bed
       const o = bathOuter();
       g.appendChild(el("rect", {
-        x: o.x + o.w, y: WALL,
+        x: o.x + o.w, y: INNER.y,
         width: Math.max(0, bed.x - (o.x + o.w)),
-        height: CABIN.h - 2 * WALL,
+        height: INNER.h,
         fill: safe ? "var(--safe)" : "var(--warn-fill)",
         stroke: "none",
       }));
@@ -763,10 +781,13 @@
         fill: "var(--bed)", "font-size": 12, "text-anchor": "middle",
         "dominant-baseline": "middle",
       });
-      bt.textContent = `Postel ${state.bedVariant}`;
+      bt.textContent = `Postel ${state.bedVariant}×${BED_LEN}`;
       g.appendChild(bt);
       if (state.showDims) {
-        dimH(g, o.x + o.w, bed.x, bed.y - 12, `${round1(gap)}`, safe ? "var(--safe-stroke)" : "var(--bad)");
+        // kóta nad postelí mimo příčky
+        dimH(g, o.x + o.w, bed.x, Math.min(bed.y, o.y) - 18, `${round1(gap)}`, safe ? "var(--safe-stroke)" : "var(--bad)", -1);
+        dimV(g, bed.y, bed.y + bed.d, bed.x + bed.w + 14, `${BED_LEN}`, "var(--bed)", "start");
+        dimH(g, bed.x, bed.x + bed.w, bed.y + bed.d + 16, `${state.bedVariant}`, "var(--bed)", 1);
       }
     }
   }
@@ -778,11 +799,11 @@
     const sk = sinkBox();
     const op = doorOpeningBox();
     const travel = doorTravelBox();
-    const issues = detail ? detectBathCollisions() : [];
-    const conflict = (key) => issues.some(() => false); // simplified: color by overlap checks below
-
-    const badTravel = detail && (aabbOverlap(travel, { x: bathOuter().x, y: bathInner().y, w: bathOuter().w, d: 63 })
-      || aabbOverlap(travel, sh));
+    const bi = bathInner();
+    const openingPassage = { x: bi.x, y: op.y, w: 4, d: op.d };
+    const wcPassage = { x: bi.x, y: bi.y, w: bi.w, d: 63 };
+    const badOpening = detail && (aabbOverlap(openingPassage, wcPassage) || aabbOverlap(op, wcBox())
+      || aabbOverlap(openingPassage, sh) || aabbOverlap(openingPassage, shClear));
     const badShower = detail && !showerFits();
 
     g.appendChild(el("rect", {
@@ -790,12 +811,13 @@
     }));
     g.appendChild(el("rect", {
       x: op.x + 2, y: op.y, width: PART - 4, height: op.d,
-      fill: "var(--door)", opacity: 0.9,
+      fill: badOpening ? "var(--bad)" : "var(--door)", opacity: 0.9,
     }));
+    // pouzdro / posuv — informativní, ne červená kolize s WC
     g.appendChild(el("rect", {
       x: travel.x, y: travel.y, width: travel.w, height: travel.d,
-      fill: badTravel ? "rgba(176,0,32,0.35)" : "var(--door)",
-      opacity: 0.35, stroke: "var(--door)", "stroke-width": 1, "stroke-dasharray": "4 3",
+      fill: "var(--door)",
+      opacity: 0.3, stroke: "var(--door)", "stroke-width": 1, "stroke-dasharray": "4 3",
     }));
 
     g.appendChild(el("rect", {
@@ -849,16 +871,17 @@
   function drawHoverDims(g) {
     if (state.tab !== "cabin" || !state.hoverCm || state.measureMode) return;
     const p = state.hoverCm;
-    dimH(g, 0, p.x, p.y - 10, `${round1(p.x)}`, "var(--dim-soft)");
-    dimH(g, p.x, CABIN.w, p.y + 14, `${round1(CABIN.w - p.x)}`, "var(--dim-soft)");
-    dimV(g, 0, p.y, p.x + 10, `${round1(p.y)}`, "var(--dim-soft)");
-    dimV(g, p.y, CABIN.h, p.x - 14, `${round1(CABIN.h - p.y)}`, "var(--dim-soft)");
+    // kóty od vnějších okrajů + světlost od SDK
+    dimH(g, 0, p.x, Math.min(p.y, INNER.y) - 16, `${round1(p.x)}`, "var(--dim-soft)", -1);
+    dimH(g, p.x, OUTER.w, Math.max(p.y, INNER.y + INNER.h) + 16, `${round1(OUTER.w - p.x)}`, "var(--dim-soft)", 1);
+    dimV(g, 0, p.y, Math.min(p.x, INNER.x) - 16, `${round1(p.y)}`, "var(--dim-soft)", "end");
+    dimV(g, p.y, OUTER.h, Math.max(p.x, INNER.x + INNER.w) + 16, `${round1(OUTER.h - p.y)}`, "var(--dim-soft)", "start");
   }
 
   function renderCabinView() {
-    const pad = 50;
+    const pad = 56;
     const svg = el("svg", {
-      viewBox: `${-pad} ${-pad} ${CABIN.w + pad * 2} ${CABIN.h + pad * 2 + 40}`,
+      viewBox: `${-pad} ${-pad} ${OUTER.w + pad * 2} ${OUTER.h + pad * 2 + 36}`,
       id: "plan-svg",
       class: state.measureMode ? "measuring" : "",
     });
@@ -873,23 +896,26 @@
     drawFurnitureCabin(g);
 
     if (state.showDims) {
-      dimH(g, 0, CABIN.w, -28, `${CABIN.w}`, "var(--dim)");
-      dimV(g, 0, CABIN.h, -28, `${CABIN.h}`, "var(--dim)");
       const o = bathOuter();
       const bi = bathInner();
-      dimH(g, o.x, o.x + o.w, o.y - 14, `${round1(o.w)}`, "var(--dim)");
-      dimH(g, bi.x, bi.x + bi.w, bi.y + bi.d + 16, `světlá ${round1(bi.w)}`, "var(--dim-soft)");
+      // vnějšek + světlost mimo stěny
+      dimH(g, 0, OUTER.w, -36, `vnějšek ${round1(OUTER.w)}`, "var(--dim)", -1);
+      dimH(g, INNER.x, INNER.x + INNER.w, OUTER.h + 28, `světlost ${CLEAR.w}`, "var(--dim-soft)", 1);
+      dimV(g, 0, OUTER.h, -36, `vnějšek ${round1(OUTER.h)}`, "var(--dim)", "end");
+      dimV(g, INNER.y, INNER.y + INNER.h, OUTER.w + 28, `světlost ${CLEAR.h}`, "var(--dim-soft)", "start");
+      // koupelna — nad a pod, ne přes příčky
+      dimH(g, o.x, o.x + o.w, o.y - 20, `vnější ${round1(o.w)}`, "var(--dim)", -1);
+      dimH(g, bi.x, bi.x + bi.w, o.y + o.d + 20, `světlá ${round1(bi.w)}`, "var(--dim-soft)", 1);
     }
 
     drawHoverDims(g);
     drawMeasure(g);
 
-    // room labels
-    const living = el("text", { x: 140, y: 160, fill: "var(--muted)", "font-size": 14 });
+    const living = el("text", { x: INNER.x + 120, y: INNER.y + 140, fill: "var(--muted)", "font-size": 14 });
     living.textContent = "OBÝVÁK";
     g.appendChild(living);
     const bedL = el("text", {
-      x: CABIN.w - WALL - 100, y: 60, fill: "var(--muted)", "font-size": 14, "text-anchor": "middle",
+      x: INNER.x + INNER.w - 80, y: INNER.y + 36, fill: "var(--muted)", "font-size": 14, "text-anchor": "middle",
     });
     bedL.textContent = "LOŽNICE";
     g.appendChild(bedL);
@@ -900,9 +926,9 @@
 
   function renderBathView() {
     const o = bathOuter();
-    const pad = 40;
+    const pad = 48;
     const svg = el("svg", {
-      viewBox: `${o.x - pad} ${o.y - WALL - 10} ${o.w + pad * 2} ${o.d + WALL + pad * 2}`,
+      viewBox: `${o.x - pad} ${o.y - WALL - 16} ${o.w + pad * 2} ${o.d + WALL + pad * 2}`,
       id: "plan-svg",
       class: state.measureMode ? "measuring" : "",
     });
@@ -916,11 +942,13 @@
     if (state.showDims) {
       const bi = bathInner();
       const op = doorOpeningBox();
-      dimV(g, bi.y, op.y, o.x - 12, `${state.doorOffset}`);
-      dimV(g, op.y, op.y + op.d, o.x - 12, `${state.doorWidth}`);
+      // kóty dveří vlevo od příčky (v obýváku), ne přes SDK
+      dimV(g, bi.y, op.y, o.x - 18, `${state.doorOffset}`, "var(--dim)", "end");
+      dimV(g, op.y, op.y + op.d, o.x - 18, `${state.doorWidth}`, "var(--dim)", "end");
       const wc = wcBox();
       const sh = showerBox();
-      dimV(g, wc.y + wc.d, sh.y, bi.x + 8, `${round1(sh.y - (wc.y + wc.d))}`);
+      dimV(g, wc.y + wc.d, sh.y, bi.x + bi.w + 14, `${round1(sh.y - (wc.y + wc.d))}`, "var(--dim-soft)", "start");
+      dimH(g, bi.x, bi.x + bi.w, o.y + o.d + 18, `světlá ${round1(bi.w)}`, "var(--dim-soft)", 1);
     }
     drawMeasure(g);
     svg.appendChild(g);
@@ -974,7 +1002,7 @@
       `Světlá šířka: ${round1(bi.w)} cm · světlá hloubka: ${round1(bi.d)} cm`;
     const gap = bedGap();
     document.getElementById("bed-hint").textContent =
-      `Postel doražená na východ · mezera k příčce ${round1(gap)} cm`;
+      `Postel ${state.bedVariant} (V–Z) × ${BED_LEN} (S–J) u východu · mezera k příčce ${round1(gap)} cm`;
     const fit = tvFits(state.tvVariant);
     document.getElementById("tv-hint").textContent = fit.overflow
       ? `${state.tvVariant}" = ${fit.need} cm — přesah ${round1(-fit.margin)} cm / strana`
