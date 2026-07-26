@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Projektová dokumentace — Elektroinstalace &amp; SmartHome · Kamyk</title>
+<style>
+  @page {
+    size: A4;
+    margin: 16mm 14mm 18mm 14mm;
+  }
+  :root {
+    --ink: #1a1f24;
+    --muted: #4a5560;
+    --line: #c9d0d6;
+    --accent: #1f4e6b;
+    --soft: #f3f6f8;
+    --ok: #1b5e3b;
+    --warn: #8a4b00;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    font-size: 9.5pt;
+    line-height: 1.35;
+    margin: 0;
+    padding: 0;
+  }
+  h1 {
+    font-size: 16pt;
+    letter-spacing: 0.02em;
+    color: var(--accent);
+    margin: 0 0 6px;
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 8px;
+  }
+  h2 {
+    font-size: 11.5pt;
+    color: var(--accent);
+    margin: 18px 0 8px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid var(--line);
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 10pt;
+    margin: 12px 0 6px;
+    color: var(--ink);
+    page-break-after: avoid;
+  }
+  p, li { margin: 0 0 6px; }
+  ul { margin: 0 0 8px; padding-left: 18px; }
+  .meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 16px;
+    margin: 10px 0 14px;
+    padding: 10px 12px;
+    background: var(--soft);
+    border: 1px solid var(--line);
+  }
+  .meta div { margin: 0; }
+  .meta strong { color: var(--accent); }
+  .subtitle {
+    color: var(--muted);
+    font-size: 9pt;
+    margin: 0 0 4px;
+  }
+  .note, .warn, .ok {
+    border-left: 3px solid var(--accent);
+    background: var(--soft);
+    padding: 7px 10px;
+    margin: 8px 0;
+    font-size: 9pt;
+  }
+  .warn { border-left-color: var(--warn); }
+  .ok { border-left-color: var(--ok); }
+  .diagram {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 7.6pt;
+    line-height: 1.25;
+    white-space: pre;
+    background: #fafbfc;
+    border: 1px solid var(--line);
+    padding: 8px 10px;
+    margin: 6px 0 10px;
+    overflow: hidden;
+    page-break-inside: avoid;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 7.6pt;
+    margin: 8px 0 10px;
+  }
+  th, td {
+    border: 1px solid var(--line);
+    padding: 3px 4px;
+    vertical-align: top;
+    text-align: left;
+  }
+  th {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+  tr:nth-child(even) td { background: #f7f9fa; }
+  .num { text-align: right; white-space: nowrap; }
+  .center { text-align: center; }
+  .bought { color: var(--ok); font-weight: 600; }
+  .planned { color: var(--muted); }
+  .deferred { color: var(--warn); font-weight: 600; }
+  a.link {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    word-break: break-all;
+  }
+  a.link:hover { color: #12374d; }
+  table.sortable th {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  table.sortable th:hover { filter: brightness(1.08); }
+  table.sortable th::after {
+    content: " ↕";
+    opacity: 0.45;
+    font-weight: 400;
+  }
+  table.sortable th.asc::after { content: " ↑"; opacity: 1; }
+  table.sortable th.desc::after { content: " ↓"; opacity: 1; }
+  .table-hint {
+    font-size: 8.5pt;
+    color: var(--muted);
+    margin: 0 0 6px;
+  }
+  @media screen {
+    body {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 18px 20px 40px;
+      font-size: 10.5pt;
+    }
+    table.sortable { font-size: 8.5pt; }
+    .shop-wrap { overflow-x: auto; }
+  }
+  @media print {
+    table.sortable th { cursor: default; }
+    table.sortable th::after { content: none; }
+    a.link { color: inherit; text-decoration: none; }
+    a.link::after { content: " (" attr(href) ")"; font-size: 6.5pt; color: var(--muted); }
+  }
+  .totals {
+    width: 60%;
+    margin-left: auto;
+    font-size: 9pt;
+  }
+  .totals td { border: none; border-bottom: 1px solid var(--line); padding: 4px 6px; }
+  .totals tr:last-child td {
+    border-bottom: 2px solid var(--accent);
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .footer {
+    margin-top: 18px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 8pt;
+  }
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .keep { page-break-inside: avoid; }
+  .small { font-size: 8.5pt; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>PROJEKTOVÁ DOKUMENTACE<br>Elektroinstalace &amp; SmartHome</h1>
+<p class="subtitle">Objekt Kamyk · Rekonstrukce / dřevostavba (chata) · Revize: oddělený slaboproud · verze Final V7</p>
+
+<div class="meta">
+  <div><strong>Koncept:</strong> Klasická silovina + oddělená datová infrastruktura + bezdrátové řízení Home Assistant (Zigbee 3.0 / Wi‑Fi)</div>
+  <div><strong>Rozvaděče:</strong> 1) silový NOARK PHS 36T · 2) samostatná slaboproudá / multimediální skříň</div>
+  <div><strong>Silový rozvaděč:</strong> Plastová skříň NOARK PHS 36T (36 modulů, IP65), na stěnu u WC</div>
+  <div><strong>Slaboproudá skříň:</strong> Samostatná multimediální skříň vedle silové (typ/rozměr dle dostupnosti)</div>
+</div>
+
+<h2>1. Hlavní filozofie a rozhraní odpovědnosti</h2>
+<p>Projekt je hybridní instalace. Nejsou použity proprietární sběrnicové systémy (Loxone, KNX) v rozvaděči. Instalace musí být revizně čistá, jednoduchá a plně funkční i bez řídicího počítače.</p>
+<ul>
+  <li><strong>Elektrikář:</strong> hrubé rozvody siloviny, krabice, kabeláž, jističe, proudový chránič, stykač, příprava rezervy pro SPD, vystavení revize.</li>
+  <li><strong>Investor:</strong> osazení chytrých mikromodulů pod vypínače, kompletní osazení a oživení slaboproudé skříně (switche, PoE, Mini PC), konfigurace Home Assistant.</li>
+</ul>
+
+<h2>2. Základní technické standardy</h2>
+<ol>
+  <li><strong>Všude dotažený nulový vodič (L+N):</strong> do každé krabice pod vypínač je dotažen modrý N. Sonoff ZBMINIR2 mají trvalé napájení a slouží jako Zigbee routery (mesh).</li>
+  <li><strong>Parotěsné krabice v SDK:</strong> při roštu 40&nbsp;mm + SDK 12,5&nbsp;mm se montují KOPOS <strong>KUL 68-45/LD NA</strong> (gumová membrána) — neprorazí se parotěsná fólie. (Single „KPL 68-50/LD“ u Koposu neexistuje; hlubší KPRL 70&nbsp;mm se do 52,5&nbsp;mm skladby nevejde.)</li>
+  <li><strong>Pevné vedení na laťovém roštu:</strong> CYKY i UTP se kotví přes šroubovací sedla KOPOS KSD-2316 a černé UV-stabilní pásky 4,8×290&nbsp;mm.</li>
+  <li><strong>Ochrana relé u bojleru:</strong> 1200&nbsp;W bojler se spíná přes stykač Noark Ex9CH25 25A. Chytrý DIN modul spíná pouze cívku stykače.</li>
+  <li><strong>Kabeláž světel:</strong> mezi krabicí pod vypínačem a svítidlem CYKY-J 3×1,5.</li>
+  <li><strong>Oddělený slaboproud:</strong> v silovém rozvaděči výhradně 230&nbsp;V technika; UTP, switche a Mini PC pouze ve slaboproudé skříni.</li>
+</ol>
+
+<h2>3. Schéma rozložení modulů v silovém rozvaděči (NOARK PHS 36T)</h2>
+<p>Kapacita 36 modulů (3×12M). Žádné IT switche ani UTP v této skříni.</p>
+<div class="diagram">+-----------------------------------------------------------------------------------+
+| [ŘADA 1]  [Hlavní vypínač] [Proudový chránič RCD] [Jističe Světla / Zásuvky / TV] |
++-----------------------------------------------------------------------------------+
+| [ŘADA 2]  [VOLNÉ 2M PRO SPD T1+T2] | [Stykač bojler 25A] | [DIN Wi‑Fi měření]   |
++-----------------------------------------------------------------------------------+
+| [ŘADA 3]  [Rezerva / silové svorkovnice pro vývody z objektu]                     |
++-----------------------------------------------------------------------------------+</div>
+<div class="warn"><strong>Pokyn pro elektrikáře:</strong> Na 2. řadě DIN ponechat přesně 2 volné modulové sloty (2M) pro svodič přepětí T1+T2 — <strong>NOARK Ex9UE1+2</strong>. Osazení ve Fázi 3 před připojením hromosvodu a vystavením revizní zprávy.</div>
+
+<h2>4. Schémata zapojení</h2>
+
+<h3>A. Slaboproudá / multimediální skříň</h3>
+<div class="diagram">[ UTP z pokojů, TV a kamer ]
+              │
+              ▼
+   [ RJ45 konektory / keystone spojky ]
+   (patch panel se nepožaduje)
+              │
+      ┌───────┴────────┐
+      ▼                ▼
+[ Mercusys MS108G ]  [ Mercusys MS108GP ]  ← PoE+ (802.3af/at)
+  non‑PoE switch       │
+  (LAN pokoje/TV       ├─► SONOFF PoE Dongle Max (Zigbee)
+   + rezervy)          ├─► IMOU Cruiser / Cruiser 2
+      │                │     přes aktivní PoE splitter 12 V
+      └───────┬────────┘     (IEEE 802.3af → 12 V DC 5,5×2,1)
+              │ LAN
+              ▼
+   [ Intel N100 Mini PC ]  ← 230 V zásuvka ve skříni
+   (Home Assistant OS)</div>
+<div class="note"><strong>Poznámka k síti:</strong> PoE switch = kamery + Zigbee dongle (+ PoE rezervy). Non‑PoE switch = pevné LAN z pokojů / TV / uplink Mini PC (+ rezervy). UTP zakončit RJ45 nebo keystone přímo do switche; plný patch panel není nutný.</div>
+
+<h3>B. Bojler — silové spínání a měření</h3>
+<div class="diagram">[ Jistič bojleru v rozvaděči ]
+              │
+              ▼
+   [ Sonoff POWR316D ]  ← Wi‑Fi DIN, měření + relé
+              │ (spíná cívku)
+              ▼
+   [ Noark Ex9CH25 25A ]  ← instalační stykač
+              │
+              │  CYKY 3×2,5
+              ▼
+   [ Bojler Ariston / Chaffoteaux 80 l, 1,2 kW ]
+
+Data spotřeby → Home Assistant přes Wi‑Fi (2,4 GHz u rozvaděče).</div>
+
+<h3>C. Světla — Sonoff ZBMINIR2 v krabici KPL (správné zapojení)</h3>
+<div class="diagram">[ Rozvaděč: jistič 10A + RCD ]
+       │
+       ├── L (hnědá) ──────────────────────────────┐
+       │                                           │
+       └── N (modrá) ──────────────────────────────┤
+                                                   ▼
+                                   ┌───────────────────────────┐
+                                   │ Sonoff ZBMINIR2           │
+                                   │ L, N = trvalé napájení    │
+                                   │ L_out → svítidlo          │
+                                   │ S1/S2 ← mechanický spínač │
+                                   └─────────────┬─────────────┘
+                                                 │ CYKY‑J 3×1,5
+                                                 ▼
+                                        [ Stropní svítidlo / LED ]
+
+Mechanický vypínač se připojuje na vstupy S1/S2 modulu (ne do série za výstupem).
+Modul spíná zátěž přímo; lokální ovládání i HA fungují současně.</div>
+
+<h3>D. Havarijní uzávěr vody (12 V NC)</h3>
+<div class="diagram">[ 230 V z rozvaděče ]
+         │
+         ▼
+[ Sonoff ZBMINIR2 + DIN držák ]  ← spíná 230 V primár zdroje
+         │
+         ▼
+[ Adaptér 12 V / ≥1 A ] ──► [ GOMEDIA 1" YYZK‑F21B NC ]
+
+Princip: NC ventil je při napájení otevřený (voda teče).
+Odpojení 12 V (povel HA / flood senzor / výpadek sítě) = uzavření vody.
+Nejedná se o beznapěťový kontakt — ZBMINIR2 spíná primární stranu 12V zdroje.</div>
+
+<h2>5. Rozpis zařízení podle místností a okruhů</h2>
+
+<div class="keep">
+<h3>Hlavní silový rozvaděč (NOARK PHS 36T)</h3>
+<ul>
+  <li>NOARK Ex9UE1+2 T1+T2 SPD (1 ks) — odloženo, rezerva 2M</li>
+  <li>Noark Ex9CH25 25A stykač (1 ks) — bojler</li>
+  <li>Sonoff POWR316D Wi‑Fi DIN (3 ks) — bojler, topení ložnice, topný žebřík</li>
+  <li>Sonoff ZBMINIR2 + DIN držák (1 ks) — spínání 12V zdroje uzávěru vody</li>
+</ul>
+</div>
+
+<div class="keep">
+<h3>Slaboproudá / multimediální skříň</h3>
+<ul>
+  <li>Intel N100 Mini PC (1 ks) — Home Assistant OS</li>
+  <li>SONOFF PoE Dongle Max (1 ks, nakoupeno) — Zigbee koordinátor</li>
+  <li>Mercusys MS108GP PoE+ (1 ks) — kamery, dongle, PoE rezervy</li>
+  <li>Mercusys MS108G non‑PoE (1 ks) — LAN pokoje/TV, rezervy</li>
+  <li>230 V zásuvka ve skříni pro Mini PC a switche</li>
+</ul>
+</div>
+
+<div class="keep">
+<h3>Koncové zóny</h3>
+<ul>
+  <li><strong>Koupelna:</strong> bojler 80&nbsp;l / 1,2&nbsp;kW, topný žebřík, Zigbee Temp/Humidity, flood senzor u pračky</li>
+  <li><strong>Ložnice:</strong> elektrický topný panel řízený POWR316D</li>
+  <li><strong>Kuchyň:</strong> Zigbee flood senzor pod dřezem</li>
+  <li><strong>Crawlspace:</strong> autonomní topný kabel s bimetalem + Zigbee teploměr (mráz)</li>
+  <li><strong>Obývák / domov:</strong> Zigbee CO₂ / Temp / Hum</li>
+  <li><strong>Všechny pokoje:</strong> 7× ZBMINIR2 pod vypínači (L+N)</li>
+  <li><strong>Přívod vody:</strong> GOMEDIA 1" YYZK-F21B NC + 12V adaptér</li>
+  <li><strong>Exteriér:</strong> IMOU Cruiser + Cruiser 2 (vlastní) přes aktivní PoE splitttery 12&nbsp;V</li>
+</ul>
+</div>
+
+<div class="ok"><strong>Má investor (mimo nákupní seznam):</strong> silové kabely CYKY (případně drobný dokup), kamery IMOU Cruiser a Cruiser 2, mechanické vypínače dle stavu objektu.</div>
+
+<div class="warn"><strong>Kamery IMOU:</strong> Cruiser / Cruiser 2 mají pouze DC 12&nbsp;V / 1&nbsp;A, nejsou native PoE. U switche MS108GP je nutný <em>aktivní</em> IEEE 802.3af splitter → 12&nbsp;V (5,5×2,1). Pasivní splitttery nepoužívat.</div>
+
+<h2>6. Kompletní nákupní seznam a rozfázování</h2>
+<p class="table-hint">Kliknutím na záhlaví sloupce seřadíš tabulku (vzestupně / sestupně). Odkazy vedou přímo na produktové stránky.</p>
+
+<div class="shop-wrap">
+<table class="sortable" id="shop-table">
+  <thead>
+    <tr>
+      <th data-type="number">Fáze</th>
+      <th data-type="text">Sekce</th>
+      <th data-type="text">Okruh / produkt</th>
+      <th data-type="text">Značka / specifikace</th>
+      <th class="center" data-type="number">Ks</th>
+      <th data-type="text">Stav</th>
+      <th data-type="text">Zdroj</th>
+      <th class="num" data-type="number">Celkem</th>
+      <th data-type="text">Poznámka / umístění</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td><td>CORE</td><td>Krabičky do SDK</td><td>KOPOS KUL 68-45/LD NA (45&nbsp;mm, guma)</td>
+      <td class="center">20</td><td class="planned">V plánu</td>
+      <td><a class="link" href="https://www.kvelektro.cz/krabice-do-sadrokartonu-kopos-kul-68-45-ld-na-p1453681" target="_blank" rel="noopener">K&amp;V Elektro</a></td>
+      <td class="num" data-sort="560">560&nbsp;Kč</td>
+      <td>Rošt 40&nbsp;mm + SDK 12,5&nbsp;mm. Pozn.: v původním znění „KPL 68-50/LD“ — u Koposu single 50&nbsp;mm LD není; toto je správný parotěsný typ (45&nbsp;mm).</td>
+    </tr>
+    <tr>
+      <td>0</td><td>CORE</td><td>Rozvodnice na omítku</td><td>NOARK PHS 36T IP65 (101496)</td>
+      <td class="center">1</td><td class="planned">V plánu</td>
+      <td><a class="link" href="https://www.kvelektro.cz/rozvodnice-na-omitku-noark-phs-36t-ip65-101496-p1161823" target="_blank" rel="noopener">K&amp;V Elektro</a></td>
+      <td class="num" data-sort="1125">1&nbsp;125&nbsp;Kč</td>
+      <td>36 modulů, prázdná skříň u WC</td>
+    </tr>
+    <tr>
+      <td>0</td><td>SÍŤ</td><td>Kabeláž UTP Cat5e</td><td>Solarix Cat5e UTP PVC (100&nbsp;% Cu)</td>
+      <td class="center" data-sort="60">60&nbsp;m</td><td class="planned">V plánu</td>
+      <td><a class="link" href="https://www.kvelektro.cz/utp-kabel-solarix-sxkd-5e-utp-pvc-sedy-metraz-p1223184" target="_blank" rel="noopener">K&amp;V Elektro</a></td>
+      <td class="num" data-sort="720">720&nbsp;Kč</td>
+      <td>Podhled: kamery, TV, LAN</td>
+    </tr>
+    <tr>
+      <td>0</td><td>MONTÁŽ</td><td>Příchytky svazků</td><td>KOPOS KSD-2316 HC-2 (100&nbsp;ks)</td>
+      <td class="center">1</td><td class="planned">V plánu</td>
+      <td><a class="link" href="https://www.kvelektro.cz/prichytky-stahovaciho-pasku-ksd-2316-hc-2-100ks-p1185501" target="_blank" rel="noopener">K&amp;V Elektro</a></td>
+      <td class="num" data-sort="139">139&nbsp;Kč</td>
+      <td>Šroubovací sedla na laťový rošt</td>
+    </tr>
+    <tr>
+      <td>0</td><td>MONTÁŽ</td><td>Stahovací pásky</td><td>GPH VPC 5-280 (4,8×290&nbsp;mm černé)</td>
+      <td class="center">1</td><td class="planned">V plánu</td>
+      <td><a class="link" href="https://www.kvelektro.cz/stahovaci-pasky-gph-cerne-vpc-5-280-4-8x290-100ks-p1148328" target="_blank" rel="noopener">K&amp;V Elektro</a></td>
+      <td class="num" data-sort="120">120&nbsp;Kč</td>
+      <td>UV stabilní fixace CYKY/UTP</td>
+    </tr>
+    <tr>
+      <td>0</td><td>ENERGIE</td><td>Bojler</td><td>ARISTON / Chaffoteaux 80&nbsp;l, 1,2&nbsp;kW</td>
+      <td class="center">1</td><td class="planned">V plánu</td>
+      <td>Bazar</td>
+      <td class="num" data-sort="500">500&nbsp;Kč</td>
+      <td>Koupelna u stropu</td>
+    </tr>
+    <tr>
+      <td>1</td><td>CORE</td><td>Řídicí jednotka</td><td>Intel N100 / 16&nbsp;GB RAM / 512&nbsp;GB SSD</td>
+      <td class="center">1</td><td class="planned">V plánu</td>
+      <td><a class="link" href="https://aukro.cz/mini-pc-intel-n100-16-gb-ram-512-gb-ssd-7126607847" target="_blank" rel="noopener">Aukro</a></td>
+      <td class="num" data-sort="3200">3&nbsp;200&nbsp;Kč</td>
+      <td>HA OS ve slaboproudé skříni (230&nbsp;V)</td>
+    </tr>
+    <tr>
+      <td>1</td><td>CORE</td><td>Zigbee koordinátor</td><td>SONOFF PoE Dongle Max</td>
+      <td class="center">1</td><td class="bought">Nakoupeno</td>
+      <td>OdKarla.cz</td>
+      <td class="num" data-sort="669">669&nbsp;Kč</td>
+      <td>LAN/PoE z MS108GP (nahradil SMLIGHT)</td>
+    </tr>
+    <tr>
+      <td>1</td><td>SÍŤ</td><td>PoE Switch</td><td>Mercusys MS108GP (8port PoE+)</td>
+      <td class="center">1</td><td class="planned">V plánu</td>
+      <td><a class="link" href="https://www.datart.cz/switch-mercusys-ms108gp-ms108gp.html" target="_blank" rel="noopener">Datart</a></td>
+      <td class="num" data-sort="620">620&nbsp;Kč</td>
+      <td>Kamery, dongle, PoE rezervy</td>
+    </tr>
+    <tr>
+      <td>1</td><td>SÍŤ</td><td>Switch non‑PoE</td><td>Mercusys MS108G (8port Gigabit)</td>
+      <td class="center">1</td><td class="planned">V plánu</td>
+      <td><a class="link" href="https://www.smarty.cz/Mercusys-MS108G-switch-4p26003" target="_blank" rel="noopener">Smarty</a></td>
+      <td class="num" data-sort="379">379&nbsp;Kč</td>
+      <td>LAN pokoje/TV, Mini PC, rezervy</td>
+    </tr>
+    <tr>
+      <td>1</td><td>CORE</td><td>Chytré spínače</td><td>Sonoff ZBMINIR2 (Zigbee, L+N)</td>
+      <td class="center">7</td><td class="bought">Nakoupeno</td>
+      <td>OdKarla.cz</td>
+      <td class="num" data-sort="1081">1&nbsp;081&nbsp;Kč</td>
+      <td>Pod vypínače; z celkových 8&nbsp;ks</td>
+    </tr>
+    <tr>
+      <td>1</td><td>CORE</td><td>DIN spínač voda</td><td>Sonoff ZBMINIR2 + DIN držák</td>
+      <td class="center">1</td><td class="bought">Nakoupeno</td>
+      <td>OdKarla.cz</td>
+      <td class="num" data-sort="155">155&nbsp;Kč</td>
+      <td>Spíná 230&nbsp;V → 12V adaptér ventilu</td>
+    </tr>
+    <tr>
+      <td>1</td><td>TEST</td><td>Testovací žárovka</td><td>LEDVANCE Zigbee E14 LED</td>
+      <td class="center">1</td><td class="bought">Nakoupeno</td>
+      <td>OdKarla.cz</td>
+      <td class="num" data-sort="149">149&nbsp;Kč</td>
+      <td>První pokusy a ladění Zigbee</td>
+    </tr>
+    <tr>
+      <td>1</td><td>CORE</td><td>DIN spínače s měřením</td><td>Sonoff POWR316D (Wi‑Fi DIN)</td>
+      <td class="center">3</td><td class="planned">V plánu</td>
+      <td>Aliexpress</td>
+      <td class="num" data-sort="1260">1&nbsp;260&nbsp;Kč</td>
+      <td>Bojler, topení ložnice, topný žebřík</td>
+    </tr>
+    <tr>
+      <td>1</td><td>CORE</td><td>Stykač bojleru</td><td>Noark Ex9CH25 11 230V (25A)</td>
+      <td class="center">1</td><td class="planned">V plánu</td>
+      <td><a class="link" href="https://www.kvelektro.cz/instalacni-stykac-noark-ex9ch25-11-230v-50-60hz-25a-1no-1nc-107322-p1677028" target="_blank" rel="noopener">K&amp;V Elektro</a></td>
+      <td class="num" data-sort="715">715&nbsp;Kč</td>
+      <td>Spíná 1200&nbsp;W, chrání relé Sonoffu</td>
+    </tr>
+    <tr>
+      <td>1</td><td>CORE</td><td>12V zdroj pro uzávěr</td><td>Adaptér 12&nbsp;V / ≥1&nbsp;A, jack 5,5×2,1</td>
+      <td class="center">1</td><td class="planned">V plánu</td>
+      <td>libovolně</td>
+      <td class="num" data-sort="150">≈150&nbsp;Kč</td>
+      <td>Primár spínaný ZBMINIR2 na DIN</td>
+    </tr>
+    <tr>
+      <td>2</td><td>VODA</td><td>Senzor úniku vody</td><td>Zigbee Flood Sensor (Tuya/Sonoff)</td>
+      <td class="center">3</td><td class="planned">V plánu</td>
+      <td>Aliexpress</td>
+      <td class="num" data-sort="1050">1&nbsp;050&nbsp;Kč</td>
+      <td>Dřez, bojler/WC, pračka</td>
+    </tr>
+    <tr>
+      <td>2</td><td>VODA</td><td>Teplotní senzor</td><td>Zigbee Temp Sensor</td>
+      <td class="center">1</td><td class="planned">V plánu</td>
+      <td>Aliexpress</td>
+      <td class="num" data-sort="350">350&nbsp;Kč</td>
+      <td>Crawlspace — monitoring mrazu</td>
+    </tr>
+    <tr>
+      <td>2</td><td>VODA</td><td>Temp/Hum koupelna</td><td>Zigbee Temp/Humidity Sensor</td>
+      <td class="center">1</td><td class="planned">V plánu</td>
+      <td>Aliexpress</td>
+      <td class="num" data-sort="350">350&nbsp;Kč</td>
+      <td>Žebřík + odvětrání sprchy</td>
+    </tr>
+    <tr>
+      <td>2</td><td>VODA</td><td>Kvalita vzduchu</td><td>Zigbee CO₂ / Temp / Hum Sensor</td>
+      <td class="center">1</td><td class="planned">V plánu</td>
+      <td>Aliexpress</td>
+      <td class="num" data-sort="950">950&nbsp;Kč</td>
+      <td>CO₂ v utěsněné dřevostavbě</td>
+    </tr>
+    <tr>
+      <td>2</td><td>SÍŤ</td><td>PoE splitter set</td><td>IEEE 802.3af → 12&nbsp;V (5,5×2,1)</td>
+      <td class="center">2</td><td class="planned">V plánu</td>
+      <td>CZ e‑shop</td>
+      <td class="num" data-sort="400">≈200–600&nbsp;Kč</td>
+      <td>Aktivní af/at (ne pasivní); IMOU Cruiser + Cruiser 2; typ. 99–300&nbsp;Kč/ks</td>
+    </tr>
+    <tr>
+      <td>3</td><td>CORE</td><td>Ochrana rozvaděče</td><td>NOARK Ex9UE1+2 1P (T1+T2)</td>
+      <td class="center">1</td><td class="deferred">Odloženo</td>
+      <td>kvelektro.cz</td>
+      <td class="num" data-sort="999999">—</td>
+      <td>Rezerva 2M na DIN; dokoupit před revizí</td>
+    </tr>
+    <tr>
+      <td>3</td><td>CORE</td><td>Uzávěr vody</td><td>GOMEDIA 1" YYZK-F21B (NC)</td>
+      <td class="center">1</td><td class="planned">V plánu</td>
+      <td>E‑shop</td>
+      <td class="num" data-sort="670">670&nbsp;Kč</td>
+      <td>Havarijní uzavření, napájení 12&nbsp;V</td>
+    </tr>
+    <tr>
+      <td>3</td><td>ENERGIE</td><td>Topný kabel</td><td>Autonomní kabel s bimetalem</td>
+      <td class="center">1</td><td class="planned">V plánu</td>
+      <td>Hobbymarket</td>
+      <td class="num" data-sort="1200">1&nbsp;200&nbsp;Kč</td>
+      <td>Crawlspace, vlastní termostat na jistič</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Finanční souhrn</h3>
+<table class="totals">
+  <tr><td>Fáze 0 — příprava instalace</td><td class="num">3&nbsp;164&nbsp;Kč</td></tr>
+  <tr><td>Fáze 1 — jádro SmartHome + silovina</td><td class="num">≈ 8&nbsp;378&nbsp;Kč</td></tr>
+  <tr><td>Fáze 2 — senzory + PoE splitttery</td><td class="num">≈ 3&nbsp;100&nbsp;Kč</td></tr>
+  <tr><td>Fáze 3 — uzávěr vody + crawlspace (bez SPD)</td><td class="num">1&nbsp;870&nbsp;Kč</td></tr>
+  <tr><td>CELKEM (orientačně, vč. DPH kde relevantní)</td><td class="num">≈ 16&nbsp;500&nbsp;Kč</td></tr>
+  <tr><td>z toho již nakoupeno</td><td class="num">2&nbsp;054&nbsp;Kč</td></tr>
+  <tr><td>zbývá dokoupit (bez SPD)</td><td class="num">≈ 14&nbsp;450&nbsp;Kč</td></tr>
+</table>
+
+<p class="small">Součty Fáze 1–2 zahrnují orientační ceny 12V adaptéru (≈150&nbsp;Kč) a aktivních PoE splitterů (typicky 99–300&nbsp;Kč/ks). UPS / 12V záloha není součástí projektu. SPD NOARK se dokoupí před revizí.</p>
+
+<h2>7. Rozfázování realizace (stručně)</h2>
+<ol>
+  <li><strong>Fáze 0:</strong> krabice, rozvaděč, UTP, uchycení — hrubá montáž s elektrikářem.</li>
+  <li><strong>Fáze 1:</strong> Mini PC, switche, Zigbee dongle, ZBMINIR2, POWR316D, stykač, oživení HA.</li>
+  <li><strong>Fáze 2:</strong> senzory, aktivní PoE splitttery, napojení kamer.</li>
+  <li><strong>Fáze 3:</strong> uzávěr vody, topný kabel crawlspace, SPD T1+T2, revize.</li>
+</ol>
+
+<div class="footer">
+  <strong>Projektová dokumentace — Elektroinstalace &amp; SmartHome · Kamyk</strong><br>
+  Verze Final V7.1 · Oddělený slaboproud · Bez UPS · NOARK SPD v rezervě · SONOFF PoE Dongle Max · POWR316D Wi‑Fi DIN<br>
+  Dokument slouží jako podklad pro elektrikáře a nákupní seznam investora. Silové zapojení musí vždy odpovídat platným ČSN a rozhodnutí revizního technika.
+</div>
+
+<script>
+(function () {
+  const table = document.getElementById("shop-table");
+  if (!table) return;
+  const tbody = table.tBodies[0];
+  const headers = Array.from(table.tHead.rows[0].cells);
+  let active = -1;
+  let asc = true;
+
+  function cellValue(td, type) {
+    if (td.dataset.sort != null && td.dataset.sort !== "") return td.dataset.sort;
+    const text = (td.textContent || "").replace(/\u00a0/g, " ").trim();
+    if (type === "number") {
+      const n = parseFloat(text.replace(/[^\d,.\-]/g, "").replace(",", "."));
+      return Number.isFinite(n) ? n : Number.POSITIVE_INFINITY;
+    }
+    return text.toLocaleLowerCase("cs");
+  }
+
+  headers.forEach((th, index) => {
+    th.addEventListener("click", () => {
+      if (active === index) asc = !asc;
+      else { active = index; asc = true; }
+      headers.forEach((h) => h.classList.remove("asc", "desc"));
+      th.classList.add(asc ? "asc" : "desc");
+      const type = th.dataset.type || "text";
+      const rows = Array.from(tbody.rows);
+      rows.sort((a, b) => {
+        const av = cellValue(a.cells[index], type);
+        const bv = cellValue(b.cells[index], type);
+        if (av < bv) return asc ? -1 : 1;
+        if (av > bv) return asc ? 1 : -1;
+        return 0;
+      });
+      rows.forEach((row) => tbody.appendChild(row));
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Půdorys chaty — návrh koupelny</title>
+<style>
+  :root {
+    --ink: #111;
+    --muted: #5a6570;
+    --bg: #f7f5f1;
+    --panel: #fff;
+    --line: #c9d0d6;
+    --wall: #111;
+    --window: #2a6fad;
+    --door: #e07a2f;
+    --dim: #c0392b;
+    --bath-fill: #e8f1f8;
+    --ok: #1b5e3b;
+    --warn: #b86b00;
+    --bad: #b00020;
+    --collision: rgba(176, 0, 32, 0.28);
+    --collision-stroke: #b00020;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  header {
+    padding: 16px 20px 8px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+  }
+  header h1 { margin: 0 0 4px; font-size: 1.25rem; }
+  header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: minmax(320px, 1fr) auto;
+    gap: 12px;
+    padding: 12px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 10px;
+    min-height: 0;
+  }
+  .card h2 {
+    margin: 0 0 8px;
+    font-size: 0.95rem;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .svg-wrap {
+    width: 100%;
+    overflow: auto;
+    background:
+      linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px) 0 0 / 20px 20px,
+      linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px) 0 0 / 20px 20px,
+      #fafafa;
+  }
+  .svg-wrap svg { display: block; width: 100%; height: auto; }
+  .panel {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+  }
+  .panel section {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 10px 12px;
+    background: #fbfcfd;
+  }
+  .panel h3 { margin: 0 0 8px; font-size: 0.95rem; }
+  label { display: block; font-size: 0.85rem; margin: 8px 0 4px; color: var(--muted); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button, .seg button {
+    font: inherit;
+    border: 1px solid var(--line);
+    background: #fff;
+    padding: 6px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .seg button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  input[type="range"] { width: 100%; }
+  .status { grid-column: 1 / -1; padding: 10px 12px; border-radius: 4px; font-size: 0.9rem; }
+  .status.ok { background: #e8f6ee; color: var(--ok); }
+  .status.warn { background: #fff4e5; color: var(--warn); }
+  .status.bad { background: #fde8ec; color: var(--bad); }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Půdorys chaty — návrh koupelny</h1>
+    <p>Interaktivní prototyp · rozměry v cm · mimo navigaci aplikace</p>
+  </header>
+  <div class="layout">
+    <div class="card">
+      <h2>Celá chata (906 × 333 cm)</h2>
+      <div class="svg-wrap" id="cabin-wrap"></div>
+    </div>
+    <div class="card">
+      <h2>Detail koupelny</h2>
+      <div class="svg-wrap" id="bath-wrap"></div>
+    </div>
+    <div class="card panel" id="controls">
+      <div class="status ok" id="status">Načítání…</div>
+      <section id="sec-door">
+        <h3>Dveře koupelny</h3>
+        <label>Šířka</label>
+        <div class="row seg" id="door-width">
+          <button type="button" data-v="60">60</button>
+          <button type="button" data-v="70" class="active">70</button>
+          <button type="button" data-v="80">80</button>
+        </div>
+        <label>Odstup od severu: <strong id="door-offset-val">90</strong> cm</label>
+        <input type="range" id="door-offset" min="65" max="140" value="90" step="1">
+        <label>Typ posuvu</label>
+        <div class="row seg" id="door-type">
+          <button type="button" data-v="A" class="active">A · po stěně zvenku → jih</button>
+          <button type="button" data-v="B">B · pouzdro</button>
+        </div>
+        <div id="pocket-dir-wrap" hidden>
+          <label>Směr pouzdra</label>
+          <div class="row seg" id="pocket-dir">
+            <button type="button" data-v="north">Sever</button>
+            <button type="button" data-v="south" class="active">Jih</button>
+          </div>
+        </div>
+      </section>
+      <section id="sec-shower">
+        <h3>Sprchový kout</h3>
+        <label>Vanička</label>
+        <div class="row seg" id="shower-preset">
+          <button type="button" data-v="80x80">80×80</button>
+          <button type="button" data-v="90x90">90×90</button>
+          <button type="button" data-v="100x80" class="active">100×80</button>
+          <button type="button" data-v="120x80">120×80</button>
+          <button type="button" data-v="full">Plná šířka</button>
+        </div>
+        <label><input type="checkbox" id="shower-rotate"> Otočit 90°</label>
+        <div id="full-depth-wrap" hidden>
+          <label>Hloubka plné šířky</label>
+          <div class="row seg" id="shower-full-depth">
+            <button type="button" data-v="70">70</button>
+            <button type="button" data-v="80" class="active">80</button>
+            <button type="button" data-v="90">90</button>
+          </div>
+        </div>
+      </section>
+      <section id="sec-sink">
+        <h3>Umyvadlo (východní stěna)</h3>
+        <label>Šířka podél stěny: <strong id="sink-w-val">60</strong> cm</label>
+        <input type="range" id="sink-w" min="40" max="80" value="60" step="1">
+        <label>Hloubka: <strong id="sink-d-val">45</strong> cm</label>
+        <input type="range" id="sink-d" min="30" max="55" value="45" step="1">
+        <label>Odstup od severu: <strong id="sink-off-val">70</strong> cm</label>
+        <input type="range" id="sink-offset" min="0" max="180" value="70" step="1">
+      </section>
+      <section id="sec-view">
+        <h3>Zobrazení</h3>
+        <label><input type="checkbox" id="show-dims" checked> Zobrazit kóty</label>
+      </section>
+      <p style="grid-column:1/-1;margin:0;font-size:0.8rem;color:var(--muted)">
+        Legenda: černá = stěny/příčky · modrá = okna · oranžová = dveře/posuv · červená = kóty/kolize
+      </p>
+    </div>
+  </div>
+  <script>
+const WALL = 5 + 1.8 + 12 + 4 + 1.12; // 23.92
+const PART = 12.5;
+const CABIN = { w: 906, h: 333 };
+
+const NORTH_SEGS = [
+  { t: "wall", l: 220 }, { t: "win", l: 96.5 }, { t: "wall", l: 120 },
+  { t: "win", l: 90.5 }, { t: "wall", l: 99 }, { t: "win", l: 56.5 },
+  { t: "wall", l: 224 },
+];
+const SOUTH_SEGS = [
+  { t: "wall", l: 204 }, { t: "door", l: 103 }, { t: "wall", l: 79 },
+  { t: "win", l: 87 }, { t: "wall", l: 434.5 },
+];
+const WEST_SEGS = [
+  { t: "wall", l: 56 }, { t: "win", l: 83 }, { t: "wall", l: 50 },
+  { t: "win", l: 83 }, { t: "wall", l: 61 },
+];
+const EAST_SEGS = [
+  { t: "wall", l: 124 }, { t: "win", l: 85 }, { t: "wall", l: 124 },
+];
+
+/** Bathroom outer box: left outer partition edge at 569 from cabin left outer. */
+function bathOuterBox() {
+  return { x: 569, y: WALL, w: 125, d: 230 };
+}
+
+/** Clear interior of bathroom (cm). Origin: cabin left-top outer. */
+function bathInnerBox() {
+  const o = bathOuterBox();
+  return {
+    x: o.x + PART,
+    y: o.y,
+    w: o.w - 2 * PART,
+    d: o.d - PART,
+  };
+}
+
+/** WC box in cabin coords. Axis of bowl 65 cm from west partition inner face. */
+function wcBox() {
+  const bi = bathInnerBox();
+  const w = 37, d = 63;
+  const axisFromWestInner = 65;
+  const x = bi.x + axisFromWestInner - w / 2;
+  const y = bi.y;
+  return { x, y, w, d };
+}
+
+function aabbOverlap(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.d && a.y + a.d > b.y;
+}
+
+/** Door opening in west partition (cabin coords). */
+function doorOpeningBox() {
+  const o = bathOuterBox();
+  const bi = bathInnerBox();
+  return {
+    x: o.x,
+    y: bi.y + state.doorOffset,
+    w: PART,
+    d: state.doorWidth,
+  };
+}
+
+/**
+ * Type A: leaf slides south along OUTSIDE (west) face of west partition.
+ * Parked leaf occupies [opening.south … opening.south + doorWidth] along Y, west of partition.
+ */
+function doorSlideZoneA() {
+  const op = doorOpeningBox();
+  return {
+    x: op.x - 4,
+    y: op.y + op.d,
+    w: 4,
+    d: state.doorWidth,
+  };
+}
+
+/**
+ * Type B: pocket inside west partition, north or south of opening.
+ */
+function doorPocketZoneB() {
+  const op = doorOpeningBox();
+  const y = state.pocketDir === "north"
+    ? op.y - state.doorWidth
+    : op.y + op.d;
+  return { x: op.x, y, w: PART, d: state.doorWidth };
+}
+
+function doorTravelBox() {
+  return state.doorType === "A" ? doorSlideZoneA() : doorPocketZoneB();
+}
+
+function showerSize() {
+  if (state.showerPreset === "full") {
+    return { w: 100, d: state.showerFullDepth };
+  }
+  const [a, b] = state.showerPreset.split("x").map(Number);
+  return state.showerRotate ? { w: b, d: a } : { w: a, d: b };
+}
+
+function showerBox() {
+  const bi = bathInnerBox();
+  const { w, d } = showerSize();
+  const x = state.showerPreset === "full" ? bi.x : bi.x + bi.w - w;
+  const y = bi.y + bi.d - d;
+  return { x, y, w, d };
+}
+
+function showerClearanceBox() {
+  const s = showerBox();
+  return { x: s.x, y: s.y - 10, w: s.w, d: 10 };
+}
+
+function sinkBox() {
+  const bi = bathInnerBox();
+  const w = state.sinkD;
+  const d = state.sinkW;
+  return {
+    x: bi.x + bi.w - w,
+    y: bi.y + state.sinkOffset,
+    w,
+    d,
+  };
+}
+
+function showerFits() {
+  const bi = bathInnerBox();
+  const s = showerBox();
+  return s.w <= bi.w + 1e-9 && s.d <= bi.d + 1e-9 && s.x >= bi.x - 1e-9;
+}
+
+/**
+ * Checks fixed collision rules (spec §7) and returns both the human-readable
+ * issues (for the status panel) and per-entity conflict flags (for highlighting).
+ */
+function detectCollisions() {
+  const bi = bathInnerBox();
+  const o = bathOuterBox();
+  const wc = wcBox();
+  // North "keep clear" band for door swept-path checks (spec §5/§7): the
+  // opening/pocket physically sits INSIDE the west partition (x in
+  // [o.x, bi.x]), so this zone must span the full outer footprint —
+  // not just bi.x.. — otherwise it can never overlap the door boxes at all.
+  const wcZone = { x: o.x, y: bi.y, w: o.w, d: 63 };
+  const sh = showerBox();
+  const shClear = showerClearanceBox();
+  const sk = sinkBox();
+  const travel = doorTravelBox();
+  const op = doorOpeningBox();
+
+  const issues = [];
+  const conflicts = { door: false, wc: false, shower: false, sink: false };
+
+  if (!showerFits()) {
+    issues.push({ level: "bad", msg: "Sprcha se nevejde do světlého prostoru koupelny." });
+    conflicts.shower = true;
+  }
+  if (aabbOverlap(travel, wcZone) || aabbOverlap(op, wcZone)) {
+    issues.push({ level: "bad", msg: "Posuv/otvor dveří koliduje se zónou WC (63 cm od severu)." });
+    conflicts.door = true;
+    conflicts.wc = true;
+  }
+  if (aabbOverlap(travel, sh) || aabbOverlap(travel, shClear)) {
+    issues.push({ level: "bad", msg: "Posuv dveří koliduje se sprchou." });
+    conflicts.door = true;
+    conflicts.shower = true;
+  }
+  if (aabbOverlap(sh, wc) || aabbOverlap(shClear, wc)) {
+    issues.push({ level: "warn", msg: "Sprcha / zóna otevírání zasahuje do WC." });
+    conflicts.shower = true;
+    conflicts.wc = true;
+  }
+  if (aabbOverlap(sh, sk) || aabbOverlap(shClear, sk)) {
+    issues.push({ level: "warn", msg: "Sprcha koliduje s umyvadlem." });
+    conflicts.shower = true;
+    conflicts.sink = true;
+  }
+  if (aabbOverlap(sk, wc)) {
+    issues.push({ level: "warn", msg: "Umyvadlo koliduje s WC." });
+    conflicts.sink = true;
+    conflicts.wc = true;
+  }
+  return { issues, conflicts };
+}
+
+function updateStatus(issues) {
+  const elStatus = document.getElementById("status");
+  if (!issues.length) {
+    elStatus.className = "status ok";
+    elStatus.textContent = "Bez kolizí — rozvržení vypadá průchodně.";
+    return issues;
+  }
+  const bad = issues.some((i) => i.level === "bad");
+  elStatus.className = "status " + (bad ? "bad" : "warn");
+  elStatus.innerHTML = issues.map((i) => i.msg).join("<br>");
+  return issues;
+}
+
+const state = {
+  doorWidth: 70,
+  doorOffset: 90, // north inner → north edge of opening
+  doorType: "A", // A | B
+  pocketDir: "south", // for type B: north | south
+  showerPreset: "100x80", // or "full"
+  showerRotate: false,
+  showerFullDepth: 80,
+  sinkW: 60, // along east wall (S–J)
+  sinkD: 45, // into room (V–Z toward west)
+  sinkOffset: 70, // north edge from north inner (keeps default clear of 100×80 shower)
+  showDims: true,
+};
+
+function el(name, attrs, children = []) {
+  const ns = "http://www.w3.org/2000/svg";
+  const node = document.createElementNS(ns, name);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
+  for (const c of children) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+  return node;
+}
+
+function wallStrokeAttrs() {
+  return { fill: "none", stroke: "var(--wall)", "stroke-width": WALL };
+}
+
+/** Horizontal dimension line with end ticks, centered label above. */
+function dimH(g, x1, x2, y, label) {
+  const mid = (x1 + x2) / 2;
+  g.appendChild(el("line", { x1, y1: y, x2, y2: y, stroke: "var(--dim)", "stroke-width": 1 }));
+  g.appendChild(el("line", { x1, y1: y - 3, x2: x1, y2: y + 3, stroke: "var(--dim)", "stroke-width": 1 }));
+  g.appendChild(el("line", { x1: x2, y1: y - 3, x2, y2: y + 3, stroke: "var(--dim)", "stroke-width": 1 }));
+  const t = el("text", { x: mid, y: y - 5, fill: "var(--dim)", "font-size": 11, "text-anchor": "middle" });
+  t.textContent = label;
+  g.appendChild(t);
+}
+/** Vertical dimension line, label to the right, vertically centered. */
+function dimV(g, y1, y2, x, label) {
+  const mid = (y1 + y2) / 2;
+  g.appendChild(el("line", { x1: x, y1, x2: x, y2, stroke: "var(--dim)", "stroke-width": 1 }));
+  g.appendChild(el("line", { x1: x - 3, y1, x2: x + 3, y2: y1, stroke: "var(--dim)", "stroke-width": 1 }));
+  g.appendChild(el("line", { x1: x - 3, y1: y2, x2: x + 3, y2, stroke: "var(--dim)", "stroke-width": 1 }));
+  const t = el("text", { x: x + 4, y: mid, fill: "var(--dim)", "font-size": 11, "dominant-baseline": "middle" });
+  t.textContent = label;
+  g.appendChild(t);
+}
+
+/** Draw outer cabin rectangle with wall thickness as inset fill ring. */
+function drawCabinShell(g) {
+  g.appendChild(el("rect", { x: 0, y: 0, width: CABIN.w, height: CABIN.h, fill: "#fff", stroke: "var(--wall)", "stroke-width": 2 }));
+  g.appendChild(el("path", {
+    d: `M0,0 H${CABIN.w} V${CABIN.h} H0 Z M${WALL},${WALL} V${CABIN.h - WALL} H${CABIN.w - WALL} V${WALL} Z`,
+    fill: "#222", "fill-rule": "evenodd",
+  }));
+}
+
+function drawOpeningsOnSide(g, side, segs) {
+  let cursor = 0;
+  for (const seg of segs) {
+    if (seg.t === "win" || seg.t === "door") {
+      let x, y, w, h;
+      if (side === "north") { x = cursor; y = 0; w = seg.l; h = WALL; }
+      if (side === "south") { x = cursor; y = CABIN.h - WALL; w = seg.l; h = WALL; }
+      if (side === "west")  { x = 0; y = cursor; w = WALL; h = seg.l; }
+      if (side === "east")  { x = CABIN.w - WALL; y = cursor; w = WALL; h = seg.l; }
+      const fill = seg.t === "win" ? "var(--window)" : "var(--door)";
+      g.appendChild(el("rect", { x, y, width: w, height: h, fill, stroke: "none" }));
+      if (seg.t === "door" && side === "south") {
+        g.appendChild(el("path", {
+          d: `M${x},${y + h} A${w},${w} 0 0 0 ${x + w},${y + h + w}`,
+          fill: "none", stroke: "var(--door)", "stroke-width": 2, "stroke-dasharray": "6 4", opacity: 0.8,
+        }));
+      }
+    }
+    cursor += seg.l;
+  }
+}
+
+function drawBathroomShell(g, { highlight = false } = {}) {
+  const o = bathOuterBox();
+  const bi = bathInnerBox();
+  g.appendChild(el("rect", {
+    x: o.x, y: o.y, width: o.w, height: o.d,
+    fill: highlight ? "var(--bath-fill)" : "#eef3f7",
+    stroke: "var(--wall)", "stroke-width": 1.5,
+  }));
+  g.appendChild(el("rect", { x: o.x, y: o.y, width: PART, height: o.d, fill: "#333" }));
+  g.appendChild(el("rect", { x: o.x + o.w - PART, y: o.y, width: PART, height: o.d, fill: "#333" }));
+  g.appendChild(el("rect", { x: o.x, y: o.y + o.d - PART, width: o.w, height: PART, fill: "#333" }));
+  g.appendChild(el("rect", {
+    x: bi.x, y: bi.y, width: bi.w, height: bi.d,
+    fill: highlight ? "#f3f9fc" : "#fff", stroke: "none",
+  }));
+}
+
+/** Punch opening, closed-leaf glyph and travel zone for the bathroom door. */
+function drawDoor(g, { collision = false } = {}) {
+  const op = doorOpeningBox();
+  g.appendChild(el("rect", {
+    x: op.x - 0.5, y: op.y, width: PART + 1, height: op.d,
+    fill: "#f3f9fc",
+  }));
+  g.appendChild(el("rect", {
+    x: op.x + 2, y: op.y, width: PART - 4, height: op.d,
+    fill: collision ? "var(--collision-stroke)" : "var(--door)", opacity: 0.85,
+  }));
+  const travel = doorTravelBox();
+  g.appendChild(el("rect", {
+    x: travel.x, y: travel.y, width: travel.w, height: travel.d,
+    fill: collision ? "var(--collision)" : "var(--door)",
+    opacity: collision ? 0.6 : 0.35,
+    stroke: collision ? "var(--collision-stroke)" : "var(--door)", "stroke-width": 1,
+    "stroke-dasharray": "4 3",
+  }));
+}
+
+/** WC bowl + tank footprint (north-west corner of the bathroom). */
+function drawWc(g, { collision = false } = {}) {
+  const wc = wcBox();
+  const fill = collision ? "var(--collision)" : "#dfe7ee";
+  const stroke = collision ? "var(--collision-stroke)" : "var(--wall)";
+  g.appendChild(el("rect", {
+    x: wc.x, y: wc.y, width: wc.w, height: wc.d,
+    fill, stroke, "stroke-width": 1.5,
+  }));
+  g.appendChild(el("ellipse", {
+    cx: wc.x + wc.w / 2, cy: wc.y + wc.d * 0.55, rx: wc.w * 0.28, ry: wc.d * 0.28,
+    fill: "#fff", stroke, "stroke-width": 1.2,
+  }));
+}
+
+/** Shower tray + north clearance zone and east-wall sink basin. */
+function drawShowerAndSink(g, { showerConflict = false, sinkConflict = false } = {}) {
+  const fits = showerFits();
+  const showerBad = !fits || showerConflict;
+  const fill = showerBad ? "var(--collision)" : "#cfeaea";
+  const stroke = showerBad ? "var(--collision-stroke)" : "#2a8f8f";
+
+  const clr = showerClearanceBox();
+  g.appendChild(el("rect", {
+    x: clr.x, y: clr.y, width: clr.w, height: clr.d,
+    fill: "none", stroke, "stroke-width": 1, "stroke-dasharray": "4 3", opacity: 0.85,
+  }));
+
+  const s = showerBox();
+  g.appendChild(el("rect", {
+    x: s.x, y: s.y, width: s.w, height: s.d,
+    fill, stroke, "stroke-width": 1.5,
+  }));
+  g.appendChild(el("circle", {
+    cx: s.x + s.w / 2, cy: s.y + s.d / 2, r: Math.max(2, Math.min(s.w, s.d) * 0.06),
+    fill: "none", stroke, "stroke-width": 1,
+  }));
+
+  const sinkFill = sinkConflict ? "var(--collision)" : "#dfe7ee";
+  const sinkStroke = sinkConflict ? "var(--collision-stroke)" : "var(--wall)";
+  const sink = sinkBox();
+  g.appendChild(el("rect", {
+    x: sink.x, y: sink.y, width: sink.w, height: sink.d,
+    fill: sinkFill, stroke: sinkStroke, "stroke-width": 1.5,
+  }));
+  g.appendChild(el("ellipse", {
+    cx: sink.x + sink.w * 0.55, cy: sink.y + sink.d / 2, rx: sink.w * 0.32, ry: sink.d * 0.32,
+    fill: "#fff", stroke: sinkStroke, "stroke-width": 1,
+  }));
+}
+
+function renderCabin(conflicts) {
+  const wrap = document.getElementById("cabin-wrap");
+  wrap.innerHTML = "";
+  const pad = 40;
+  const svg = el("svg", {
+    viewBox: `${-pad} ${-pad} ${CABIN.w + pad * 2} ${CABIN.h + pad * 2}`,
+    role: "img", "aria-label": "Půdorys chaty",
+  });
+  const g = el("g", {});
+  drawCabinShell(g);
+  drawOpeningsOnSide(g, "north", NORTH_SEGS);
+  drawOpeningsOnSide(g, "south", SOUTH_SEGS);
+  drawOpeningsOnSide(g, "west", WEST_SEGS);
+  drawOpeningsOnSide(g, "east", EAST_SEGS);
+  drawBathroomShell(g, { highlight: true });
+  drawDoor(g, { collision: conflicts.door });
+  drawShowerAndSink(g, { showerConflict: conflicts.shower, sinkConflict: conflicts.sink });
+  svg.appendChild(g);
+  wrap.appendChild(svg);
+}
+
+/** Dynamic dimension lines shown when state.showDims is on (Task 6 §3). */
+function drawBathDims(g) {
+  const bi = bathInnerBox();
+  const o = bathOuterBox();
+  const op = doorOpeningBox();
+  const wc = wcBox();
+  const shClear = showerClearanceBox();
+  const sink = sinkBox();
+
+  const doorDimX = o.x - 10;
+  dimV(g, bi.y, op.y, doorDimX, `${state.doorOffset}`);
+  dimV(g, op.y, op.y + op.d, doorDimX - 14, `${state.doorWidth}`);
+
+  const passageX = bi.x + 6;
+  const passageGap = Math.max(0, shClear.y - (wc.y + wc.d));
+  dimV(g, wc.y + wc.d, shClear.y, passageX, passageGap.toFixed(0));
+
+  const sinkDimX = o.x + o.w + 10;
+  dimV(g, bi.y, sink.y, sinkDimX, `${state.sinkOffset}`);
+  const gapToShower = Math.max(0, shClear.y - (sink.y + sink.d));
+  dimV(g, sink.y + sink.d, shClear.y, sinkDimX, gapToShower.toFixed(0));
+}
+
+function renderBath(conflicts) {
+  const wrap = document.getElementById("bath-wrap");
+  wrap.innerHTML = "";
+  const o = bathOuterBox();
+  const pad = 30;
+  const svg = el("svg", {
+    viewBox: `${o.x - pad} ${o.y - pad} ${o.w + pad * 2} ${o.d + pad * 2}`,
+    role: "img", "aria-label": "Detail koupelny",
+  });
+  const g = el("g", {});
+  g.appendChild(el("rect", {
+    x: o.x - 20, y: o.y - WALL, width: o.w + 40, height: WALL, fill: "#222",
+  }));
+  drawBathroomShell(g, { highlight: true });
+  drawDoor(g, { collision: conflicts.door });
+  drawWc(g, { collision: conflicts.wc });
+  drawShowerAndSink(g, { showerConflict: conflicts.shower, sinkConflict: conflicts.sink });
+  if (state.showDims) drawBathDims(g);
+  svg.appendChild(g);
+  wrap.appendChild(svg);
+}
+
+function render() {
+  const { issues, conflicts } = detectCollisions();
+  renderCabin(conflicts);
+  renderBath(conflicts);
+  updateStatus(issues);
+}
+
+/** Keep the sink inside bathInnerBox() when its width or the shared offset slider change. */
+function clampSink() {
+  const bi = bathInnerBox();
+  const maxOff = Math.max(0, bi.d - state.sinkW);
+  state.sinkOffset = Math.min(Math.max(0, state.sinkOffset), maxOff);
+  const input = document.getElementById("sink-offset");
+  if (input) {
+    input.max = String(maxOff);
+    input.value = String(state.sinkOffset);
+    document.getElementById("sink-off-val").textContent = String(state.sinkOffset);
+  }
+}
+
+function bindSeg(id, key, map = (v) => v) {
+  const root = document.getElementById(id);
+  root.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-v]");
+    if (!btn) return;
+    root.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
+    state[key] = map(btn.dataset.v);
+    if (key === "doorType") {
+      document.getElementById("pocket-dir-wrap").hidden = state.doorType !== "B";
+    }
+    if (key === "showerPreset") {
+      document.getElementById("full-depth-wrap").hidden = state.showerPreset !== "full";
+    }
+    render();
+  });
+}
+bindSeg("door-width", "doorWidth", Number);
+bindSeg("door-type", "doorType");
+bindSeg("pocket-dir", "pocketDir");
+const doorOffset = document.getElementById("door-offset");
+doorOffset.addEventListener("input", () => {
+  state.doorOffset = Number(doorOffset.value);
+  document.getElementById("door-offset-val").textContent = String(state.doorOffset);
+  render();
+});
+
+bindSeg("shower-preset", "showerPreset");
+bindSeg("shower-full-depth", "showerFullDepth", Number);
+
+const showerRotate = document.getElementById("shower-rotate");
+showerRotate.addEventListener("change", () => {
+  state.showerRotate = showerRotate.checked;
+  render();
+});
+
+function bindRange(id, key, labelId) {
+  const input = document.getElementById(id);
+  input.addEventListener("input", () => {
+    state[key] = Number(input.value);
+    if (labelId) document.getElementById(labelId).textContent = String(state[key]);
+    render();
+  });
+}
+function bindRangeWithClamp(id, key, labelId) {
+  const input = document.getElementById(id);
+  input.addEventListener("input", () => {
+    state[key] = Number(input.value);
+    if (labelId) document.getElementById(labelId).textContent = String(state[key]);
+    clampSink();
+    render();
+  });
+}
+bindRangeWithClamp("sink-w", "sinkW", "sink-w-val");
+bindRange("sink-d", "sinkD", "sink-d-val");
+bindRangeWithClamp("sink-offset", "sinkOffset", "sink-off-val");
+
+const showDims = document.getElementById("show-dims");
+showDims.addEventListener("change", () => {
+  state.showDims = showDims.checked;
+  render();
+});
+
+clampSink();
+render();
+  </script>
+</body>
+</html>
