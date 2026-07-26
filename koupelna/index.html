@@ -170,6 +170,17 @@
   .status.warn { background: #fff4e5; color: var(--warn); }
   .status.bad { background: #fde8ec; color: var(--bad); }
   .hint { font-size: 0.78rem; color: var(--muted); margin-top: 6px; }
+  .legend {
+    font-size: 0.78rem;
+    color: var(--muted);
+    line-height: 1.45;
+    margin: 0 0 12px;
+    padding: 8px 10px;
+    background: #f3f6f8;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+  }
+  .legend strong { color: var(--ink); font-weight: 600; }
   .variant-list {
     list-style: none;
     margin: 8px 0 0;
@@ -229,6 +240,10 @@
       <aside class="side" id="side">
         <h1 id="side-title">Půdorys chaty</h1>
         <p class="sub" id="side-sub">Táhni příčky · safe zóny jsou jen vizuální</p>
+        <div class="legend" id="legend">
+          Světlost místností: <strong>906 × 333 cm</strong> (od SDK)<br>
+          Obvodová stěna: <strong>23,92 cm</strong> · SDK příčky: <strong>12,5 cm</strong>
+        </div>
         <div class="status ok" id="status">—</div>
 
         <div id="panel-cabin">
@@ -578,41 +593,42 @@
     return issues;
   }
 
-  function dimLabel(g, x, y, label, color, anchor = "middle") {
-    const padX = 4;
-    const approxW = Math.max(28, String(label).length * 6.2);
-    const bx = anchor === "middle" ? x - approxW / 2
-      : anchor === "start" ? x - 2
-      : x - approxW + 2;
-    g.appendChild(el("rect", {
-      x: bx, y: y - 9, width: approxW + padX, height: 14,
-      fill: "#fff", stroke: color, "stroke-width": 0.6, rx: 2, opacity: 0.95,
-    }));
-    const t = el("text", {
-      x, y: y + 1.5, fill: color, "font-size": 11,
-      "text-anchor": anchor, "dominant-baseline": "middle",
-    });
-    t.textContent = label;
-    g.appendChild(t);
-  }
-
-  function dimV(g, y1, y2, x, label, color = "var(--dim)", labelSide = "end") {
-    if (Math.abs(y2 - y1) < 1) return;
-    const mid = (y1 + y2) / 2;
-    g.appendChild(el("line", { x1: x, y1, x2: x, y2, stroke: color, "stroke-width": 1 }));
-    g.appendChild(el("line", { x1: x - 3, y1, x2: x + 3, y2: y1, stroke: color, "stroke-width": 1 }));
-    g.appendChild(el("line", { x1: x - 3, y1: y2, x2: x + 3, y2, stroke: color, "stroke-width": 1 }));
-    const lx = labelSide === "start" ? x + 8 : x - 8;
-    const anchor = labelSide === "start" ? "start" : "end";
-    dimLabel(g, lx, mid, label, color, anchor);
-  }
-  function dimH(g, x1, x2, y, label, color = "var(--dim)", labelYOffset = -1) {
+  /** Tenká kóta s mezerou uprostřed pro text — bez bublin. */
+  function dimH(g, x1, x2, y, label, color = "var(--dim)") {
     if (Math.abs(x2 - x1) < 1) return;
     const mid = (x1 + x2) / 2;
-    g.appendChild(el("line", { x1, y1: y, x2, y2: y, stroke: color, "stroke-width": 1 }));
-    g.appendChild(el("line", { x1, y1: y - 3, x2: x1, y2: y + 3, stroke: color, "stroke-width": 1 }));
-    g.appendChild(el("line", { x1: x2, y1: y - 3, x2, y2: y + 3, stroke: color, "stroke-width": 1 }));
-    dimLabel(g, mid, y + labelYOffset, label, color, "middle");
+    const text = String(label);
+    const gap = Math.min(Math.abs(x2 - x1) * 0.45, Math.max(16, text.length * 4.6));
+    const a = Math.min(x1, x2);
+    const b = Math.max(x1, x2);
+    g.appendChild(el("line", { x1: a, y1: y, x2: mid - gap / 2, y2: y, stroke: color, "stroke-width": 0.8 }));
+    g.appendChild(el("line", { x1: mid + gap / 2, y1: y, x2: b, y2: y, stroke: color, "stroke-width": 0.8 }));
+    g.appendChild(el("line", { x1: a, y1: y - 2.5, x2: a, y2: y + 2.5, stroke: color, "stroke-width": 0.8 }));
+    g.appendChild(el("line", { x1: b, y1: y - 2.5, x2: b, y2: y + 2.5, stroke: color, "stroke-width": 0.8 }));
+    const t = el("text", {
+      x: mid, y, fill: color, "font-size": 9,
+      "text-anchor": "middle", "dominant-baseline": "middle",
+    });
+    t.textContent = text;
+    g.appendChild(t);
+  }
+  function dimV(g, y1, y2, x, label, color = "var(--dim)") {
+    if (Math.abs(y2 - y1) < 1) return;
+    const mid = (y1 + y2) / 2;
+    const text = String(label);
+    const gap = Math.min(Math.abs(y2 - y1) * 0.45, Math.max(14, text.length * 4.2));
+    const a = Math.min(y1, y2);
+    const b = Math.max(y1, y2);
+    g.appendChild(el("line", { x1: x, y1: a, x2: x, y2: mid - gap / 2, stroke: color, "stroke-width": 0.8 }));
+    g.appendChild(el("line", { x1: x, y1: mid + gap / 2, x2: x, y2: b, stroke: color, "stroke-width": 0.8 }));
+    g.appendChild(el("line", { x1: x - 2.5, y1: a, x2: x + 2.5, y2: a, stroke: color, "stroke-width": 0.8 }));
+    g.appendChild(el("line", { x1: x - 2.5, y1: b, x2: x + 2.5, y2: b, stroke: color, "stroke-width": 0.8 }));
+    const t = el("text", {
+      x, y: mid, fill: color, "font-size": 9,
+      "text-anchor": "middle", "dominant-baseline": "middle",
+    });
+    t.textContent = text;
+    g.appendChild(t);
   }
 
   function drawCabinShell(g) {
@@ -798,11 +814,9 @@
       });
       bt.textContent = `Postel ${state.bedVariant}×${BED_LEN}`;
       g.appendChild(bt);
-      if (state.showDims) {
-        // kóta nad postelí mimo příčky
-        dimH(g, o.x + o.w, bed.x, Math.min(bed.y, o.y) - 18, `${round1(gap)}`, safe ? "var(--safe-stroke)" : "var(--bad)", -1);
-        dimV(g, bed.y, bed.y + bed.d, bed.x + bed.w + 14, `${BED_LEN}`, "var(--bed)", "start");
-        dimH(g, bed.x, bed.x + bed.w, bed.y + bed.d + 16, `${state.bedVariant}`, "var(--bed)", 1);
+      if (state.showDims && gap > 1) {
+        // jen mezera koupelna↔postel, ne rozměry postele
+        dimH(g, o.x + o.w, bed.x, bed.y + 14, `${round1(gap)}`, safe ? "var(--safe-stroke)" : "var(--bad)");
       }
     }
   }
@@ -876,8 +890,8 @@
     g.appendChild(el("circle", { cx: a.x, cy: a.y, r: 3, fill: "var(--dim)" }));
     g.appendChild(el("circle", { cx: b.x, cy: b.y, r: 3, fill: "var(--dim)" }));
     const t = el("text", {
-      x: (a.x + b.x) / 2 + 8, y: (a.y + b.y) / 2 - 6,
-      fill: "var(--dim)", "font-size": 12, "font-weight": 600,
+      x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - 8,
+      fill: "var(--dim)", "font-size": 9, "text-anchor": "middle",
     });
     t.textContent = `${round1(dist(a, b))} cm`;
     g.appendChild(t);
@@ -886,17 +900,21 @@
   function drawHoverDims(g) {
     if (state.tab !== "cabin" || !state.hoverCm || state.measureMode) return;
     const p = state.hoverCm;
-    // kóty od vnějších okrajů + světlost od SDK
-    dimH(g, 0, p.x, Math.min(p.y, INNER.y) - 16, `${round1(p.x)}`, "var(--dim-soft)", -1);
-    dimH(g, p.x, OUTER.w, Math.max(p.y, INNER.y + INNER.h) + 16, `${round1(OUTER.w - p.x)}`, "var(--dim-soft)", 1);
-    dimV(g, 0, p.y, Math.min(p.x, INNER.x) - 16, `${round1(p.y)}`, "var(--dim-soft)", "end");
-    dimV(g, p.y, OUTER.h, Math.max(p.x, INNER.x + INNER.w) + 16, `${round1(OUTER.h - p.y)}`, "var(--dim-soft)", "start");
+    // lokální odstupy uvnitř světlosti — bez celkových „mimo obraz“ kót
+    const x0 = INNER.x, x1 = INNER.x + INNER.w;
+    const y0 = INNER.y, y1 = INNER.y + INNER.h;
+    if (p.x > x0 && p.x < x1 && p.y > y0 && p.y < y1) {
+      dimH(g, x0, p.x, p.y - 10, `${round1(p.x - x0)}`, "var(--dim-soft)");
+      dimH(g, p.x, x1, p.y + 10, `${round1(x1 - p.x)}`, "var(--dim-soft)");
+      dimV(g, y0, p.y, p.x - 10, `${round1(p.y - y0)}`, "var(--dim-soft)");
+      dimV(g, p.y, y1, p.x + 10, `${round1(y1 - p.y)}`, "var(--dim-soft)");
+    }
   }
 
   function renderCabinView() {
-    const pad = 56;
+    const pad = 36;
     const svg = el("svg", {
-      viewBox: `${-pad} ${-pad} ${OUTER.w + pad * 2} ${OUTER.h + pad * 2 + 36}`,
+      viewBox: `${-pad} ${-pad} ${OUTER.w + pad * 2} ${OUTER.h + pad * 2}`,
       id: "plan-svg",
       class: state.measureMode ? "measuring" : "",
     });
@@ -913,14 +931,9 @@
     if (state.showDims) {
       const o = bathOuter();
       const bi = bathInner();
-      // vnějšek + světlost mimo stěny
-      dimH(g, 0, OUTER.w, -36, `vnějšek ${round1(OUTER.w)}`, "var(--dim)", -1);
-      dimH(g, INNER.x, INNER.x + INNER.w, OUTER.h + 28, `světlost ${CLEAR.w}`, "var(--dim-soft)", 1);
-      dimV(g, 0, OUTER.h, -36, `vnějšek ${round1(OUTER.h)}`, "var(--dim)", "end");
-      dimV(g, INNER.y, INNER.y + INNER.h, OUTER.w + 28, `světlost ${CLEAR.h}`, "var(--dim-soft)", "start");
-      // koupelna — nad a pod, ne přes příčky
-      dimH(g, o.x, o.x + o.w, o.y - 20, `vnější ${round1(o.w)}`, "var(--dim)", -1);
-      dimH(g, bi.x, bi.x + bi.w, o.y + o.d + 20, `světlá ${round1(bi.w)}`, "var(--dim-soft)", 1);
+      // jen relevantní vnitřní kóty koupelny (světlost chaty je v legendě)
+      dimH(g, o.x, o.x + o.w, o.y - 12, `${round1(o.w)}`, "var(--dim)");
+      dimH(g, bi.x, bi.x + bi.w, o.y + o.d + 12, `${round1(bi.w)}`, "var(--dim-soft)");
     }
 
     drawHoverDims(g);
@@ -957,13 +970,14 @@
     if (state.showDims) {
       const bi = bathInner();
       const op = doorOpeningBox();
-      // kóty dveří vlevo od příčky (v obýváku), ne přes SDK
-      dimV(g, bi.y, op.y, o.x - 18, `${state.doorOffset}`, "var(--dim)", "end");
-      dimV(g, op.y, op.y + op.d, o.x - 18, `${state.doorWidth}`, "var(--dim)", "end");
+      dimV(g, bi.y, op.y, o.x - 14, `${state.doorOffset}`, "var(--dim)");
+      dimV(g, op.y, op.y + op.d, o.x - 14, `${state.doorWidth}`, "var(--dim)");
       const wc = wcBox();
       const sh = showerBox();
-      dimV(g, wc.y + wc.d, sh.y, bi.x + bi.w + 14, `${round1(sh.y - (wc.y + wc.d))}`, "var(--dim-soft)", "start");
-      dimH(g, bi.x, bi.x + bi.w, o.y + o.d + 18, `světlá ${round1(bi.w)}`, "var(--dim-soft)", 1);
+      if (sh.y > wc.y + wc.d) {
+        dimV(g, wc.y + wc.d, sh.y, bi.x + bi.w + 12, `${round1(sh.y - (wc.y + wc.d))}`, "var(--dim-soft)");
+      }
+      dimH(g, bi.x, bi.x + bi.w, o.y + o.d + 12, `${round1(bi.w)}`, "var(--dim-soft)");
     }
     drawMeasure(g);
     svg.appendChild(g);
@@ -1045,6 +1059,13 @@
       state.tab === "cabin"
         ? "Táhni šedé úchyty příček · safe zóny jen vizuálně"
         : "Rozměry místnosti zděděné z tabu Půdorys";
+    const legend = document.getElementById("legend");
+    if (legend) {
+      const bi = bathInner();
+      legend.innerHTML = state.tab === "cabin"
+        ? `Světlost chaty: <strong>${CLEAR.w} × ${CLEAR.h} cm</strong> (od SDK)<br>Obvodová stěna: <strong>23,92 cm</strong> · SDK příčky: <strong>12,5 cm</strong>`
+        : `Koupelna světlá: <strong>${round1(bi.w)} × ${round1(bi.d)} cm</strong><br>WC fixní · příčky z tabu Půdorys`;
+    }
   }
 
   function svgPoint(svg, evt) {
