@@ -351,6 +351,45 @@
     color: var(--muted);
     padding: 4px 2px;
   }
+  .elec-points-panel .pt-edit-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+  }
+  .elec-points-panel .pt-edit-row input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-size: 0.78rem;
+    padding: 3px 5px;
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+  }
+  .elec-points-panel .pt-ways {
+    font: inherit;
+    font-size: 0.72rem;
+    padding: 2px 3px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: #fff;
+  }
+  .elec-points-panel .icon-tiny {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    font-size: 0.85rem;
+    line-height: 1;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 3px;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  .elec-points-panel .icon-tiny:hover { background: #eef5f9; }
+  .elec-points-panel .icon-tiny.ok { color: var(--ok); border-color: var(--ok); }
+  .elec-points-panel .icon-tiny.cancel { color: var(--bad); }
   .elec-points-panel #elec-points-panel-body {
     flex: 1;
     min-height: 0;
@@ -1003,8 +1042,8 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.9.5";
-  const APP_BUILD = 46;
+  const APP_VERSION = "3.10.0";
+  const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
 
@@ -1546,7 +1585,109 @@
     return { x: alongToStripX(panel, pt.along), y: yFromFloor(pt.h, roomH), panel };
   }
 
-  function addElecPoint({ type, x, y, h, name, circuitId }) {
+  function elevUnfoldXY(pt) {
+    let x = 0;
+    for (const u of ELEV_UNFOLD) {
+      const wlen = elevWallMeta(u.wall).len;
+      if (u.wall === pt.wall) {
+        const local = u.flip ? wlen - pt.along : pt.along;
+        return { x: x + local, h: pt.h };
+      }
+      x += wlen;
+    }
+    return null;
+  }
+
+  /** Délka trasy ve světlých cm (approx, včetně přes roh). */
+  function elevRunLengthCm(run) {
+    const pts = runPointsNorm(run);
+    let len = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1];
+      const b = pts[i];
+      if (a.wall === b.wall) {
+        len += Math.hypot(b.along - a.along, b.h - a.h);
+      } else {
+        const pa = elevUnfoldXY(a);
+        const pb = elevUnfoldXY(b);
+        if (pa && pb) len += Math.hypot(pb.x - pa.x, pb.h - pa.h);
+        else len += Math.abs(b.h - a.h);
+      }
+    }
+    return len;
+  }
+
+  function formatRunMeters(cm) {
+    const m = cm / 100;
+    if (m < 0.05) return "~0 m";
+    if (m < 10) return `~${m.toFixed(1).replace(".", ",")} m`;
+    return `~${Math.round(m)} m`;
+  }
+
+  function circuitRunsLengthCm(circuitId) {
+    return state.elecElevRuns
+      .filter((r) => r.circuitId === circuitId)
+      .reduce((n, r) => n + elevRunLengthCm(r), 0);
+  }
+
+  function socketWays(pt) {
+    const n = Number(pt?.ways);
+    return n >= 1 && n <= 4 ? n : 1;
+  }
+
+  function drawElecPointGlyph(g, pt, cx, cy, r) {
+    const stroke = "#fff";
+    const sw = Math.max(1.1, r * 0.22);
+    if (pt.type === "socket") {
+      const ways = socketWays(pt);
+      const gap = r * 0.38;
+      const start = cx - ((ways - 1) * gap) / 2;
+      for (let i = 0; i < ways; i++) {
+        const x = start + i * gap;
+        g.appendChild(el("line", {
+          x1: x, y1: cy - r * 0.35, x2: x, y2: cy + r * 0.35,
+          stroke, "stroke-width": sw, "stroke-linecap": "round", "pointer-events": "none",
+        }));
+      }
+    } else if (pt.type === "switch") {
+      g.appendChild(el("line", {
+        x1: cx - r * 0.45, y1: cy + r * 0.35, x2: cx + r * 0.4, y2: cy - r * 0.4,
+        stroke, "stroke-width": sw * 1.15, "stroke-linecap": "round", "pointer-events": "none",
+      }));
+      g.appendChild(el("circle", {
+        cx: cx - r * 0.45, cy: cy + r * 0.35, r: r * 0.14,
+        fill: stroke, "pointer-events": "none",
+      }));
+    } else if (pt.type === "light") {
+      g.appendChild(el("circle", {
+        cx, cy, r: r * 0.22, fill: stroke, "pointer-events": "none",
+      }));
+      for (let i = 0; i < 4; i++) {
+        const a = (i * Math.PI) / 2 + Math.PI / 4;
+        g.appendChild(el("line", {
+          x1: cx + Math.cos(a) * r * 0.35, y1: cy + Math.sin(a) * r * 0.35,
+          x2: cx + Math.cos(a) * r * 0.7, y2: cy + Math.sin(a) * r * 0.7,
+          stroke, "stroke-width": sw * 0.9, "stroke-linecap": "round", "pointer-events": "none",
+        }));
+      }
+    } else if (pt.type === "panel") {
+      const s = r * 0.7;
+      g.appendChild(el("rect", {
+        x: cx - s / 2, y: cy - s / 2, width: s, height: s,
+        fill: "none", stroke, "stroke-width": sw, "pointer-events": "none",
+      }));
+      g.appendChild(el("line", {
+        x1: cx, y1: cy - s / 2, x2: cx, y2: cy + s / 2,
+        stroke, "stroke-width": sw * 0.8, "pointer-events": "none",
+      }));
+      g.appendChild(el("line", {
+        x1: cx - s / 2, y1: cy, x2: cx + s / 2, y2: cy,
+        stroke, "stroke-width": sw * 0.8, "pointer-events": "none",
+      }));
+    }
+  }
+
+  function addElecPoint({ type, x, y, h, name, circuitId, ways }) {
     const circ = findElecCircuit(circuitId || state.elecActiveCircuitId);
     if (!circ) return null;
     ensureElectroVisible();
@@ -1559,6 +1700,7 @@
       y: y ?? 50,
       h: h ?? ELEC_DEFAULT_H[t] ?? 30,
       name: (name && String(name).trim()) || "",
+      ways: t === "socket" ? (ways >= 1 && ways <= 4 ? ways : 1) : undefined,
     });
     state.elecPoints.push(pt);
     state.elecSelectedId = pt.id;
@@ -2561,21 +2703,24 @@
         const cx = mapX(on.along);
         const cy = yFromFloor(on.h, roomH);
         const pg = el("g", { opacity: inActive ? 1 : 0.28 });
+        const rr = sel ? 7 : 5.5;
         pg.appendChild(el("circle", {
           class: "elec-point",
           "data-elec": pt.id,
           "data-elec-kind": "point",
           "data-elev-wall": wall,
-          cx, cy, r: sel ? 7 : 5.5,
+          cx, cy, r: rr,
           fill: color, stroke: sel ? "#111" : "#fff", "stroke-width": sel ? 2 : 1.2,
           "pointer-events": editable ? "all" : "none",
         }));
+        drawElecPointGlyph(pg, pt, cx, cy, rr);
         const label = el("text", {
           x: cx + 8, y: cy - 6,
           fill: color, "font-size": 8, "font-family": PLAN_FONT,
           "pointer-events": "none",
         });
-        label.textContent = `${ELEC_LABELS[pt.type]} · ${Math.round(pt.h)}`;
+        const waysBit = pt.type === "socket" && socketWays(pt) > 1 ? `${socketWays(pt)}× · ` : "";
+        label.textContent = `${waysBit}${ELEC_LABELS[pt.type]} · ${Math.round(pt.h)}`;
         pg.appendChild(label);
         g.appendChild(pg);
       }
@@ -2660,8 +2805,9 @@
       const a = elecAbs(pt);
       const color = ELEC_COLORS[pt.type] || "#2980b9";
       const sel = state.elecSelectedKind === "point" && pt.id === state.elecSelectedId;
-      const r = sel ? 7 : 5.5;
-      g.appendChild(el("circle", {
+      const r = sel ? 7.5 : 6;
+      const pg = el("g", {});
+      pg.appendChild(el("circle", {
         class: "elec-point",
         "data-elec": pt.id,
         "data-elec-kind": "point",
@@ -2671,29 +2817,17 @@
         "stroke-width": sel ? 2 : 1.2,
         "pointer-events": editable ? "all" : "none",
       }));
-      if (pt.type === "switch") {
-        g.appendChild(el("line", {
-          x1: a.x - 3, y1: a.y + 2, x2: a.x + 3, y2: a.y - 3,
-          stroke: "#fff", "stroke-width": 1.4, "pointer-events": "none",
-        }));
-      } else if (pt.type === "light") {
-        g.appendChild(el("circle", {
-          cx: a.x, cy: a.y, r: 2, fill: "#fff", "pointer-events": "none",
-        }));
-      } else if (pt.type === "panel") {
-        g.appendChild(el("rect", {
-          x: a.x - 2.5, y: a.y - 2.5, width: 5, height: 5,
-          fill: "#fff", "pointer-events": "none",
-        }));
-      }
+      drawElecPointGlyph(pg, pt, a.x, a.y, r);
       const label = el("text", {
-        x: a.x + 8, y: a.y - 6,
+        x: a.x + 9, y: a.y - 6,
         fill: color, "font-size": 8, "font-family": PLAN_FONT,
         "pointer-events": "none",
       });
       const nameBit = pt.name ? `${pt.name} · ` : "";
-      label.textContent = `${nameBit}${ELEC_LABELS[pt.type] || pt.type} · ${Math.round(pt.h)}`;
-      g.appendChild(label);
+      const waysBit = pt.type === "socket" && socketWays(pt) > 1 ? `${socketWays(pt)}× · ` : "";
+      label.textContent = `${nameBit}${waysBit}${ELEC_LABELS[pt.type] || pt.type} · ${Math.round(pt.h)}`;
+      pg.appendChild(label);
+      g.appendChild(pg);
     }
   }
 
@@ -2728,13 +2862,13 @@
     }
     panel.hidden = false;
     const pts = state.elecPoints.filter((p) => p.circuitId === circ.id);
-    const runs = state.elecElevRuns.filter((r) => r.circuitId === circ.id);
+    const runLen = circuitRunsLengthCm(circ.id);
     const head = document.createElement("div");
     head.className = "head";
     head.innerHTML =
       `<span class="elec-ico" aria-hidden="true">${ELEC_KIND_ICONS[circ.kind]}</span>` +
       `<span>Body · ${circuitRoomKey(circ)} / ${ELEC_KIND_LABELS[circ.kind]}</span>` +
-      `<span class="muted">${pts.length} bodů${runs.length ? ` · ${runs.length} tras` : ""}</span>`;
+      `<span class="muted">${pts.length} bodů${runLen > 0 ? ` · trasy ${formatRunMeters(runLen)}` : ""}</span>`;
     body.appendChild(head);
 
     if (!pts.length) {
@@ -2753,14 +2887,81 @@
       const ico = document.createElement("span");
       ico.className = "elec-ico";
       ico.textContent = ELEC_TYPE_ICONS[pt.type] || "•";
+
+      const labWrap = document.createElement("span");
+      labWrap.className = "pt-label";
       const lab = document.createElement("span");
-      lab.className = "pt-label";
       lab.textContent = pt.name
         ? `${pt.name} · ${ELEC_LABELS[pt.type]}`
         : (ELEC_LABELS[pt.type] || pt.type);
+      labWrap.appendChild(lab);
+
       const h = document.createElement("span");
       h.className = "pt-h";
       h.textContent = `${Math.round(pt.h)} cm`;
+
+      let waysSel = null;
+      if (pt.type === "socket") {
+        waysSel = document.createElement("select");
+        waysSel.className = "pt-ways";
+        waysSel.title = "Počet zásuvek";
+        for (let n = 1; n <= 4; n++) {
+          const o = document.createElement("option");
+          o.value = String(n);
+          o.textContent = `${n}×`;
+          if (socketWays(pt) === n) o.selected = true;
+          waysSel.appendChild(o);
+        }
+        waysSel.addEventListener("click", (e) => e.stopPropagation());
+        waysSel.addEventListener("change", () => {
+          pt.ways = Number(waysSel.value) || 1;
+          render();
+        });
+      }
+
+      const btnEdit = document.createElement("button");
+      btnEdit.type = "button";
+      btnEdit.className = "icon-tiny";
+      btnEdit.title = "Přejmenovat";
+      btnEdit.textContent = "✎";
+      btnEdit.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (labWrap.querySelector("input")) return;
+        const draft = pt.name || "";
+        lab.hidden = true;
+        btnEdit.hidden = true;
+        const row = document.createElement("span");
+        row.className = "pt-edit-row";
+        const inp = document.createElement("input");
+        inp.type = "text";
+        inp.value = draft;
+        inp.placeholder = "název bodu";
+        const ok = document.createElement("button");
+        ok.type = "button";
+        ok.className = "icon-tiny ok";
+        ok.title = "Uložit";
+        ok.textContent = "✓";
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "icon-tiny cancel";
+        cancel.title = "Zrušit";
+        cancel.textContent = "✗";
+        const finish = (save) => {
+          if (save) pt.name = inp.value.trim();
+          render();
+        };
+        ok.addEventListener("click", (ev) => { ev.stopPropagation(); finish(true); });
+        cancel.addEventListener("click", (ev) => { ev.stopPropagation(); finish(false); });
+        inp.addEventListener("click", (ev) => ev.stopPropagation());
+        inp.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter") { ev.preventDefault(); finish(true); }
+          if (ev.key === "Escape") { ev.preventDefault(); finish(false); }
+        });
+        row.append(inp, ok, cancel);
+        labWrap.appendChild(row);
+        queueMicrotask(() => { inp.focus(); inp.select(); });
+      });
+
       const del = document.createElement("button");
       del.type = "button";
       del.className = "btn";
@@ -2771,7 +2972,10 @@
         state.elecPoints = state.elecPoints.filter((p) => p.id !== pt.id);
         render();
       });
-      li.append(ico, lab, h, del);
+
+      li.append(ico, labWrap);
+      if (waysSel) li.appendChild(waysSel);
+      li.append(h, btnEdit, del);
       li.addEventListener("click", () => {
         state.elecSelectedId = pt.id;
         state.elecSelectedKind = "point";
@@ -2784,7 +2988,7 @@
 
   function appendElecCircuitCard(parent, circ, { leafLabel } = {}) {
     const pts = state.elecPoints.filter((p) => p.circuitId === circ.id);
-    const runs = state.elecElevRuns.filter((r) => r.circuitId === circ.id);
+    const runLen = circuitRunsLengthCm(circ.id);
     const isActive = circ.id === state.elecActiveCircuitId;
     const card = document.createElement("div");
     card.className = "elec-circ" + (isActive ? " active" : "");
@@ -2793,7 +2997,7 @@
     head.className = "elec-circ-head";
     const label = leafLabel || circ.name;
     const metaBits = [`${pts.length}b`];
-    if (runs.length) metaBits.push(`${runs.length}t`);
+    if (runLen > 0) metaBits.push(formatRunMeters(runLen));
     head.innerHTML =
       `<span class="elec-ico" aria-hidden="true">${ELEC_KIND_ICONS[circ.kind]}</span>` +
       `<span class="name">${label}</span>` +
@@ -2921,7 +3125,8 @@
         row.className = "elec-row";
         const lab = document.createElement("span");
         const kindIco = circ ? (ELEC_KIND_ICONS[circ.kind] || CABLE_ICONS[run.cableType] || "") : (CABLE_ICONS[run.cableType] || "");
-        lab.textContent = `${kindIco} ${CABLE_LABELS[run.cableType] || run.cableType} · ${circ ? circ.name : "?"} · ${wallSet.join("+")} · ${pts.length}b`.trim();
+        const meters = formatRunMeters(elevRunLengthCm(run));
+        lab.textContent = `${kindIco} ${CABLE_LABELS[run.cableType] || run.cableType} · ${circ ? circ.name : "?"} · ${wallSet.join("+")} · ${meters}`.trim();
         const del = document.createElement("button");
         del.type = "button";
         del.className = "btn";
@@ -3998,7 +4203,12 @@
       })),
       elecActiveCircuitId: state.elecActiveCircuitId,
       elecPoints: state.elecPoints.map((p) => ({
-        id: p.id, type: p.type, circuitId: p.circuitId, x: p.x, y: p.y, h: p.h, name: p.name || "",
+        id: p.id,
+        type: p.type,
+        circuitId: p.circuitId,
+        x: p.x, y: p.y, h: p.h,
+        name: p.name || "",
+        ...(p.type === "socket" ? { ways: socketWays(p) } : {}),
       })),
       elecRuns: state.elecRuns.map((r) => ({
         id: r.id,
@@ -4078,6 +4288,7 @@
           : (type === "light" || type === "switch" ? "lights" : type === "panel" ? "data" : "sockets");
         circuitId = ensureKindCircuit(circuits, kindMap, legacyKind);
       }
+      const waysN = Number(p.ways);
       return clampElecXY({
         id: typeof p.id === "string" ? p.id : newElecId("e"),
         type,
@@ -4086,6 +4297,7 @@
         y: Number(p.y) || 0,
         h: Number(p.h) || ELEC_DEFAULT_H.socket,
         name: (p.name && String(p.name).trim()) || "",
+        ...(type === "socket" ? { ways: waysN >= 1 && waysN <= 4 ? waysN : 1 } : {}),
       });
     });
   }
