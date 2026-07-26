@@ -2,6 +2,7 @@
 
 Schváleno 2026-07-26.  
 **906 × 333 cm = světlost** (od SDK k SDK). Vnější = světlost + 2× **23,92 cm**. SDK příčky **12,5 cm**.  
+Kóty otvorů a X polohy (220, 313, 324, 569…) jsou **od vnitřního Z líce světlosti**, ne od vnějšího okraje.  
 Postel: kratší strana (140/160) **V–Z**, delší 200 **S–J**, u východní stěny.  
 Kolize dveří: jen **průchod otvorem** vs WC/sprcha — pouzdro ve příčce nevadí.
 
