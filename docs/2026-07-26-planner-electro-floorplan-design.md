@@ -1,25 +1,27 @@
-# Design: Planner — tab Elektro (půdorys)
+# Design: Planner — tab Elektro
 
 **Datum:** 2026-07-26  
-**Stav:** implementace v1 (cesta 3)  
-**Verze appky:** 3.3.0
+**Verze:** 3.4.0
 
-## Cíl
-Schematicky zakreslit **body** (zásuvka / vypínač / světlo / rozvaděč) a **volné trasy** na půdorysu — pro návrh kudy táhnout elektro. Bez obvodů, fází a wall-snap.
+## Struktura
+- Tab **3 · Elektro** (samostatné Pohledy zrušeny)
+- Krok **1 · Půdorys** — body ve složkách okruhů
+- Krok **2 · Pohledy** — elevace + body u stěny + trasy kabelů
 
-## UI
-- Tab **4 · Elektro**
-- Toolbar checkbox **Elektro** (zobrazit/skrýt vrstvu)
-- Panel: typ bodu, výška (cm nad podlahou), **+ Bod**, **+ Trasa**, seznam
-- Default výšky: zásuvka 30 · vypínač 120 · světlo = světlá výška · rozvaděč 150
+## Okruhy (složky)
+`data` · `lights` · `sockets` — Datové / Světla / Zásuvky
+
+## Body
+Typ: zásuvka / vypínač / světlo / rozvaděč + výška (cm) + okruh.  
+**+ Bod** = jeden kus, pak drag na přesnou polohu.
+
+## Pohledy (krok 2)
+- Body z půdorysu u stěny (≤ 45 cm od líce; světla → nejbližší stěna)
+- Filtr okruhů (checkboxy)
+- Trasy: **Slaboproud** / **CYKY 1,5** / **CYKY 2,5**
 
 ## Model
 ```js
-elecPoints: [{ id, type, x, y, h, name }]  // x,y clear cm
-elecRuns:   [{ id, name, points: [{x,y}, ...] }]
+elecPoints: [{ id, type, circuit, x, y, h, name }]
+elecElevRuns: [{ id, wall, cableType, circuit, points: [{along,h}] }]
 ```
-
-## Mimo v1
-- Wall-snap tras na obvod/příčky
-- Editace na elevacích
-- Okruhy / barvy fází

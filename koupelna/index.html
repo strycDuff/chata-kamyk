@@ -160,6 +160,23 @@
   }
   .elec-list .elec-row input[type="number"] { width: 64px; }
   .elec-list .elec-row input[type="text"] { flex: 1; min-width: 80px; }
+  .elec-folder {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    margin-bottom: 8px;
+    background: #fafafa;
+  }
+  .elec-folder > summary {
+    cursor: pointer;
+    padding: 8px 10px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    list-style: none;
+  }
+  .elec-folder > summary::-webkit-details-marker { display: none; }
+  .elec-folder .elec-list { margin: 0; padding: 0 8px 8px; }
+  .elec-folder .elec-list li { background: #fff; }
+  .elec-filters { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 8px 0; font-size: 0.85rem; }
   .icon-btn {
     width: 38px;
     height: 38px;
@@ -368,8 +385,7 @@
       <div class="tabs" id="tabs">
         <button type="button" data-tab="cabin" class="active">1 · Půdorys</button>
         <button type="button" data-tab="furniture">2 · Nábytek</button>
-        <button type="button" data-tab="elevations">3 · Pohledy</button>
-        <button type="button" data-tab="electro">4 · Elektro</button>
+        <button type="button" data-tab="electro">3 · Elektro</button>
       </div>
       <button type="button" class="icon-btn" id="btn-measure" title="Měřit vzdálenost" aria-label="Měřit vzdálenost">📏</button>
       <button type="button" class="icon-btn" id="btn-measure-reset" title="Reset měření" aria-label="Reset měření">↺</button>
@@ -520,45 +536,76 @@
         </details>
         </div>
 
-        <div id="panel-elevations" hidden>
-          <p class="hint">Čelní pohledy vnitřních líčů obvodu — jen geometrie (bez elektro). Levá osa = Z (S/J) nebo S (Z/V).</p>
-          <label>Stěna</label>
-          <div class="row seg" id="elev-wall">
-            <button type="button" data-v="north" class="active">Sever</button>
-            <button type="button" data-v="south">Jih</button>
-            <button type="button" data-v="west">Západ</button>
-            <button type="button" data-v="east">Východ</button>
-          </div>
-          <label>Světlá výška: <strong id="room-h-val">210</strong> cm</label>
-          <input type="range" id="room-h" min="200" max="280" value="210" step="1">
-          <label>Parapet běžného okna: <strong id="sill-h-val">90</strong> cm</label>
-          <input type="range" id="sill-h" min="40" max="140" value="90" step="1">
-          <p class="hint" id="win-h-hint">Otvor okna 83 cm · kuchyňské 62 cm (stejné nadpraží, parapet nad linkou)</p>
-          <label>Otvor dveří (výška): <strong id="door-open-h-val">200</strong> cm</label>
-          <input type="range" id="door-open-h" min="180" max="220" value="200" step="1">
-          <label>Křídlo dveří (výška): <strong id="door-leaf-h-val">190</strong> cm</label>
-          <input type="range" id="door-leaf-h" min="180" max="220" value="190" step="1">
-          <p class="hint" id="elev-hint"></p>
-        </div>
-
         <div id="panel-electro" hidden>
-          <p class="hint">Body (zásuvka / vypínač / světlo / rozvaděč) + volné trasy na půdorysu. Výška = cm nad podlahou.</p>
-          <label>Typ bodu</label>
-          <div class="row seg" id="elec-type">
-            <button type="button" data-v="socket" class="active">Zásuvka</button>
-            <button type="button" data-v="switch">Vypínač</button>
-            <button type="button" data-v="light">Světlo</button>
-            <button type="button" data-v="panel">Rozvaděč</button>
+          <div class="row seg" id="elec-step" style="margin-bottom:10px">
+            <button type="button" data-v="plan" class="active">1 · Půdorys</button>
+            <button type="button" data-v="elev">2 · Pohledy</button>
           </div>
-          <label>Výška bodu: <strong id="elec-h-val">30</strong> cm</label>
-          <input type="range" id="elec-h" min="10" max="220" value="30" step="1">
-          <div class="row" style="margin:8px 0">
-            <button type="button" class="btn" id="btn-elec-point">+ Bod</button>
-            <button type="button" class="btn" id="btn-elec-run">+ Trasa</button>
+
+          <div id="elec-plan-tools">
+            <p class="hint">Umísti body do složek okruhů. + Bod = jeden kus, pak dorovnej dragem.</p>
+            <label>Okruh</label>
+            <div class="row seg" id="elec-circuit">
+              <button type="button" data-v="data">Datové</button>
+              <button type="button" data-v="lights">Světla</button>
+              <button type="button" data-v="sockets" class="active">Zásuvky</button>
+            </div>
+            <label>Typ bodu</label>
+            <div class="row seg" id="elec-type">
+              <button type="button" data-v="socket" class="active">Zásuvka</button>
+              <button type="button" data-v="switch">Vypínač</button>
+              <button type="button" data-v="light">Světlo</button>
+              <button type="button" data-v="panel">Rozvaděč</button>
+            </div>
+            <label>Výška bodu: <strong id="elec-h-val">30</strong> cm</label>
+            <input type="range" id="elec-h" min="10" max="220" value="30" step="1">
+            <button type="button" class="btn" id="btn-elec-point" style="width:100%;margin:8px 0">+ Bod</button>
+            <p class="hint" id="elec-mode-hint"></p>
+            <div id="elec-list"></div>
           </div>
-          <button type="button" class="btn" id="btn-elec-run-finish" style="width:100%;margin-bottom:8px" hidden>Ukončit trasu</button>
-          <p class="hint" id="elec-mode-hint"></p>
-          <ul class="elec-list" id="elec-list"></ul>
+
+          <div id="elec-elev-tools" hidden>
+            <p class="hint">Body z půdorysu u stěny. Trasy kabelů kresli zde (3 typy).</p>
+            <label>Stěna</label>
+            <div class="row seg" id="elev-wall">
+              <button type="button" data-v="north" class="active">Sever</button>
+              <button type="button" data-v="south">Jih</button>
+              <button type="button" data-v="west">Západ</button>
+              <button type="button" data-v="east">Východ</button>
+            </div>
+            <label>Filtr okruhů</label>
+            <div class="elec-filters">
+              <label class="chk"><input type="checkbox" id="filt-data" checked> Datové</label>
+              <label class="chk"><input type="checkbox" id="filt-lights" checked> Světla</label>
+              <label class="chk"><input type="checkbox" id="filt-sockets" checked> Zásuvky</label>
+            </div>
+            <label>Typ kabelu (nová trasa)</label>
+            <div class="row seg" id="elec-cable">
+              <button type="button" data-v="slaboproud">Slaboproud</button>
+              <button type="button" data-v="cyky15">CYKY 1,5</button>
+              <button type="button" data-v="cyky25" class="active">CYKY 2,5</button>
+            </div>
+            <div class="row" style="margin:8px 0">
+              <button type="button" class="btn" id="btn-elec-run">+ Trasa</button>
+              <button type="button" class="btn" id="btn-elec-run-finish" hidden>Ukončit</button>
+            </div>
+            <p class="hint" id="elec-elev-hint"></p>
+            <ul class="elec-list" id="elec-elev-list"></ul>
+            <details class="side-block" style="margin-top:10px">
+              <summary>Výšky místnosti / otvorů</summary>
+              <div class="side-block-body">
+                <label>Světlá výška: <strong id="room-h-val">210</strong> cm</label>
+                <input type="range" id="room-h" min="200" max="280" value="210" step="1">
+                <label>Parapet běžného okna: <strong id="sill-h-val">90</strong> cm</label>
+                <input type="range" id="sill-h" min="40" max="140" value="90" step="1">
+                <p class="hint">Otvor okna 83 cm · kuchyňské 62 cm (stejné nadpraží)</p>
+                <label>Otvor dveří: <strong id="door-open-h-val">200</strong> cm</label>
+                <input type="range" id="door-open-h" min="180" max="220" value="200" step="1">
+                <label>Křídlo dveří: <strong id="door-leaf-h-val">190</strong> cm</label>
+                <input type="range" id="door-leaf-h" min="180" max="220" value="190" step="1">
+              </div>
+            </details>
+          </div>
         </div>
 
         <div id="panel-furniture" hidden>
@@ -587,7 +634,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.3.0";
+  const APP_VERSION = "3.4.0";
   const APP_BUILD = 28;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -686,12 +733,20 @@
     return nx;
   }
 
-  const STORAGE_KEY = "chata-kamyk-planner-variants-v7";
+  const STORAGE_KEY = "chata-kamyk-planner-variants-v8";
   const FURN_MIN = 20;
   const ELEC_TYPES = ["socket", "switch", "light", "panel"];
   const ELEC_LABELS = { socket: "Zásuvka", switch: "Vypínač", light: "Světlo", panel: "Rozvaděč" };
   const ELEC_DEFAULT_H = { socket: 30, switch: 120, light: 210, panel: 150 };
   const ELEC_COLORS = { socket: "#2980b9", switch: "#8e44ad", light: "#f39c12", panel: "#c0392b" };
+  const ELEC_CIRCUITS = ["data", "lights", "sockets"];
+  const ELEC_CIRCUIT_LABELS = { data: "Datové", lights: "Světla", sockets: "Zásuvky" };
+  const TYPE_TO_CIRCUIT = { socket: "sockets", switch: "lights", light: "lights", panel: "sockets" };
+  const CABLE_TYPES = ["slaboproud", "cyky15", "cyky25"];
+  const CABLE_LABELS = { slaboproud: "Slaboproud", cyky15: "CYKY 1,5", cyky25: "CYKY 2,5" };
+  const CABLE_COLORS = { slaboproud: "#8e44ad", cyky15: "#f39c12", cyky25: "#2980b9" };
+  const CABLE_TO_CIRCUIT = { slaboproud: "data", cyky15: "lights", cyky25: "sockets" };
+  const ELEC_WALL_PROX = 45;
 
   const state = {
     tab: "cabin",
@@ -735,14 +790,19 @@
     windowSillH: 90,
     doorOpeningH: 200,
     doorLeafH: 190,
+    elecStep: "plan", // plan | elev
+    elecCircuit: "sockets",
+    elecFilter: { data: true, lights: true, sockets: true },
+    elecCableType: "cyky25",
     elecPoints: [],
-    elecRuns: [],
+    elecRuns: [], // legacy plan polylines (optional)
+    elecElevRuns: [], // { id, wall, cableType, circuit, name, points: [{along,h}] }
     elecSelectedId: null,
-    elecSelectedKind: null, // "point" | "run"
+    elecSelectedKind: null, // "point" | "run" | "elev-run"
     elecMode: null, // null | "point" | "run"
     elecType: "socket",
     elecH: 30,
-    elecRunDraft: null, // [{x,y}, ...] clear cm while drawing
+    elecRunDraft: null, // plan: [{x,y}] | elev: [{along,h}]
   };
 
   let furnIdSeq = 1;
@@ -860,16 +920,58 @@
     return state.elecRuns.find((r) => r.id === id);
   }
 
+  function findElecElevRun(id) {
+    return state.elecElevRuns.find((r) => r.id === id);
+  }
+
   function elecAbs(pt) {
     return { x: absX(pt.x), y: INNER.y + pt.y };
   }
 
-  function addElecPoint({ type, x, y, h, name }) {
+  function circuitVisible(circuit) {
+    if (!(state.tab === "electro" && state.elecStep === "elev")) return true;
+    return !!state.elecFilter[circuit];
+  }
+
+  /** Bod na elevaci stěny: { along, h } nebo null. */
+  function elecPointOnWall(pt, wall) {
+    const prox = ELEC_WALL_PROX;
+    if (wall === "north" && pt.y <= prox) return { along: pt.x, h: pt.h };
+    if (wall === "south" && pt.y >= CLEAR.h - prox) return { along: pt.x, h: pt.h };
+    if (wall === "west" && pt.x <= prox) return { along: pt.y, h: pt.h };
+    if (wall === "east" && pt.x >= CLEAR.w - prox) return { along: pt.y, h: pt.h };
+    if (pt.type === "light") {
+      const cands = [
+        { wall: "north", d: pt.y, along: pt.x },
+        { wall: "south", d: CLEAR.h - pt.y, along: pt.x },
+        { wall: "west", d: pt.x, along: pt.y },
+        { wall: "east", d: CLEAR.w - pt.x, along: pt.y },
+      ];
+      cands.sort((a, b) => a.d - b.d);
+      if (cands[0].wall === wall) return { along: cands[0].along, h: pt.h };
+    }
+    return null;
+  }
+
+  function applyElevToPlanPoint(pt, wall, along, h) {
+    const len = elevWallMeta(wall).len;
+    const a = Math.min(len, Math.max(0, along));
+    pt.h = Math.min(state.roomClearH, Math.max(10, h));
+    if (wall === "north") { pt.x = a; pt.y = Math.min(pt.y, ELEC_WALL_PROX * 0.4); }
+    else if (wall === "south") { pt.x = a; pt.y = Math.max(pt.y, CLEAR.h - ELEC_WALL_PROX * 0.4); }
+    else if (wall === "west") { pt.y = a; pt.x = Math.min(pt.x, ELEC_WALL_PROX * 0.4); }
+    else { pt.y = a; pt.x = Math.max(pt.x, CLEAR.w - ELEC_WALL_PROX * 0.4); }
+    clampElecXY(pt);
+  }
+
+  function addElecPoint({ type, x, y, h, name, circuit }) {
     ensureElectroVisible();
     const t = ELEC_TYPES.includes(type) ? type : "socket";
+    const circ = ELEC_CIRCUITS.includes(circuit) ? circuit : (TYPE_TO_CIRCUIT[t] || state.elecCircuit);
     const pt = clampElecXY({
       id: newElecId("e"),
       type: t,
+      circuit: circ,
       x: x ?? 50,
       y: y ?? 50,
       h: h ?? ELEC_DEFAULT_H[t] ?? 30,
@@ -888,17 +990,36 @@
       return null;
     }
     ensureElectroVisible();
-    const run = {
-      id: newElecId("r"),
-      name: "",
-      points: draft.map((p) => clampElecXY({ x: p.x, y: p.y })),
-    };
-    state.elecRuns.push(run);
+    if (state.elecStep === "elev") {
+      const cable = CABLE_TYPES.includes(state.elecCableType) ? state.elecCableType : "cyky25";
+      const run = {
+        id: newElecId("er"),
+        wall: state.elevWall,
+        cableType: cable,
+        circuit: CABLE_TO_CIRCUIT[cable],
+        name: "",
+        points: draft.map((p) => ({
+          along: Math.min(elevWallMeta(state.elevWall).len, Math.max(0, p.along)),
+          h: Math.min(state.roomClearH, Math.max(0, p.h)),
+        })),
+      };
+      state.elecElevRuns.push(run);
+      state.elecSelectedId = run.id;
+      state.elecSelectedKind = "elev-run";
+    } else {
+      const run = {
+        id: newElecId("r"),
+        circuit: state.elecCircuit,
+        name: "",
+        points: draft.map((p) => clampElecXY({ x: p.x, y: p.y })),
+      };
+      state.elecRuns.push(run);
+      state.elecSelectedId = run.id;
+      state.elecSelectedKind = "run";
+    }
     state.elecRunDraft = null;
     state.elecMode = null;
-    state.elecSelectedId = run.id;
-    state.elecSelectedKind = "run";
-    return run;
+    return true;
   }
   function dist(a, b) {
     return Math.hypot(b.x - a.x, b.y - a.y);
@@ -1854,16 +1975,21 @@
     labR.textContent = wall === "west" || wall === "east" ? "J" : "V";
     g.appendChild(labR);
 
+    drawElectroOnElevation(g, wall, roomH);
+
     svg.appendChild(g);
+    if (state.tab === "electro" && state.elecStep === "elev" && state.elecMode === "run") {
+      svg.classList.add("measuring");
+    }
     return svg;
   }
 
   function drawElectroLayer(g) {
     if (!state.showElectro) return;
-    const editable = state.tab === "electro";
+    const editable = state.tab === "electro" && state.elecStep === "plan";
 
     const drawPoly = (pts, attrs) => {
-      if (!pts.length) return;
+      if (!pts.length || pts[0].x == null) return;
       const d = pts.map((p, i) => {
         const a = elecAbs(p);
         return `${i ? "L" : "M"}${a.x},${a.y}`;
@@ -1872,6 +1998,7 @@
     };
 
     for (const run of state.elecRuns) {
+      if (run.circuit && !circuitVisible(run.circuit)) continue;
       const sel = state.elecSelectedKind === "run" && run.id === state.elecSelectedId;
       drawPoly(run.points, {
         class: "elec-run",
@@ -1884,23 +2011,8 @@
       });
     }
 
-    if (state.elecRunDraft && state.elecRunDraft.length) {
-      drawPoly(state.elecRunDraft, {
-        stroke: "#e67e22",
-        "stroke-width": 2,
-        "stroke-dasharray": "3,3",
-        "pointer-events": "none",
-      });
-      for (const p of state.elecRunDraft) {
-        const a = elecAbs(p);
-        g.appendChild(el("circle", {
-          cx: a.x, cy: a.y, r: 3,
-          fill: "#e67e22", "pointer-events": "none",
-        }));
-      }
-    }
-
     for (const pt of state.elecPoints) {
+      if (!circuitVisible(pt.circuit || TYPE_TO_CIRCUIT[pt.type] || "sockets")) continue;
       const a = elecAbs(pt);
       const color = ELEC_COLORS[pt.type] || "#2980b9";
       const sel = state.elecSelectedKind === "point" && pt.id === state.elecSelectedId;
@@ -1915,7 +2027,6 @@
         "stroke-width": sel ? 2 : 1.2,
         "pointer-events": editable ? "all" : "none",
       }));
-      // typ symbol
       if (pt.type === "switch") {
         g.appendChild(el("line", {
           x1: a.x - 3, y1: a.y + 2, x2: a.x + 3, y2: a.y - 3,
@@ -1943,9 +2054,9 @@
   }
 
   function renderElecList() {
-    const ul = document.getElementById("elec-list");
-    if (!ul) return;
-    ul.innerHTML = "";
+    const root = document.getElementById("elec-list");
+    if (!root) return;
+    root.innerHTML = "";
 
     const addDel = (li, onDel) => {
       const meta = document.createElement("div");
@@ -1963,94 +2074,193 @@
       li.appendChild(meta);
     };
 
-    state.elecPoints.forEach((pt) => {
-      const li = document.createElement("li");
-      if (state.elecSelectedKind === "point" && pt.id === state.elecSelectedId) li.classList.add("selected");
-      const row1 = document.createElement("div");
-      row1.className = "elec-row";
-      const sel = document.createElement("select");
-      ELEC_TYPES.forEach((t) => {
-        const o = document.createElement("option");
-        o.value = t;
-        o.textContent = ELEC_LABELS[t];
-        if (t === pt.type) o.selected = true;
-        sel.appendChild(o);
+    for (const circ of ELEC_CIRCUITS) {
+      const folder = document.createElement("details");
+      folder.className = "elec-folder";
+      folder.open = true;
+      const sum = document.createElement("summary");
+      const pts = state.elecPoints.filter((p) => (p.circuit || TYPE_TO_CIRCUIT[p.type]) === circ);
+      sum.textContent = `${ELEC_CIRCUIT_LABELS[circ]} (${pts.length})`;
+      folder.appendChild(sum);
+      const ul = document.createElement("ul");
+      ul.className = "elec-list";
+      pts.forEach((pt) => {
+        const li = document.createElement("li");
+        if (state.elecSelectedKind === "point" && pt.id === state.elecSelectedId) li.classList.add("selected");
+        const row1 = document.createElement("div");
+        row1.className = "elec-row";
+        const sel = document.createElement("select");
+        ELEC_TYPES.forEach((t) => {
+          const o = document.createElement("option");
+          o.value = t;
+          o.textContent = ELEC_LABELS[t];
+          if (t === pt.type) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.addEventListener("click", (e) => e.stopPropagation());
+        sel.addEventListener("change", () => {
+          pt.type = sel.value;
+          render();
+        });
+        const circSel = document.createElement("select");
+        ELEC_CIRCUITS.forEach((c) => {
+          const o = document.createElement("option");
+          o.value = c;
+          o.textContent = ELEC_CIRCUIT_LABELS[c];
+          if (c === (pt.circuit || circ)) o.selected = true;
+          circSel.appendChild(o);
+        });
+        circSel.addEventListener("click", (e) => e.stopPropagation());
+        circSel.addEventListener("change", () => {
+          pt.circuit = circSel.value;
+          render();
+        });
+        const hInp = document.createElement("input");
+        hInp.type = "number";
+        hInp.min = "10";
+        hInp.max = "220";
+        hInp.value = String(Math.round(pt.h));
+        hInp.addEventListener("click", (e) => e.stopPropagation());
+        hInp.addEventListener("change", () => {
+          pt.h = Math.min(220, Math.max(10, Number(hInp.value) || 30));
+          render();
+        });
+        const name = document.createElement("input");
+        name.type = "text";
+        name.placeholder = "popis";
+        name.value = pt.name || "";
+        name.addEventListener("click", (e) => e.stopPropagation());
+        name.addEventListener("change", () => {
+          pt.name = name.value.trim();
+          render();
+        });
+        row1.append(sel, circSel, hInp, document.createTextNode("cm"), name);
+        li.appendChild(row1);
+        addDel(li, () => {
+          state.elecPoints = state.elecPoints.filter((p) => p.id !== pt.id);
+          if (state.elecSelectedId === pt.id) {
+            state.elecSelectedId = null;
+            state.elecSelectedKind = null;
+          }
+        });
+        li.addEventListener("click", () => {
+          state.elecSelectedId = pt.id;
+          state.elecSelectedKind = "point";
+          render();
+        });
+        ul.appendChild(li);
       });
-      sel.addEventListener("click", (e) => e.stopPropagation());
-      sel.addEventListener("change", () => {
-        pt.type = sel.value;
-        if (!pt.h) pt.h = ELEC_DEFAULT_H[pt.type];
-        render();
-      });
-      const hInp = document.createElement("input");
-      hInp.type = "number";
-      hInp.min = "10";
-      hInp.max = "220";
-      hInp.value = String(Math.round(pt.h));
-      hInp.title = "Výška nad podlahou (cm)";
-      hInp.addEventListener("click", (e) => e.stopPropagation());
-      hInp.addEventListener("change", () => {
-        pt.h = Math.min(220, Math.max(10, Number(hInp.value) || 30));
-        render();
-      });
-      const name = document.createElement("input");
-      name.type = "text";
-      name.placeholder = "popis";
-      name.value = pt.name || "";
-      name.addEventListener("click", (e) => e.stopPropagation());
-      name.addEventListener("change", () => {
-        pt.name = name.value.trim();
-        render();
-      });
-      row1.append(sel, hInp, document.createTextNode("cm"), name);
-      li.appendChild(row1);
-      addDel(li, () => {
-        state.elecPoints = state.elecPoints.filter((p) => p.id !== pt.id);
-        if (state.elecSelectedId === pt.id) {
-          state.elecSelectedId = null;
-          state.elecSelectedKind = null;
-        }
-      });
-      li.addEventListener("click", () => {
-        state.elecSelectedId = pt.id;
-        state.elecSelectedKind = "point";
-        render();
-      });
-      ul.appendChild(li);
-    });
+      folder.appendChild(ul);
+      root.appendChild(folder);
+    }
+  }
 
-    state.elecRuns.forEach((run, idx) => {
-      const li = document.createElement("li");
-      if (state.elecSelectedKind === "run" && run.id === state.elecSelectedId) li.classList.add("selected");
-      const row1 = document.createElement("div");
-      row1.className = "elec-row";
-      const name = document.createElement("input");
-      name.type = "text";
-      name.placeholder = `Trasa ${idx + 1}`;
-      name.value = run.name || "";
-      name.addEventListener("click", (e) => e.stopPropagation());
-      name.addEventListener("change", () => {
-        run.name = name.value.trim();
-        render();
+  function renderElecElevList() {
+    const ul = document.getElementById("elec-elev-list");
+    if (!ul) return;
+    ul.innerHTML = "";
+    state.elecElevRuns
+      .filter((r) => r.wall === state.elevWall)
+      .forEach((run, idx) => {
+        if (!circuitVisible(run.circuit || CABLE_TO_CIRCUIT[run.cableType])) return;
+        const li = document.createElement("li");
+        if (state.elecSelectedKind === "elev-run" && run.id === state.elecSelectedId) li.classList.add("selected");
+        const row = document.createElement("div");
+        row.className = "elec-row";
+        const lab = document.createElement("span");
+        lab.textContent = `${CABLE_LABELS[run.cableType] || run.cableType} · ${run.points.length} bodů`;
+        const name = document.createElement("input");
+        name.type = "text";
+        name.placeholder = `Trasa ${idx + 1}`;
+        name.value = run.name || "";
+        name.addEventListener("click", (e) => e.stopPropagation());
+        name.addEventListener("change", () => {
+          run.name = name.value.trim();
+          render();
+        });
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "btn";
+        del.textContent = "Smazat";
+        del.addEventListener("click", (e) => {
+          e.stopPropagation();
+          state.elecElevRuns = state.elecElevRuns.filter((r) => r.id !== run.id);
+          render();
+        });
+        row.append(lab, name, del);
+        li.appendChild(row);
+        li.addEventListener("click", () => {
+          state.elecSelectedId = run.id;
+          state.elecSelectedKind = "elev-run";
+          render();
+        });
+        ul.appendChild(li);
       });
-      const meta = document.createElement("span");
-      meta.textContent = `${run.points.length} bodů`;
-      row1.append(name, meta);
-      li.appendChild(row1);
-      addDel(li, () => {
-        state.elecRuns = state.elecRuns.filter((r) => r.id !== run.id);
-        if (state.elecSelectedId === run.id) {
-          state.elecSelectedId = null;
-          state.elecSelectedKind = null;
-        }
+  }
+
+  function drawElectroOnElevation(g, wall, roomH) {
+    if (!state.showElectro) return;
+    const editable = state.tab === "electro" && state.elecStep === "elev";
+
+    for (const run of state.elecElevRuns) {
+      if (run.wall !== wall) continue;
+      if (!circuitVisible(run.circuit || CABLE_TO_CIRCUIT[run.cableType])) continue;
+      const sel = state.elecSelectedKind === "elev-run" && run.id === state.elecSelectedId;
+      const color = CABLE_COLORS[run.cableType] || "#e67e22";
+      const d = run.points.map((p, i) => {
+        const x = p.along;
+        const y = yFromFloor(p.h, roomH);
+        return `${i ? "L" : "M"}${x},${y}`;
+      }).join(" ");
+      g.appendChild(el("path", {
+        class: "elec-run",
+        "data-elec": run.id,
+        "data-elec-kind": "elev-run",
+        d, fill: "none",
+        stroke: sel ? "#111" : color,
+        "stroke-width": sel ? 2.8 : 2.2,
+        "stroke-dasharray": run.cableType === "slaboproud" ? "2,3" : "8,4",
+        "pointer-events": editable ? "stroke" : "none",
+      }));
+    }
+
+    if (state.elecRunDraft && state.elecStep === "elev" && state.elecRunDraft.length) {
+      const color = CABLE_COLORS[state.elecCableType] || "#e67e22";
+      const d = state.elecRunDraft.map((p, i) => {
+        const y = yFromFloor(p.h, roomH);
+        return `${i ? "L" : "M"}${p.along},${y}`;
+      }).join(" ");
+      g.appendChild(el("path", {
+        d, fill: "none", stroke: color, "stroke-width": 2, "stroke-dasharray": "3,3",
+        "pointer-events": "none",
+      }));
+    }
+
+    for (const pt of state.elecPoints) {
+      const circ = pt.circuit || TYPE_TO_CIRCUIT[pt.type] || "sockets";
+      if (!circuitVisible(circ)) continue;
+      const on = elecPointOnWall(pt, wall);
+      if (!on) continue;
+      const color = ELEC_COLORS[pt.type] || "#2980b9";
+      const sel = state.elecSelectedKind === "point" && pt.id === state.elecSelectedId;
+      const cx = on.along;
+      const cy = yFromFloor(on.h, roomH);
+      g.appendChild(el("circle", {
+        class: "elec-point",
+        "data-elec": pt.id,
+        "data-elec-kind": "point",
+        cx, cy, r: sel ? 7 : 5.5,
+        fill: color, stroke: sel ? "#111" : "#fff", "stroke-width": sel ? 2 : 1.2,
+        "pointer-events": editable ? "all" : "none",
+      }));
+      const label = el("text", {
+        x: cx + 8, y: cy - 6,
+        fill: color, "font-size": 8, "font-family": PLAN_FONT,
+        "pointer-events": "none",
       });
-      li.addEventListener("click", () => {
-        state.elecSelectedId = run.id;
-        state.elecSelectedKind = "run";
-        render();
-      });
-      ul.appendChild(li);
-    });
+      label.textContent = `${ELEC_LABELS[pt.type]} · ${Math.round(pt.h)}`;
+      g.appendChild(label);
+    }
   }
 
   function renderCabinView() {
@@ -2170,34 +2380,37 @@
     syncAppMeta();
     const wrap = document.getElementById("canvas-wrap");
     wrap.innerHTML = "";
-    wrap.appendChild(state.tab === "elevations" ? renderElevationView() : renderCabinView());
+    const showElev = state.tab === "electro" && state.elecStep === "elev";
+    wrap.appendChild(showElev ? renderElevationView() : renderCabinView());
     updateStatus();
     if (state.tab === "cabin") syncSideHints();
     renderFurnList();
     renderElecList();
+    renderElecElevList();
     document.getElementById("panel-cabin").hidden = state.tab !== "cabin";
     document.getElementById("panel-furniture").hidden = state.tab !== "furniture";
-    document.getElementById("panel-elevations").hidden = state.tab !== "elevations";
     document.getElementById("panel-electro").hidden = state.tab !== "electro";
+    const planTools = document.getElementById("elec-plan-tools");
+    const elevTools = document.getElementById("elec-elev-tools");
+    if (planTools) planTools.hidden = state.elecStep !== "plan";
+    if (elevTools) elevTools.hidden = state.elecStep !== "elev";
     const titles = {
       cabin: ["Půdorys", "Táhni příčky · sekce vpravo rozbal dle potřeby"],
       furniture: ["Nábytek", "Vrstvy obdélníků ve světlosti · kolize = červená"],
-      elevations: ["Pohledy", "Čelní elevace obvodu · geometrický podklad"],
-      electro: ["Elektro", "Body + trasy na půdorysu · výška u bodu"],
+      electro: state.elecStep === "elev"
+        ? ["Elektro · pohledy", "Body u stěny · trasy kabelů (Slaboproud / CYKY)"]
+        : ["Elektro · půdorys", "Body ve složkách okruhů · + Bod = jeden kus"],
     };
     const [t, sub] = titles[state.tab] || titles.cabin;
     document.getElementById("side-title").textContent = t;
     document.getElementById("side-sub").textContent = sub;
     const legend = document.getElementById("legend");
     if (legend) {
-      if (state.tab === "elevations") {
+      if (showElev) {
         const m = elevWallMeta(state.elevWall);
-        const head = state.windowSillH + WIN_OPEN_H;
-        const kitSill = head - WIN_KITCHEN_OPEN_H;
         legend.innerHTML =
           `${m.title}<br>` +
-          `Výška <strong>${state.roomClearH}</strong> · okno ${WIN_OPEN_H} (parapet ${state.windowSillH}→${head}) · ` +
-          `kuchyň ${WIN_KITCHEN_OPEN_H} (parapet ${kitSill}→${head}) · dveře ${state.doorOpeningH}/${state.doorLeafH} cm`;
+          `Body z půdorysu u stěny (≤${ELEC_WALL_PROX} cm) · filtr okruhů · trasy: Slaboproud / CYKY 1,5 / 2,5`;
       } else {
         legend.innerHTML =
           `Světlost: <strong>${CLEAR.w} × ${CLEAR.h} cm</strong> (od SDK)<br>` +
@@ -2212,10 +2425,6 @@
         ? `${state.furnitureLayers.length} vrstev · klikni kus pro výběr`
         : "Přidej vrstvu tlačítkem + nebo kreslením.";
     }
-    const elevHint = document.getElementById("elev-hint");
-    if (elevHint && state.tab === "elevations") {
-      elevHint.textContent = "Čárkované svislice = napojení příček / nábytku na stěnu. Okna modře, dveře okrově.";
-    }
     document.getElementById("btn-furn-draw")?.classList.toggle("active", state.furnMode === "draw");
     document.getElementById("btn-elec-point")?.classList.toggle("active", state.elecMode === "point");
     document.getElementById("btn-elec-run")?.classList.toggle("active", state.elecMode === "run");
@@ -2225,16 +2434,18 @@
     }
     const elecHint = document.getElementById("elec-mode-hint");
     if (elecHint) {
-      if (state.elecMode === "point") elecHint.textContent = "Klikni do půdorysu — umístí bod zvoleného typu.";
-      else if (state.elecMode === "run") {
+      if (state.elecMode === "point") elecHint.textContent = "Klikni jednou do půdorysu — bod se umístí a můžeš ho dorovnat.";
+      else elecHint.textContent = `${state.elecPoints.length} bodů ve složkách Datové / Světla / Zásuvky.`;
+    }
+    const elevHint = document.getElementById("elec-elev-hint");
+    if (elevHint) {
+      if (state.elecMode === "run") {
         const n = state.elecRunDraft?.length || 0;
-        elecHint.textContent = n
-          ? `Trasa: ${n} bodů · klikni další vrchol · Ukončit trasu / dvojklik`
-          : "Klikni první bod trasy…";
+        elevHint.textContent = n
+          ? `Trasa ${CABLE_LABELS[state.elecCableType]}: ${n} bodů · další klik / Ukončit / dvojklik`
+          : `Klikni první bod trasy (${CABLE_LABELS[state.elecCableType]})…`;
       } else {
-        elecHint.textContent = state.elecPoints.length || state.elecRuns.length
-          ? `${state.elecPoints.length} bodů · ${state.elecRuns.length} tras`
-          : "Zapni + Bod nebo + Trasa.";
+        elevHint.textContent = "Přetahuj body na stěně · + Trasa kreslí kabel.";
       }
     }
     const elecHLab = document.getElementById("elec-h-val");
@@ -2246,6 +2457,22 @@
     document.querySelectorAll("#elec-type button").forEach((b) => {
       b.classList.toggle("active", b.dataset.v === state.elecType);
     });
+    document.querySelectorAll("#elec-circuit button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.v === state.elecCircuit);
+    });
+    document.querySelectorAll("#elec-step button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.v === state.elecStep);
+    });
+    document.querySelectorAll("#elec-cable button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.v === state.elecCableType);
+    });
+    document.querySelectorAll("#elev-wall button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.v === state.elevWall);
+    });
+    for (const c of ELEC_CIRCUITS) {
+      const cb = document.getElementById(`filt-${c}`);
+      if (cb) cb.checked = !!state.elecFilter[c];
+    }
   }
 
   function svgPoint(svg, evt) {
@@ -2302,6 +2529,14 @@
         pt.x = d.origX + dx;
         pt.y = d.origY + dy;
         clampElecXY(pt);
+      }
+      render();
+      return;
+    }
+    if (d.type === "elec-elev-move") {
+      const pt = findElecPoint(d.elecId);
+      if (pt) {
+        applyElevToPlanPoint(pt, d.wall, d.origAlong + dx, d.origH - dy);
       }
       render();
       return;
@@ -2372,49 +2607,90 @@
     }
 
     if (state.tab === "electro" && !state.measureMode) {
-      const elecEl = evt.target.closest("[data-elec]");
-      if (elecEl && state.elecMode !== "point" && state.elecMode !== "run") {
-        const id = elecEl.getAttribute("data-elec");
-        const kind = elecEl.getAttribute("data-elec-kind");
-        state.elecSelectedId = id;
-        state.elecSelectedKind = kind;
-        if (kind === "point") {
-          const pt = findElecPoint(id);
-          if (pt) {
-            state.drag = {
-              type: "elec-move",
-              elecId: id,
-              start: p,
-              origX: pt.x,
-              origY: pt.y,
-            };
+      if (state.elecStep === "plan") {
+        const elecEl = evt.target.closest("[data-elec]");
+        if (elecEl && state.elecMode !== "point") {
+          const id = elecEl.getAttribute("data-elec");
+          const kind = elecEl.getAttribute("data-elec-kind");
+          state.elecSelectedId = id;
+          state.elecSelectedKind = kind;
+          if (kind === "point") {
+            const pt = findElecPoint(id);
+            if (pt) {
+              state.drag = {
+                type: "elec-move",
+                elecId: id,
+                start: p,
+                origX: pt.x,
+                origY: pt.y,
+              };
+            }
           }
+          evt.preventDefault();
+          render();
+          return;
         }
-        evt.preventDefault();
-        render();
-        return;
-      }
-      if (state.elecMode === "point") {
-        const cx = Math.min(CLEAR.w, Math.max(0, p.x - INNER.x));
-        const cy = Math.min(CLEAR.h, Math.max(0, p.y - INNER.y));
-        addElecPoint({ type: state.elecType, x: cx, y: cy, h: state.elecH });
-        evt.preventDefault();
-        render();
-        return;
-      }
-      if (state.elecMode === "run") {
-        const cx = Math.min(CLEAR.w, Math.max(0, p.x - INNER.x));
-        const cy = Math.min(CLEAR.h, Math.max(0, p.y - INNER.y));
-        if (!state.elecRunDraft) state.elecRunDraft = [];
-        if (evt.detail >= 2 && state.elecRunDraft.length >= 1) {
-          state.elecRunDraft.push({ x: cx, y: cy });
-          finishElecRunDraft();
-        } else {
-          state.elecRunDraft.push({ x: cx, y: cy });
+        if (state.elecMode === "point") {
+          const cx = Math.min(CLEAR.w, Math.max(0, p.x - INNER.x));
+          const cy = Math.min(CLEAR.h, Math.max(0, p.y - INNER.y));
+          addElecPoint({
+            type: state.elecType,
+            circuit: state.elecCircuit,
+            x: cx, y: cy, h: state.elecH,
+          });
+          state.elecMode = null;
+          state.drag = {
+            type: "elec-move",
+            elecId: state.elecSelectedId,
+            start: p,
+            origX: cx,
+            origY: cy,
+          };
+          evt.preventDefault();
+          render();
+          return;
         }
-        evt.preventDefault();
-        render();
-        return;
+      }
+
+      if (state.elecStep === "elev") {
+        const elecEl = evt.target.closest("[data-elec]");
+        if (elecEl && state.elecMode !== "run") {
+          const id = elecEl.getAttribute("data-elec");
+          const kind = elecEl.getAttribute("data-elec-kind");
+          state.elecSelectedId = id;
+          state.elecSelectedKind = kind;
+          if (kind === "point") {
+            const pt = findElecPoint(id);
+            const on = pt && elecPointOnWall(pt, state.elevWall);
+            if (pt && on) {
+              state.drag = {
+                type: "elec-elev-move",
+                elecId: id,
+                wall: state.elevWall,
+                start: p,
+                origAlong: on.along,
+                origH: on.h,
+              };
+            }
+          }
+          evt.preventDefault();
+          render();
+          return;
+        }
+        if (state.elecMode === "run") {
+          const along = Math.min(elevWallMeta(state.elevWall).len, Math.max(0, p.x));
+          const h = Math.min(state.roomClearH, Math.max(0, state.roomClearH - p.y));
+          if (!state.elecRunDraft) state.elecRunDraft = [];
+          if (evt.detail >= 2 && state.elecRunDraft.length >= 1) {
+            state.elecRunDraft.push({ along, h });
+            finishElecRunDraft();
+          } else {
+            state.elecRunDraft.push({ along, h });
+          }
+          evt.preventDefault();
+          render();
+          return;
+        }
       }
     }
 
@@ -2663,10 +2939,21 @@
   bindRange("door-open-h", "doorOpeningH", "door-open-h-val");
   bindRange("door-leaf-h", "doorLeafH", "door-leaf-h-val");
   bindSeg("elev-wall", "elevWall");
+  bindSeg("elec-step", "elecStep", (v) => v, () => {
+    state.elecMode = null;
+    state.elecRunDraft = null;
+  });
+  bindSeg("elec-circuit", "elecCircuit");
+  bindSeg("elec-cable", "elecCableType");
 
   document.querySelectorAll("#tabs [data-tab]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      state.tab = btn.getAttribute("data-tab");
+      let tab = btn.getAttribute("data-tab");
+      if (tab === "elevations") {
+        tab = "electro";
+        state.elecStep = "elev";
+      }
+      state.tab = tab;
       state.furnMode = null;
       state.furnDraw = null;
       state.elecMode = null;
@@ -2675,7 +2962,7 @@
       state.measureMode = false;
       document.getElementById("btn-measure")?.classList.remove("active");
       document.querySelectorAll("#tabs [data-tab]").forEach((b) => {
-        b.classList.toggle("active", b === btn);
+        b.classList.toggle("active", b.getAttribute("data-tab") === state.tab);
       });
       document.getElementById("furn-form").hidden = true;
       render();
@@ -2683,11 +2970,13 @@
   });
 
   document.getElementById("btn-elec-point").addEventListener("click", () => {
+    state.elecStep = "plan";
     state.elecMode = state.elecMode === "point" ? null : "point";
     state.elecRunDraft = null;
     render();
   });
   document.getElementById("btn-elec-run").addEventListener("click", () => {
+    state.elecStep = "elev";
     if (state.elecMode === "run") {
       finishElecRunDraft();
       state.elecMode = null;
@@ -2709,14 +2998,25 @@
     const btn = e.target.closest("button[data-v]");
     if (!btn) return;
     state.elecType = btn.dataset.v;
+    state.elecCircuit = TYPE_TO_CIRCUIT[state.elecType] || state.elecCircuit;
     state.elecH = ELEC_DEFAULT_H[state.elecType] ?? 30;
     if (state.elecType === "light") state.elecH = state.roomClearH;
     document.querySelectorAll("#elec-type button").forEach((b) => {
       b.classList.toggle("active", b === btn);
     });
+    document.querySelectorAll("#elec-circuit button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.v === state.elecCircuit);
+    });
     document.getElementById("elec-h").value = String(Math.round(state.elecH));
     document.getElementById("elec-h-val").textContent = String(Math.round(state.elecH));
   });
+  for (const c of ELEC_CIRCUITS) {
+    document.getElementById(`filt-${c}`)?.addEventListener("change", (e) => {
+      state.elecFilter[c] = e.target.checked;
+      render();
+    });
+  }
+
 
   document.getElementById("btn-furn-add").addEventListener("click", () => {
     state.tab = "furniture";
@@ -2771,13 +3071,23 @@
         id: l.id, name: l.name, x: l.x, y: l.y, w: l.w, d: l.d,
       })),
       elecPoints: state.elecPoints.map((p) => ({
-        id: p.id, type: p.type, x: p.x, y: p.y, h: p.h, name: p.name || "",
+        id: p.id, type: p.type, circuit: p.circuit, x: p.x, y: p.y, h: p.h, name: p.name || "",
       })),
       elecRuns: state.elecRuns.map((r) => ({
         id: r.id,
+        circuit: r.circuit || null,
         name: r.name || "",
         points: r.points.map((p) => ({ x: p.x, y: p.y })),
       })),
+      elecElevRuns: state.elecElevRuns.map((r) => ({
+        id: r.id,
+        wall: r.wall,
+        cableType: r.cableType,
+        circuit: r.circuit,
+        name: r.name || "",
+        points: r.points.map((p) => ({ along: p.along, h: p.h })),
+      })),
+      elecFilter: { ...state.elecFilter },
       appVersion: APP_VERSION,
       appBuild: APP_BUILD,
       appCommit: APP_COMMIT,
@@ -2797,31 +3107,52 @@
   }
   function normalizeElecPoints(raw) {
     if (!Array.isArray(raw)) return [];
-    return raw.map((p) => clampElecXY({
-      id: typeof p.id === "string" ? p.id : newElecId("e"),
-      type: ELEC_TYPES.includes(p.type) ? p.type : "socket",
-      x: Number(p.x) || 0,
-      y: Number(p.y) || 0,
-      h: Number(p.h) || ELEC_DEFAULT_H.socket,
-      name: (p.name && String(p.name).trim()) || "",
-    }));
+    return raw.map((p) => {
+      const type = ELEC_TYPES.includes(p.type) ? p.type : "socket";
+      return clampElecXY({
+        id: typeof p.id === "string" ? p.id : newElecId("e"),
+        type,
+        circuit: ELEC_CIRCUITS.includes(p.circuit) ? p.circuit : (TYPE_TO_CIRCUIT[type] || "sockets"),
+        x: Number(p.x) || 0,
+        y: Number(p.y) || 0,
+        h: Number(p.h) || ELEC_DEFAULT_H.socket,
+        name: (p.name && String(p.name).trim()) || "",
+      });
+    });
   }
   function normalizeElecRuns(raw) {
     if (!Array.isArray(raw)) return [];
     return raw.map((r) => ({
       id: typeof r.id === "string" ? r.id : newElecId("r"),
+      circuit: ELEC_CIRCUITS.includes(r.circuit) ? r.circuit : null,
       name: (r.name && String(r.name).trim()) || "",
       points: Array.isArray(r.points)
         ? r.points.map((p) => clampElecXY({ x: Number(p.x) || 0, y: Number(p.y) || 0 }))
         : [],
     })).filter((r) => r.points.length >= 2);
   }
+  function normalizeElecElevRuns(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.map((r) => {
+      const cable = CABLE_TYPES.includes(r.cableType) ? r.cableType : "cyky25";
+      return {
+        id: typeof r.id === "string" ? r.id : newElecId("er"),
+        wall: ["north", "south", "west", "east"].includes(r.wall) ? r.wall : "north",
+        cableType: cable,
+        circuit: ELEC_CIRCUITS.includes(r.circuit) ? r.circuit : CABLE_TO_CIRCUIT[cable],
+        name: (r.name && String(r.name).trim()) || "",
+        points: Array.isArray(r.points)
+          ? r.points.map((p) => ({ along: Number(p.along) || 0, h: Number(p.h) || 0 }))
+          : [],
+      };
+    }).filter((r) => r.points.length >= 2);
+  }
   function applySnapshot(data) {
     if (!data || typeof data !== "object") return;
     const {
       tab, measureMode, measureA, measureB, measureCursor, hoverCm, drag,
       furnMode, furnDraw, furnitureLayers,
-      elecMode, elecRunDraft, elecSelectedId, elecSelectedKind, elecPoints, elecRuns,
+      elecMode, elecRunDraft, elecSelectedId, elecSelectedKind, elecPoints, elecRuns, elecElevRuns,
       savedAt, appVersion, appBuild, appCommit, ...rest
     } = data;
     Object.assign(state, rest);
@@ -2834,11 +3165,16 @@
     state.furnDraw = null;
     state.elecPoints = normalizeElecPoints(elecPoints);
     state.elecRuns = normalizeElecRuns(elecRuns);
+    state.elecElevRuns = normalizeElecElevRuns(elecElevRuns);
     state.elecSelectedId = null;
     state.elecSelectedKind = null;
     state.elecMode = null;
     state.elecRunDraft = null;
     if (!state.elecType) state.elecType = "socket";
+    if (!state.elecCircuit) state.elecCircuit = "sockets";
+    if (!state.elecStep) state.elecStep = "plan";
+    if (!state.elecCableType) state.elecCableType = "cyky25";
+    if (!state.elecFilter) state.elecFilter = { data: true, lights: true, sockets: true };
     if (state.elecH == null) state.elecH = ELEC_DEFAULT_H.socket;
     state.measureMode = false;
     state.measureA = null;
@@ -2846,7 +3182,12 @@
     state.measureCursor = null;
     state.hoverCm = null;
     state.drag = null;
-    if (tab === "cabin" || tab === "furniture" || tab === "elevations" || tab === "electro") state.tab = tab;
+    if (tab === "elevations") {
+      state.tab = "electro";
+      state.elecStep = "elev";
+    } else if (tab === "cabin" || tab === "furniture" || tab === "electro") {
+      state.tab = tab;
+    }
     if (state.roomClearH == null) state.roomClearH = 210;
     if (state.windowSillH == null) state.windowSillH = 90;
     if (state.doorOpeningH == null) state.doorOpeningH = 200;
