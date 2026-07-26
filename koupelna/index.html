@@ -338,6 +338,7 @@
       <div class="tabs" id="tabs">
         <button type="button" data-tab="cabin" class="active">1 · Půdorys</button>
         <button type="button" data-tab="furniture">2 · Nábytek</button>
+        <button type="button" data-tab="elevations">3 · Pohledy</button>
       </div>
       <button type="button" class="icon-btn" id="btn-measure" title="Měřit vzdálenost" aria-label="Měřit vzdálenost">📏</button>
       <button type="button" class="icon-btn" id="btn-measure-reset" title="Reset měření" aria-label="Reset měření">↺</button>
@@ -487,6 +488,28 @@
         </details>
         </div>
 
+        <div id="panel-elevations" hidden>
+          <p class="hint">Čelní pohledy vnitřních líčů obvodu — jen geometrie (bez elektro). Levá osa = Z (S/J) nebo S (Z/V).</p>
+          <label>Stěna</label>
+          <div class="row seg" id="elev-wall">
+            <button type="button" data-v="north" class="active">Sever</button>
+            <button type="button" data-v="south">Jih</button>
+            <button type="button" data-v="west">Západ</button>
+            <button type="button" data-v="east">Východ</button>
+          </div>
+          <label>Světlá výška: <strong id="room-h-val">210</strong> cm</label>
+          <input type="range" id="room-h" min="200" max="280" value="210" step="1">
+          <label>Parapet okna: <strong id="sill-h-val">90</strong> cm</label>
+          <input type="range" id="sill-h" min="40" max="140" value="90" step="1">
+          <label>Nadpraží okna: <strong id="win-head-val">200</strong> cm</label>
+          <input type="range" id="win-head" min="150" max="280" value="200" step="1">
+          <label>Otvor dveří (výška): <strong id="door-open-h-val">200</strong> cm</label>
+          <input type="range" id="door-open-h" min="180" max="220" value="200" step="1">
+          <label>Křídlo dveří (výška): <strong id="door-leaf-h-val">190</strong> cm</label>
+          <input type="range" id="door-leaf-h" min="180" max="220" value="190" step="1">
+          <p class="hint" id="elev-hint"></p>
+        </div>
+
         <div id="panel-furniture" hidden>
           <p class="hint">Obdélníky jen ve světlosti. V seznamu upravíš název i Š×H. Kolize = červená (povolené). Zobrazit/skrýt: checkbox „Ostatní nábytek“.</p>
           <button type="button" class="btn" id="btn-furn-add" style="width:100%;margin-bottom:8px">+ Nová vrstva</button>
@@ -513,7 +536,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.1.0";
+  const APP_VERSION = "3.2.0";
   const APP_BUILD = 28;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -648,6 +671,12 @@
     furnSelectedId: null,
     furnMode: null, // null | "draw" | "place"
     furnDraw: null, // { x0, y0, x1, y1 } absolute during draw
+    elevWall: "north", // north | south | west | east
+    roomClearH: 210,
+    windowSillH: 90,
+    windowHeadH: 200,
+    doorOpeningH: 200,
+    doorLeafH: 190,
   };
 
   let furnIdSeq = 1;
@@ -1513,6 +1542,162 @@
     }
   }
 
+  function elevWallMeta(wall) {
+    if (wall === "north") return { segs: NORTH_SEGS, len: CLEAR.w, title: "Sever (pohled na S stěnu)", axis: "Z→V" };
+    if (wall === "south") return { segs: SOUTH_SEGS, len: CLEAR.w, title: "Jih (pohled na J stěnu)", axis: "Z→V" };
+    if (wall === "west") return { segs: WEST_SEGS, len: CLEAR.h, title: "Západ (pohled na Z stěnu)", axis: "S→J" };
+    return { segs: EAST_SEGS, len: CLEAR.h, title: "Východ (pohled na V stěnu)", axis: "S→J" };
+  }
+
+  function elevOpeningSpans(segs) {
+    let c = 0;
+    const spans = [];
+    for (const s of segs) {
+      if (s.t === "win" || s.t === "door") spans.push({ t: s.t, a: c, b: c + s.l });
+      c += s.l;
+    }
+    return spans;
+  }
+
+  /** Svislé napojení příček na obvod (clear cm podél stěny). */
+  function elevPartitionHits(wall) {
+    const hits = [];
+    if (wall === "north") {
+      hits.push({ x: state.bathLeft, label: "koupelna Z" });
+      hits.push({ x: state.bathLeft + state.bathW, label: "koupelna V" });
+      hits.push({ x: state.tvX, label: "TV Z" });
+      hits.push({ x: state.tvX + PART, label: "TV V" });
+    } else if (wall === "south") {
+      hits.push({ x: state.kitchenLeft, label: "kuchyň Z" });
+      hits.push({ x: state.kitchenLeft + state.kitchenLen, label: "kuchyň V" });
+    } else if (wall === "east") {
+      // postel u V — jen orientační hrana matrace/rámu od severu
+      if (state.showBed) {
+        const { d } = bedOuterSize();
+        hits.push({ x: d, label: "postel J" });
+      }
+    } else if (wall === "west") {
+      if (state.showSofa) hits.push({ x: 240, label: "gauč J" });
+    }
+    return hits.filter((h) => h.x > 0.5 && h.x < elevWallMeta(wall).len - 0.5);
+  }
+
+  function yFromFloor(hFromFloor, roomH) {
+    return roomH - hFromFloor;
+  }
+
+  function renderElevationView() {
+    const wall = state.elevWall;
+    const meta = elevWallMeta(wall);
+    const roomH = state.roomClearH;
+    const pad = 36;
+    const svg = el("svg", {
+      viewBox: `${-pad} ${-pad} ${meta.len + pad * 2} ${roomH + pad * 2}`,
+      id: "plan-svg",
+    });
+    const g = el("g", { id: "plan-root" });
+
+    // stěna (výplň)
+    g.appendChild(el("rect", {
+      x: 0, y: 0, width: meta.len, height: roomH,
+      fill: "#f4f6f7", stroke: "#111111", "stroke-width": 2,
+    }));
+    // podlaha / strop
+    g.appendChild(el("line", {
+      x1: 0, y1: roomH, x2: meta.len, y2: roomH,
+      stroke: "#111111", "stroke-width": 2.5,
+    }));
+    g.appendChild(el("line", {
+      x1: 0, y1: 0, x2: meta.len, y2: 0,
+      stroke: "#111111", "stroke-width": 1.5,
+    }));
+
+    const sill = Math.min(state.windowSillH, roomH - 10);
+    const winHead = Math.min(Math.max(state.windowHeadH, sill + 20), roomH);
+    const doorOpen = Math.min(state.doorOpeningH, roomH);
+    const doorLeaf = Math.min(state.doorLeafH, doorOpen);
+
+    for (const span of elevOpeningSpans(meta.segs)) {
+      const w = span.b - span.a;
+      if (span.t === "win") {
+        const y = yFromFloor(winHead, roomH);
+        const h = winHead - sill;
+        g.appendChild(el("rect", {
+          x: span.a, y, width: w, height: h,
+          fill: "rgba(0,168,255,0.12)", stroke: "#00a8ff", "stroke-width": 2,
+        }));
+        // kříž okna
+        g.appendChild(el("line", {
+          x1: span.a + w / 2, y1: y, x2: span.a + w / 2, y2: y + h,
+          stroke: "#00a8ff", "stroke-width": 1,
+        }));
+        g.appendChild(el("line", {
+          x1: span.a, y1: y + h / 2, x2: span.b, y2: y + h / 2,
+          stroke: "#00a8ff", "stroke-width": 1,
+        }));
+      } else {
+        const yOpen = yFromFloor(doorOpen, roomH);
+        g.appendChild(el("rect", {
+          x: span.a, y: yOpen, width: w, height: doorOpen,
+          fill: "rgba(225,177,44,0.18)", stroke: "#d35400", "stroke-width": 2,
+        }));
+        const yLeaf = yFromFloor(doorLeaf, roomH);
+        g.appendChild(el("rect", {
+          x: span.a + 3, y: yLeaf, width: Math.max(4, w - 6), height: doorLeaf,
+          fill: "none", stroke: "#e1b12c", "stroke-width": 1.5, "stroke-dasharray": "5,3",
+        }));
+      }
+    }
+
+    for (const hit of elevPartitionHits(wall)) {
+      g.appendChild(el("line", {
+        x1: hit.x, y1: 0, x2: hit.x, y2: roomH,
+        stroke: "#2c3e50", "stroke-width": 2, "stroke-dasharray": "6,4",
+      }));
+      const t = el("text", {
+        x: hit.x + 3, y: 14,
+        fill: "#2c3e50", "font-size": 8, "font-family": PLAN_FONT,
+      });
+      t.textContent = hit.label;
+      g.appendChild(t);
+    }
+
+    // titul + osa
+    const title = el("text", {
+      x: meta.len / 2, y: -18,
+      fill: "#1f4e6b", "font-size": 12, "font-family": PLAN_FONT,
+      "text-anchor": "middle",
+    });
+    title.textContent = `${meta.title} · ${meta.axis} · světlá výška ${roomH} cm`;
+    g.appendChild(title);
+
+    if (state.showDims) {
+      dimH(g, 0, meta.len, roomH + 16, `${round1(meta.len)}`, "#c0392b");
+      dimV(g, 0, roomH, -14, `${roomH}`, "#c0392b");
+      dimV(g, yFromFloor(sill, roomH), roomH, meta.len + 14, `${sill}`, "#7f8c8d");
+      const doorSpan = elevOpeningSpans(meta.segs).find((s) => s.t === "door");
+      if (doorSpan) {
+        dimV(g, yFromFloor(doorOpen, roomH), roomH, doorSpan.a - 12, `${doorOpen}`, "#d35400");
+      }
+    }
+
+    // popisky rohů osy
+    const labL = el("text", {
+      x: 0, y: roomH + 30, fill: "#7f8c8d", "font-size": 9, "font-family": PLAN_FONT,
+    });
+    labL.textContent = wall === "west" || wall === "east" ? "S" : "Z";
+    g.appendChild(labL);
+    const labR = el("text", {
+      x: meta.len, y: roomH + 30, fill: "#7f8c8d", "font-size": 9, "font-family": PLAN_FONT,
+      "text-anchor": "end",
+    });
+    labR.textContent = wall === "west" || wall === "east" ? "J" : "V";
+    g.appendChild(labR);
+
+    svg.appendChild(g);
+    return svg;
+  }
+
   function renderCabinView() {
     const pad = 36;
     const svg = el("svg", {
@@ -1618,26 +1803,40 @@
     clampSink();
     clampKitchen();
     clampDoorOffset();
+    state.windowHeadH = Math.min(state.roomClearH, Math.max(state.windowSillH + 20, state.windowHeadH));
+    state.doorOpeningH = Math.min(state.roomClearH, state.doorOpeningH);
+    state.doorLeafH = Math.min(state.doorOpeningH, state.doorLeafH);
     syncAppMeta();
     const wrap = document.getElementById("canvas-wrap");
     wrap.innerHTML = "";
-    wrap.appendChild(renderCabinView());
+    wrap.appendChild(state.tab === "elevations" ? renderElevationView() : renderCabinView());
     updateStatus();
     if (state.tab === "cabin") syncSideHints();
     renderFurnList();
     document.getElementById("panel-cabin").hidden = state.tab !== "cabin";
     document.getElementById("panel-furniture").hidden = state.tab !== "furniture";
-    document.getElementById("side-title").textContent =
-      state.tab === "cabin" ? "Půdorys" : "Nábytek";
-    document.getElementById("side-sub").textContent =
-      state.tab === "cabin"
-        ? "Táhni příčky · sekce vpravo rozbal dle potřeby"
-        : "Vrstvy obdélníků ve světlosti · kolize = červená";
+    document.getElementById("panel-elevations").hidden = state.tab !== "elevations";
+    const titles = {
+      cabin: ["Půdorys", "Táhni příčky · sekce vpravo rozbal dle potřeby"],
+      furniture: ["Nábytek", "Vrstvy obdélníků ve světlosti · kolize = červená"],
+      elevations: ["Pohledy", "Čelní elevace obvodu · export SVG pro zakreslení elektro"],
+    };
+    const [t, sub] = titles[state.tab] || titles.cabin;
+    document.getElementById("side-title").textContent = t;
+    document.getElementById("side-sub").textContent = sub;
     const legend = document.getElementById("legend");
     if (legend) {
-      legend.innerHTML =
-        `Světlost: <strong>${CLEAR.w} × ${CLEAR.h} cm</strong> (od SDK)<br>` +
-        `Obvod: <strong>${String(WALL_REAL).replace(".", ",")} cm</strong> (v půdorysu zjednodušeně) · SDK: <strong>12,5 cm</strong>`;
+      if (state.tab === "elevations") {
+        const m = elevWallMeta(state.elevWall);
+        legend.innerHTML =
+          `${m.title}<br>` +
+          `Výška <strong>${state.roomClearH}</strong> · parapet <strong>${state.windowSillH}</strong> · ` +
+          `okno do <strong>${state.windowHeadH}</strong> · otvor dveří <strong>${state.doorOpeningH}</strong> / křídlo <strong>${state.doorLeafH}</strong> cm`;
+      } else {
+        legend.innerHTML =
+          `Světlost: <strong>${CLEAR.w} × ${CLEAR.h} cm</strong> (od SDK)<br>` +
+          `Obvod: <strong>${String(WALL_REAL).replace(".", ",")} cm</strong> (v půdorysu zjednodušeně) · SDK: <strong>12,5 cm</strong>`;
+      }
     }
     const modeHint = document.getElementById("furn-mode-hint");
     if (modeHint) {
@@ -1646,6 +1845,10 @@
       else modeHint.textContent = state.furnitureLayers.length
         ? `${state.furnitureLayers.length} vrstev · klikni kus pro výběr`
         : "Přidej vrstvu tlačítkem + nebo kreslením.";
+    }
+    const elevHint = document.getElementById("elev-hint");
+    if (elevHint && state.tab === "elevations") {
+      elevHint.textContent = "Čárkované svislice = napojení příček / nábytku na stěnu. Okna modře, dveře okrově.";
     }
     document.getElementById("btn-furn-draw")?.classList.toggle("active", state.furnMode === "draw");
   }
@@ -1870,6 +2073,11 @@
       ["sink-w", "sinkW", "sink-w-val"],
       ["sink-d", "sinkD", "sink-d-val"],
       ["sink-offset", "sinkOffset", "sink-off-val"],
+      ["room-h", "roomClearH", "room-h-val"],
+      ["sill-h", "windowSillH", "sill-h-val"],
+      ["win-head", "windowHeadH", "win-head-val"],
+      ["door-open-h", "doorOpeningH", "door-open-h-val"],
+      ["door-leaf-h", "doorLeafH", "door-leaf-h-val"],
     ];
     for (const [id, key, lab] of map) {
       const input = document.getElementById(id);
@@ -1895,6 +2103,7 @@
 
   function bindRange(id, key, lab) {
     const input = document.getElementById(id);
+    if (!input) return;
     input.addEventListener("input", () => {
       let v = Number(input.value);
       if (key === "tvX") {
@@ -1995,6 +2204,12 @@
   bindRange("sink-w", "sinkW", "sink-w-val");
   bindRange("sink-d", "sinkD", "sink-d-val");
   bindRange("sink-offset", "sinkOffset", "sink-off-val");
+  bindRange("room-h", "roomClearH", "room-h-val");
+  bindRange("sill-h", "windowSillH", "sill-h-val");
+  bindRange("win-head", "windowHeadH", "win-head-val");
+  bindRange("door-open-h", "doorOpeningH", "door-open-h-val");
+  bindRange("door-leaf-h", "doorLeafH", "door-leaf-h-val");
+  bindSeg("elev-wall", "elevWall");
 
   document.querySelectorAll("#tabs [data-tab]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -2101,7 +2316,13 @@
     state.measureCursor = null;
     state.hoverCm = null;
     state.drag = null;
-    if (tab === "cabin" || tab === "furniture") state.tab = tab;
+    if (tab === "cabin" || tab === "furniture" || tab === "elevations") state.tab = tab;
+    if (state.roomClearH == null) state.roomClearH = 210;
+    if (state.windowSillH == null) state.windowSillH = 90;
+    if (state.windowHeadH == null) state.windowHeadH = 200;
+    if (state.doorOpeningH == null) state.doorOpeningH = 200;
+    if (state.doorLeafH == null) state.doorLeafH = 190;
+    if (!state.elevWall) state.elevWall = "north";
     syncSlidersFromState();
     if (state.showFurniture == null) state.showFurniture = true;
     document.getElementById("show-sofa").checked = !!state.showSofa;
@@ -2119,6 +2340,7 @@
       ["bed-variant", "bedVariant"], ["tv-variant", "tvVariant"],
       ["door-width", "doorWidth"], ["door-type", "doorType"], ["pocket-dir", "pocketDir"],
       ["shower-preset", "showerPreset"], ["shower-full-depth", "showerFullDepth"],
+      ["elev-wall", "elevWall"],
     ]) {
       const root = document.getElementById(id);
       if (!root) continue;
