@@ -130,6 +130,36 @@
   }
   .canvas-wrap .furn-move { cursor: move; }
   .canvas-wrap .furn-se { cursor: nwse-resize; }
+  .canvas-wrap .elec-point { cursor: move; }
+  .canvas-wrap .elec-run { cursor: pointer; }
+  .elec-list { list-style: none; margin: 8px 0 0; padding: 0; }
+  .elec-list li {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 8px;
+    margin-bottom: 6px;
+    background: #fff;
+  }
+  .elec-list li.selected { border-color: var(--accent); background: #eef5f9; }
+  .elec-list .elec-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 4px;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .elec-list .elec-row input[type="number"],
+  .elec-list .elec-row input[type="text"],
+  .elec-list .elec-row select {
+    font: inherit;
+    padding: 3px 5px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+  }
+  .elec-list .elec-row input[type="number"] { width: 64px; }
+  .elec-list .elec-row input[type="text"] { flex: 1; min-width: 80px; }
   .icon-btn {
     width: 38px;
     height: 38px;
@@ -339,6 +369,7 @@
         <button type="button" data-tab="cabin" class="active">1 · Půdorys</button>
         <button type="button" data-tab="furniture">2 · Nábytek</button>
         <button type="button" data-tab="elevations">3 · Pohledy</button>
+        <button type="button" data-tab="electro">4 · Elektro</button>
       </div>
       <button type="button" class="icon-btn" id="btn-measure" title="Měřit vzdálenost" aria-label="Měřit vzdálenost">📏</button>
       <button type="button" class="icon-btn" id="btn-measure-reset" title="Reset měření" aria-label="Reset měření">↺</button>
@@ -347,6 +378,7 @@
       <label class="chk"><input type="checkbox" id="show-sofa" checked> Gauč</label>
       <label class="chk"><input type="checkbox" id="show-bed" checked> Postel</label>
       <label class="chk"><input type="checkbox" id="show-furniture" checked> Ostatní nábytek</label>
+      <label class="chk"><input type="checkbox" id="show-electro" checked> Elektro</label>
       <label class="chk"><input type="checkbox" id="show-dims" checked> Kóty</label>
       <button type="button" class="btn" id="btn-export" title="SVG včetně stavu pro import na jiném PC">Export SVG</button>
       <button type="button" class="btn" id="btn-import" title="Načíst SVG (nebo JSON) exportovaný z tohoto nástroje">Import</button>
@@ -509,6 +541,26 @@
           <p class="hint" id="elev-hint"></p>
         </div>
 
+        <div id="panel-electro" hidden>
+          <p class="hint">Body (zásuvka / vypínač / světlo / rozvaděč) + volné trasy na půdorysu. Výška = cm nad podlahou.</p>
+          <label>Typ bodu</label>
+          <div class="row seg" id="elec-type">
+            <button type="button" data-v="socket" class="active">Zásuvka</button>
+            <button type="button" data-v="switch">Vypínač</button>
+            <button type="button" data-v="light">Světlo</button>
+            <button type="button" data-v="panel">Rozvaděč</button>
+          </div>
+          <label>Výška bodu: <strong id="elec-h-val">30</strong> cm</label>
+          <input type="range" id="elec-h" min="10" max="220" value="30" step="1">
+          <div class="row" style="margin:8px 0">
+            <button type="button" class="btn" id="btn-elec-point">+ Bod</button>
+            <button type="button" class="btn" id="btn-elec-run">+ Trasa</button>
+          </div>
+          <button type="button" class="btn" id="btn-elec-run-finish" style="width:100%;margin-bottom:8px" hidden>Ukončit trasu</button>
+          <p class="hint" id="elec-mode-hint"></p>
+          <ul class="elec-list" id="elec-list"></ul>
+        </div>
+
         <div id="panel-furniture" hidden>
           <p class="hint">Obdélníky jen ve světlosti. V seznamu upravíš název i Š×H. Kolize = červená (povolené). Zobrazit/skrýt: checkbox „Ostatní nábytek“.</p>
           <button type="button" class="btn" id="btn-furn-add" style="width:100%;margin-bottom:8px">+ Nová vrstva</button>
@@ -535,7 +587,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.2.1";
+  const APP_VERSION = "3.3.0";
   const APP_BUILD = 28;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -634,8 +686,12 @@
     return nx;
   }
 
-  const STORAGE_KEY = "chata-kamyk-planner-variants-v6";
+  const STORAGE_KEY = "chata-kamyk-planner-variants-v7";
   const FURN_MIN = 20;
+  const ELEC_TYPES = ["socket", "switch", "light", "panel"];
+  const ELEC_LABELS = { socket: "Zásuvka", switch: "Vypínač", light: "Světlo", panel: "Rozvaděč" };
+  const ELEC_DEFAULT_H = { socket: 30, switch: 120, light: 210, panel: 150 };
+  const ELEC_COLORS = { socket: "#2980b9", switch: "#8e44ad", light: "#f39c12", panel: "#c0392b" };
 
   const state = {
     tab: "cabin",
@@ -652,6 +708,7 @@
     showSofa: true,
     showBed: true,
     showFurniture: true,
+    showElectro: true,
     showDims: true,
     doorWidth: 70,
     doorOffset: 90,
@@ -678,9 +735,18 @@
     windowSillH: 90,
     doorOpeningH: 200,
     doorLeafH: 190,
+    elecPoints: [],
+    elecRuns: [],
+    elecSelectedId: null,
+    elecSelectedKind: null, // "point" | "run"
+    elecMode: null, // null | "point" | "run"
+    elecType: "socket",
+    elecH: 30,
+    elecRunDraft: null, // [{x,y}, ...] clear cm while drawing
   };
 
   let furnIdSeq = 1;
+  let elecIdSeq = 1;
 
   const ns = "http://www.w3.org/2000/svg";
 
@@ -767,6 +833,72 @@
     state.furnitureLayers.push(layer);
     state.furnSelectedId = layer.id;
     return layer;
+  }
+
+  function newElecId(prefix) {
+    return `${prefix}${Date.now().toString(36)}_${elecIdSeq++}`;
+  }
+
+  function ensureElectroVisible() {
+    if (state.showElectro) return;
+    state.showElectro = true;
+    const cb = document.getElementById("show-electro");
+    if (cb) cb.checked = true;
+  }
+
+  function clampElecXY(pt) {
+    pt.x = Math.min(CLEAR.w, Math.max(0, pt.x));
+    pt.y = Math.min(CLEAR.h, Math.max(0, pt.y));
+    return pt;
+  }
+
+  function findElecPoint(id) {
+    return state.elecPoints.find((p) => p.id === id);
+  }
+
+  function findElecRun(id) {
+    return state.elecRuns.find((r) => r.id === id);
+  }
+
+  function elecAbs(pt) {
+    return { x: absX(pt.x), y: INNER.y + pt.y };
+  }
+
+  function addElecPoint({ type, x, y, h, name }) {
+    ensureElectroVisible();
+    const t = ELEC_TYPES.includes(type) ? type : "socket";
+    const pt = clampElecXY({
+      id: newElecId("e"),
+      type: t,
+      x: x ?? 50,
+      y: y ?? 50,
+      h: h ?? ELEC_DEFAULT_H[t] ?? 30,
+      name: (name && String(name).trim()) || "",
+    });
+    state.elecPoints.push(pt);
+    state.elecSelectedId = pt.id;
+    state.elecSelectedKind = "point";
+    return pt;
+  }
+
+  function finishElecRunDraft() {
+    const draft = state.elecRunDraft;
+    if (!draft || draft.length < 2) {
+      state.elecRunDraft = null;
+      return null;
+    }
+    ensureElectroVisible();
+    const run = {
+      id: newElecId("r"),
+      name: "",
+      points: draft.map((p) => clampElecXY({ x: p.x, y: p.y })),
+    };
+    state.elecRuns.push(run);
+    state.elecRunDraft = null;
+    state.elecMode = null;
+    state.elecSelectedId = run.id;
+    state.elecSelectedKind = "run";
+    return run;
   }
   function dist(a, b) {
     return Math.hypot(b.x - a.x, b.y - a.y);
@@ -1726,6 +1858,201 @@
     return svg;
   }
 
+  function drawElectroLayer(g) {
+    if (!state.showElectro) return;
+    const editable = state.tab === "electro";
+
+    const drawPoly = (pts, attrs) => {
+      if (!pts.length) return;
+      const d = pts.map((p, i) => {
+        const a = elecAbs(p);
+        return `${i ? "L" : "M"}${a.x},${a.y}`;
+      }).join(" ");
+      g.appendChild(el("path", { d, fill: "none", ...attrs }));
+    };
+
+    for (const run of state.elecRuns) {
+      const sel = state.elecSelectedKind === "run" && run.id === state.elecSelectedId;
+      drawPoly(run.points, {
+        class: "elec-run",
+        "data-elec": run.id,
+        "data-elec-kind": "run",
+        stroke: sel ? "#1f4e6b" : "#e67e22",
+        "stroke-width": sel ? 2.8 : 2,
+        "stroke-dasharray": "7,4",
+        "pointer-events": editable ? "stroke" : "none",
+      });
+    }
+
+    if (state.elecRunDraft && state.elecRunDraft.length) {
+      drawPoly(state.elecRunDraft, {
+        stroke: "#e67e22",
+        "stroke-width": 2,
+        "stroke-dasharray": "3,3",
+        "pointer-events": "none",
+      });
+      for (const p of state.elecRunDraft) {
+        const a = elecAbs(p);
+        g.appendChild(el("circle", {
+          cx: a.x, cy: a.y, r: 3,
+          fill: "#e67e22", "pointer-events": "none",
+        }));
+      }
+    }
+
+    for (const pt of state.elecPoints) {
+      const a = elecAbs(pt);
+      const color = ELEC_COLORS[pt.type] || "#2980b9";
+      const sel = state.elecSelectedKind === "point" && pt.id === state.elecSelectedId;
+      const r = sel ? 7 : 5.5;
+      g.appendChild(el("circle", {
+        class: "elec-point",
+        "data-elec": pt.id,
+        "data-elec-kind": "point",
+        cx: a.x, cy: a.y, r,
+        fill: color,
+        stroke: sel ? "#111" : "#fff",
+        "stroke-width": sel ? 2 : 1.2,
+        "pointer-events": editable ? "all" : "none",
+      }));
+      // typ symbol
+      if (pt.type === "switch") {
+        g.appendChild(el("line", {
+          x1: a.x - 3, y1: a.y + 2, x2: a.x + 3, y2: a.y - 3,
+          stroke: "#fff", "stroke-width": 1.4, "pointer-events": "none",
+        }));
+      } else if (pt.type === "light") {
+        g.appendChild(el("circle", {
+          cx: a.x, cy: a.y, r: 2, fill: "#fff", "pointer-events": "none",
+        }));
+      } else if (pt.type === "panel") {
+        g.appendChild(el("rect", {
+          x: a.x - 2.5, y: a.y - 2.5, width: 5, height: 5,
+          fill: "#fff", "pointer-events": "none",
+        }));
+      }
+      const label = el("text", {
+        x: a.x + 8, y: a.y - 6,
+        fill: color, "font-size": 8, "font-family": PLAN_FONT,
+        "pointer-events": "none",
+      });
+      const nameBit = pt.name ? `${pt.name} · ` : "";
+      label.textContent = `${nameBit}${ELEC_LABELS[pt.type] || pt.type} · ${Math.round(pt.h)}`;
+      g.appendChild(label);
+    }
+  }
+
+  function renderElecList() {
+    const ul = document.getElementById("elec-list");
+    if (!ul) return;
+    ul.innerHTML = "";
+
+    const addDel = (li, onDel) => {
+      const meta = document.createElement("div");
+      meta.className = "elec-row";
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "btn";
+      del.textContent = "Smazat";
+      del.addEventListener("click", (e) => {
+        e.stopPropagation();
+        onDel();
+        render();
+      });
+      meta.appendChild(del);
+      li.appendChild(meta);
+    };
+
+    state.elecPoints.forEach((pt) => {
+      const li = document.createElement("li");
+      if (state.elecSelectedKind === "point" && pt.id === state.elecSelectedId) li.classList.add("selected");
+      const row1 = document.createElement("div");
+      row1.className = "elec-row";
+      const sel = document.createElement("select");
+      ELEC_TYPES.forEach((t) => {
+        const o = document.createElement("option");
+        o.value = t;
+        o.textContent = ELEC_LABELS[t];
+        if (t === pt.type) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener("click", (e) => e.stopPropagation());
+      sel.addEventListener("change", () => {
+        pt.type = sel.value;
+        if (!pt.h) pt.h = ELEC_DEFAULT_H[pt.type];
+        render();
+      });
+      const hInp = document.createElement("input");
+      hInp.type = "number";
+      hInp.min = "10";
+      hInp.max = "220";
+      hInp.value = String(Math.round(pt.h));
+      hInp.title = "Výška nad podlahou (cm)";
+      hInp.addEventListener("click", (e) => e.stopPropagation());
+      hInp.addEventListener("change", () => {
+        pt.h = Math.min(220, Math.max(10, Number(hInp.value) || 30));
+        render();
+      });
+      const name = document.createElement("input");
+      name.type = "text";
+      name.placeholder = "popis";
+      name.value = pt.name || "";
+      name.addEventListener("click", (e) => e.stopPropagation());
+      name.addEventListener("change", () => {
+        pt.name = name.value.trim();
+        render();
+      });
+      row1.append(sel, hInp, document.createTextNode("cm"), name);
+      li.appendChild(row1);
+      addDel(li, () => {
+        state.elecPoints = state.elecPoints.filter((p) => p.id !== pt.id);
+        if (state.elecSelectedId === pt.id) {
+          state.elecSelectedId = null;
+          state.elecSelectedKind = null;
+        }
+      });
+      li.addEventListener("click", () => {
+        state.elecSelectedId = pt.id;
+        state.elecSelectedKind = "point";
+        render();
+      });
+      ul.appendChild(li);
+    });
+
+    state.elecRuns.forEach((run, idx) => {
+      const li = document.createElement("li");
+      if (state.elecSelectedKind === "run" && run.id === state.elecSelectedId) li.classList.add("selected");
+      const row1 = document.createElement("div");
+      row1.className = "elec-row";
+      const name = document.createElement("input");
+      name.type = "text";
+      name.placeholder = `Trasa ${idx + 1}`;
+      name.value = run.name || "";
+      name.addEventListener("click", (e) => e.stopPropagation());
+      name.addEventListener("change", () => {
+        run.name = name.value.trim();
+        render();
+      });
+      const meta = document.createElement("span");
+      meta.textContent = `${run.points.length} bodů`;
+      row1.append(name, meta);
+      li.appendChild(row1);
+      addDel(li, () => {
+        state.elecRuns = state.elecRuns.filter((r) => r.id !== run.id);
+        if (state.elecSelectedId === run.id) {
+          state.elecSelectedId = null;
+          state.elecSelectedKind = null;
+        }
+      });
+      li.addEventListener("click", () => {
+        state.elecSelectedId = run.id;
+        state.elecSelectedKind = "run";
+        render();
+      });
+      ul.appendChild(li);
+    });
+  }
+
   function renderCabinView() {
     const pad = 36;
     const svg = el("svg", {
@@ -1743,6 +2070,7 @@
     drawBathFixtures(g, { detail: true });
     drawFurnitureCabin(g);
     drawFurnitureLayers(g);
+    drawElectroLayer(g);
 
     if (state.showDims && state.tab === "cabin") {
       const o = bathOuter();
@@ -1755,7 +2083,10 @@
     drawMeasure(g);
 
     svg.appendChild(g);
-    if (state.tab === "furniture" && state.furnMode === "draw") {
+    if (
+      (state.tab === "furniture" && state.furnMode === "draw") ||
+      (state.tab === "electro" && (state.elecMode === "point" || state.elecMode === "run"))
+    ) {
       svg.classList.add("measuring");
     }
     return svg;
@@ -1803,6 +2134,9 @@
       );
       if (hits && level === "ok") level = "warn";
     }
+    if (state.elecPoints.length || state.elecRuns.length) {
+      msgs.push(`Elektro: ${state.elecPoints.length} bodů · ${state.elecRuns.length} tras`);
+    }
     elStatus.className = "status " + level;
     elStatus.innerHTML = msgs.join("<br>");
   }
@@ -1840,13 +2174,16 @@
     updateStatus();
     if (state.tab === "cabin") syncSideHints();
     renderFurnList();
+    renderElecList();
     document.getElementById("panel-cabin").hidden = state.tab !== "cabin";
     document.getElementById("panel-furniture").hidden = state.tab !== "furniture";
     document.getElementById("panel-elevations").hidden = state.tab !== "elevations";
+    document.getElementById("panel-electro").hidden = state.tab !== "electro";
     const titles = {
       cabin: ["Půdorys", "Táhni příčky · sekce vpravo rozbal dle potřeby"],
       furniture: ["Nábytek", "Vrstvy obdélníků ve světlosti · kolize = červená"],
-      elevations: ["Pohledy", "Čelní elevace obvodu · export SVG pro zakreslení elektro"],
+      elevations: ["Pohledy", "Čelní elevace obvodu · geometrický podklad"],
+      electro: ["Elektro", "Body + trasy na půdorysu · výška u bodu"],
     };
     const [t, sub] = titles[state.tab] || titles.cabin;
     document.getElementById("side-title").textContent = t;
@@ -1880,6 +2217,35 @@
       elevHint.textContent = "Čárkované svislice = napojení příček / nábytku na stěnu. Okna modře, dveře okrově.";
     }
     document.getElementById("btn-furn-draw")?.classList.toggle("active", state.furnMode === "draw");
+    document.getElementById("btn-elec-point")?.classList.toggle("active", state.elecMode === "point");
+    document.getElementById("btn-elec-run")?.classList.toggle("active", state.elecMode === "run");
+    const finishBtn = document.getElementById("btn-elec-run-finish");
+    if (finishBtn) {
+      finishBtn.hidden = !(state.elecMode === "run" && state.elecRunDraft && state.elecRunDraft.length >= 2);
+    }
+    const elecHint = document.getElementById("elec-mode-hint");
+    if (elecHint) {
+      if (state.elecMode === "point") elecHint.textContent = "Klikni do půdorysu — umístí bod zvoleného typu.";
+      else if (state.elecMode === "run") {
+        const n = state.elecRunDraft?.length || 0;
+        elecHint.textContent = n
+          ? `Trasa: ${n} bodů · klikni další vrchol · Ukončit trasu / dvojklik`
+          : "Klikni první bod trasy…";
+      } else {
+        elecHint.textContent = state.elecPoints.length || state.elecRuns.length
+          ? `${state.elecPoints.length} bodů · ${state.elecRuns.length} tras`
+          : "Zapni + Bod nebo + Trasa.";
+      }
+    }
+    const elecHLab = document.getElementById("elec-h-val");
+    const elecHInp = document.getElementById("elec-h");
+    if (elecHLab && elecHInp) {
+      elecHInp.value = String(Math.round(state.elecH));
+      elecHLab.textContent = String(Math.round(state.elecH));
+    }
+    document.querySelectorAll("#elec-type button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.v === state.elecType);
+    });
   }
 
   function svgPoint(svg, evt) {
@@ -1927,6 +2293,16 @@
         x1: Math.min(INNER.x + INNER.w, Math.max(INNER.x, p.x)),
         y1: Math.min(INNER.y + INNER.h, Math.max(INNER.y, p.y)),
       };
+      render();
+      return;
+    }
+    if (d.type === "elec-move") {
+      const pt = findElecPoint(d.elecId);
+      if (pt) {
+        pt.x = d.origX + dx;
+        pt.y = d.origY + dy;
+        clampElecXY(pt);
+      }
       render();
       return;
     }
@@ -1989,6 +2365,53 @@
         const cy = Math.min(INNER.y + INNER.h, Math.max(INNER.y, p.y));
         state.drag = { type: "furn-draw", start: { x: cx, y: cy } };
         state.furnDraw = { x0: cx, y0: cy, x1: cx, y1: cy };
+        evt.preventDefault();
+        render();
+        return;
+      }
+    }
+
+    if (state.tab === "electro" && !state.measureMode) {
+      const elecEl = evt.target.closest("[data-elec]");
+      if (elecEl && state.elecMode !== "point" && state.elecMode !== "run") {
+        const id = elecEl.getAttribute("data-elec");
+        const kind = elecEl.getAttribute("data-elec-kind");
+        state.elecSelectedId = id;
+        state.elecSelectedKind = kind;
+        if (kind === "point") {
+          const pt = findElecPoint(id);
+          if (pt) {
+            state.drag = {
+              type: "elec-move",
+              elecId: id,
+              start: p,
+              origX: pt.x,
+              origY: pt.y,
+            };
+          }
+        }
+        evt.preventDefault();
+        render();
+        return;
+      }
+      if (state.elecMode === "point") {
+        const cx = Math.min(CLEAR.w, Math.max(0, p.x - INNER.x));
+        const cy = Math.min(CLEAR.h, Math.max(0, p.y - INNER.y));
+        addElecPoint({ type: state.elecType, x: cx, y: cy, h: state.elecH });
+        evt.preventDefault();
+        render();
+        return;
+      }
+      if (state.elecMode === "run") {
+        const cx = Math.min(CLEAR.w, Math.max(0, p.x - INNER.x));
+        const cy = Math.min(CLEAR.h, Math.max(0, p.y - INNER.y));
+        if (!state.elecRunDraft) state.elecRunDraft = [];
+        if (evt.detail >= 2 && state.elecRunDraft.length >= 1) {
+          state.elecRunDraft.push({ x: cx, y: cy });
+          finishElecRunDraft();
+        } else {
+          state.elecRunDraft.push({ x: cx, y: cy });
+        }
         evt.preventDefault();
         render();
         return;
@@ -2198,6 +2621,9 @@
   document.getElementById("show-furniture").addEventListener("change", (e) => {
     state.showFurniture = e.target.checked; render();
   });
+  document.getElementById("show-electro").addEventListener("change", (e) => {
+    state.showElectro = e.target.checked; render();
+  });
   document.getElementById("show-dims").addEventListener("change", (e) => {
     state.showDims = e.target.checked; render();
   });
@@ -2243,6 +2669,8 @@
       state.tab = btn.getAttribute("data-tab");
       state.furnMode = null;
       state.furnDraw = null;
+      state.elecMode = null;
+      state.elecRunDraft = null;
       state.drag = null;
       state.measureMode = false;
       document.getElementById("btn-measure")?.classList.remove("active");
@@ -2252,6 +2680,42 @@
       document.getElementById("furn-form").hidden = true;
       render();
     });
+  });
+
+  document.getElementById("btn-elec-point").addEventListener("click", () => {
+    state.elecMode = state.elecMode === "point" ? null : "point";
+    state.elecRunDraft = null;
+    render();
+  });
+  document.getElementById("btn-elec-run").addEventListener("click", () => {
+    if (state.elecMode === "run") {
+      finishElecRunDraft();
+      state.elecMode = null;
+    } else {
+      state.elecMode = "run";
+      state.elecRunDraft = [];
+    }
+    render();
+  });
+  document.getElementById("btn-elec-run-finish").addEventListener("click", () => {
+    finishElecRunDraft();
+    render();
+  });
+  document.getElementById("elec-h").addEventListener("input", (e) => {
+    state.elecH = Number(e.target.value) || 30;
+    document.getElementById("elec-h-val").textContent = String(Math.round(state.elecH));
+  });
+  document.getElementById("elec-type").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-v]");
+    if (!btn) return;
+    state.elecType = btn.dataset.v;
+    state.elecH = ELEC_DEFAULT_H[state.elecType] ?? 30;
+    if (state.elecType === "light") state.elecH = state.roomClearH;
+    document.querySelectorAll("#elec-type button").forEach((b) => {
+      b.classList.toggle("active", b === btn);
+    });
+    document.getElementById("elec-h").value = String(Math.round(state.elecH));
+    document.getElementById("elec-h-val").textContent = String(Math.round(state.elecH));
   });
 
   document.getElementById("btn-furn-add").addEventListener("click", () => {
@@ -2298,12 +2762,21 @@
   function snapshot() {
     const {
       measureMode, measureA, measureB, measureCursor, hoverCm, drag,
-      furnMode, furnDraw, ...rest
+      furnMode, furnDraw, elecMode, elecRunDraft, elecSelectedId, elecSelectedKind,
+      ...rest
     } = state;
     return {
       ...rest,
       furnitureLayers: state.furnitureLayers.map((l) => ({
         id: l.id, name: l.name, x: l.x, y: l.y, w: l.w, d: l.d,
+      })),
+      elecPoints: state.elecPoints.map((p) => ({
+        id: p.id, type: p.type, x: p.x, y: p.y, h: p.h, name: p.name || "",
+      })),
+      elecRuns: state.elecRuns.map((r) => ({
+        id: r.id,
+        name: r.name || "",
+        points: r.points.map((p) => ({ x: p.x, y: p.y })),
       })),
       appVersion: APP_VERSION,
       appBuild: APP_BUILD,
@@ -2322,12 +2795,34 @@
       d: Number(l.d) || 120,
     }));
   }
+  function normalizeElecPoints(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.map((p) => clampElecXY({
+      id: typeof p.id === "string" ? p.id : newElecId("e"),
+      type: ELEC_TYPES.includes(p.type) ? p.type : "socket",
+      x: Number(p.x) || 0,
+      y: Number(p.y) || 0,
+      h: Number(p.h) || ELEC_DEFAULT_H.socket,
+      name: (p.name && String(p.name).trim()) || "",
+    }));
+  }
+  function normalizeElecRuns(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.map((r) => ({
+      id: typeof r.id === "string" ? r.id : newElecId("r"),
+      name: (r.name && String(r.name).trim()) || "",
+      points: Array.isArray(r.points)
+        ? r.points.map((p) => clampElecXY({ x: Number(p.x) || 0, y: Number(p.y) || 0 }))
+        : [],
+    })).filter((r) => r.points.length >= 2);
+  }
   function applySnapshot(data) {
     if (!data || typeof data !== "object") return;
     const {
       tab, measureMode, measureA, measureB, measureCursor, hoverCm, drag,
-      furnMode, furnDraw, furnitureLayers, savedAt,
-      appVersion, appBuild, appCommit, ...rest
+      furnMode, furnDraw, furnitureLayers,
+      elecMode, elecRunDraft, elecSelectedId, elecSelectedKind, elecPoints, elecRuns,
+      savedAt, appVersion, appBuild, appCommit, ...rest
     } = data;
     Object.assign(state, rest);
     if (state.kitchenLeft == null) state.kitchenLeft = 313;
@@ -2337,13 +2832,21 @@
     state.furnSelectedId = state.furnitureLayers[0]?.id || null;
     state.furnMode = null;
     state.furnDraw = null;
+    state.elecPoints = normalizeElecPoints(elecPoints);
+    state.elecRuns = normalizeElecRuns(elecRuns);
+    state.elecSelectedId = null;
+    state.elecSelectedKind = null;
+    state.elecMode = null;
+    state.elecRunDraft = null;
+    if (!state.elecType) state.elecType = "socket";
+    if (state.elecH == null) state.elecH = ELEC_DEFAULT_H.socket;
     state.measureMode = false;
     state.measureA = null;
     state.measureB = null;
     state.measureCursor = null;
     state.hoverCm = null;
     state.drag = null;
-    if (tab === "cabin" || tab === "furniture" || tab === "elevations") state.tab = tab;
+    if (tab === "cabin" || tab === "furniture" || tab === "elevations" || tab === "electro") state.tab = tab;
     if (state.roomClearH == null) state.roomClearH = 210;
     if (state.windowSillH == null) state.windowSillH = 90;
     if (state.doorOpeningH == null) state.doorOpeningH = 200;
@@ -2351,9 +2854,11 @@
     if (!state.elevWall) state.elevWall = "north";
     syncSlidersFromState();
     if (state.showFurniture == null) state.showFurniture = true;
+    if (state.showElectro == null) state.showElectro = true;
     document.getElementById("show-sofa").checked = !!state.showSofa;
     document.getElementById("show-bed").checked = !!state.showBed;
     document.getElementById("show-furniture").checked = !!state.showFurniture;
+    document.getElementById("show-electro").checked = !!state.showElectro;
     document.getElementById("show-dims").checked = !!state.showDims;
     document.getElementById("shower-rotate").checked = !!state.showerRotate;
     document.getElementById("full-depth-wrap").hidden = state.showerPreset !== "full";
