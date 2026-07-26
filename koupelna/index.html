@@ -177,6 +177,54 @@
   .elec-folder .elec-list { margin: 0; padding: 0 8px 8px; }
   .elec-folder .elec-list li { background: #fff; }
   .elec-filters { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 8px 0; font-size: 0.85rem; }
+  .elec-stepper {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .elec-stepper button {
+    font: inherit;
+    text-align: left;
+    border: 2px solid var(--line);
+    background: #fff;
+    padding: 10px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--ink);
+  }
+  .elec-stepper button.active {
+    border-color: var(--accent);
+    background: #e8eef3;
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+  .elec-stepper .step-num {
+    display: block;
+    font-weight: 700;
+    font-size: 0.92rem;
+    margin-bottom: 2px;
+  }
+  .elec-stepper .step-desc {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.3;
+  }
+  .elev-wall-toggles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 10px;
+    margin: 6px 0 10px;
+    font-size: 0.85rem;
+  }
+  .elev-wall-toggles label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    color: var(--ink);
+    font-weight: 500;
+  }
   .icon-btn {
     width: 38px;
     height: 38px;
@@ -397,7 +445,8 @@
       <label class="chk"><input type="checkbox" id="show-electro" checked> Elektro</label>
       <label class="chk"><input type="checkbox" id="show-dims" checked> Kóty</label>
       <button type="button" class="btn" id="btn-export" title="SVG včetně stavu pro import na jiném PC">Export SVG</button>
-      <button type="button" class="btn" id="btn-import" title="Načíst SVG (nebo JSON) exportovaný z tohoto nástroje">Import</button>
+      <button type="button" class="btn" id="btn-export-json" title="Celý stav plánovače jako formátovaný JSON">Export JSON</button>
+      <button type="button" class="btn" id="btn-import" title="Načíst SVG nebo JSON exportovaný z tohoto nástroje">Import</button>
       <input type="file" id="import-file" accept=".svg,.json,image/svg+xml,application/json" hidden>
     </div>
 
@@ -537,9 +586,15 @@
         </div>
 
         <div id="panel-electro" hidden>
-          <div class="row seg" id="elec-step" style="margin-bottom:10px">
-            <button type="button" data-v="plan" class="active">1 · Půdorys</button>
-            <button type="button" data-v="elev">2 · Pohledy</button>
+          <div class="elec-stepper" id="elec-step">
+            <button type="button" data-v="plan" class="active">
+              <span class="step-num">1 · Půdorys</span>
+              <span class="step-desc">Okruhy a body (zásuvky, vypínače…)</span>
+            </button>
+            <button type="button" data-v="elev">
+              <span class="step-num">2 · Pohledy</span>
+              <span class="step-desc">Trasy na stěnách · i více najednou</span>
+            </button>
           </div>
 
           <div id="elec-plan-tools">
@@ -574,14 +629,14 @@
           </div>
 
           <div id="elec-elev-tools" hidden>
-            <p class="hint">Aktivní okruh určuje výchozí kabel. Trasy: ortogonální snap (pravé úhly), náhled k kurzoru + výška.</p>
+            <p class="hint">Zapni 1+ stěny — rozvinou se do pásu s rohy. Trasa může jít přes roh jedním tahem.</p>
             <p class="hint" id="elec-active-hint-elev"></p>
-            <label>Stěna</label>
-            <div class="row seg" id="elev-wall">
-              <button type="button" data-v="north" class="active">Sever</button>
-              <button type="button" data-v="south">Jih</button>
-              <button type="button" data-v="west">Západ</button>
-              <button type="button" data-v="east">Východ</button>
+            <label>Stěny v pásu (zapni libovolné)</label>
+            <div class="elev-wall-toggles" id="elev-wall">
+              <label class="chk"><input type="checkbox" data-wall="north" checked> Sever</label>
+              <label class="chk"><input type="checkbox" data-wall="east"> Východ</label>
+              <label class="chk"><input type="checkbox" data-wall="south"> Jih</label>
+              <label class="chk"><input type="checkbox" data-wall="west"> Západ</label>
             </div>
             <label>Filtr typů okruhů</label>
             <div class="elec-filters">
@@ -645,8 +700,8 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.5.0";
-  const APP_BUILD = 28;
+  const APP_VERSION = "3.6.0";
+  const APP_BUILD = 35;
   const APP_COMMIT = "";
   // BUILD_META_END
 
@@ -758,6 +813,16 @@
   const CABLE_LABELS = { slaboproud: "Slaboproud", cyky15: "CYKY 1,5", cyky25: "CYKY 2,5" };
   const CABLE_COLORS = { slaboproud: "#8e44ad", cyky15: "#f39c12", cyky25: "#2980b9" };
   const ELEC_WALL_PROX = 45;
+  const ELEV_WALL_ORDER = ["north", "east", "south", "west"];
+  const ELEV_WALL_LABELS = { north: "Sever", east: "Východ", south: "Jih", west: "Západ" };
+  /** Rozvinutý pás po obvodu (uvnitř): flip u J/Z, aby sousední stěny sdílely roh. */
+  const ELEV_UNFOLD = [
+    { wall: "north", flip: false, cornerAfter: "NE" },
+    { wall: "east", flip: false, cornerAfter: "SE" },
+    { wall: "south", flip: true, cornerAfter: "SW" },
+    { wall: "west", flip: true, cornerAfter: "NW" },
+  ];
+  const ELEV_CORNER_GAP = 16;
 
   const state = {
     tab: "cabin",
@@ -796,7 +861,7 @@
     furnSelectedId: null,
     furnMode: null, // null | "draw" | "place"
     furnDraw: null, // { x0, y0, x1, y1 } absolute during draw
-    elevWall: "north", // north | south | west | east
+    elevWalls: ["north"], // multi-select, order = unfold ring
     roomClearH: 210,
     windowSillH: 90,
     doorOpeningH: 200,
@@ -811,7 +876,7 @@
     elecCursor: null, // elev preview { along, h }
     elecPoints: [],
     elecRuns: [], // legacy
-    elecElevRuns: [], // { id, wall, cableType, circuitId, name, points: [{along,h}] }
+    elecElevRuns: [], // { id, cableType, circuitId, name, points: [{wall,along,h}] }
     elecSelectedId: null,
     elecSelectedKind: null, // "point" | "run" | "elev-run" | "circuit"
     elecMode: null, // null | "point" | "run"
@@ -1012,12 +1077,107 @@
     clampElecXY(pt);
   }
 
-  function orthoSnapElev(prev, along, h) {
+  function orthoSnapElev(prev, wall, along, h) {
     if (!state.elecOrtho || !prev) return { along, h };
+    if (prev.wall && wall && prev.wall !== wall) {
+      // přes roh: drž výšku
+      return { along, h: prev.h };
+    }
     const da = Math.abs(along - prev.along);
     const dh = Math.abs(h - prev.h);
     if (da >= dh) return { along, h: prev.h };
     return { along: prev.along, h };
+  }
+
+  function normalizeElevWalls(raw, legacySingle) {
+    const set = new Set();
+    if (Array.isArray(raw)) {
+      for (const w of raw) {
+        if (ELEV_WALL_ORDER.includes(w)) set.add(w);
+      }
+    }
+    if (!set.size && ELEV_WALL_ORDER.includes(legacySingle)) set.add(legacySingle);
+    if (!set.size) set.add("north");
+    return ELEV_WALL_ORDER.filter((w) => set.has(w));
+  }
+
+  function elevStripLayout() {
+    const selected = normalizeElevWalls(state.elevWalls);
+    state.elevWalls = selected;
+    const panels = [];
+    let x = 0;
+    const ring = ELEV_UNFOLD.filter((u) => selected.includes(u.wall));
+    for (let i = 0; i < ring.length; i++) {
+      const u = ring[i];
+      const len = elevWallMeta(u.wall).len;
+      panels.push({
+        wall: u.wall,
+        flip: u.flip,
+        x0: x,
+        x1: x + len,
+        len,
+        cornerAfter: i < ring.length - 1 ? u.cornerAfter : null,
+      });
+      x += len;
+      if (i < ring.length - 1) x += ELEV_CORNER_GAP;
+    }
+    return { panels, totalW: x, roomH: state.roomClearH };
+  }
+
+  function alongToStripX(panel, along) {
+    const a = Math.min(panel.len, Math.max(0, along));
+    const local = panel.flip ? panel.len - a : a;
+    return panel.x0 + local;
+  }
+
+  function elevHit(svgX, svgY) {
+    const { panels, roomH } = elevStripLayout();
+    const h = Math.min(roomH, Math.max(0, roomH - svgY));
+    if (!panels.length) return null;
+    for (const panel of panels) {
+      if (svgX >= panel.x0 - 0.5 && svgX <= panel.x1 + 0.5) {
+        const local = Math.min(panel.len, Math.max(0, svgX - panel.x0));
+        const along = panel.flip ? panel.len - local : local;
+        return { wall: panel.wall, along, h, panel };
+      }
+    }
+    // rohová mezera → nejbližší hrana
+    let best = null;
+    let bestD = Infinity;
+    for (const panel of panels) {
+      for (const edge of [panel.x0, panel.x1]) {
+        const d = Math.abs(svgX - edge);
+        if (d < bestD) {
+          bestD = d;
+          const along = Math.abs(svgX - panel.x0) < Math.abs(svgX - panel.x1)
+            ? (panel.flip ? panel.len : 0)
+            : (panel.flip ? 0 : panel.len);
+          best = { wall: panel.wall, along, h, panel };
+        }
+      }
+    }
+    return best;
+  }
+
+  function runPointsNorm(run) {
+    if (!run || !Array.isArray(run.points)) return [];
+    return run.points.map((p) => ({
+      wall: ELEV_WALL_ORDER.includes(p.wall) ? p.wall : (run.wall || "north"),
+      along: Number(p.along) || 0,
+      h: Number(p.h) || 0,
+    }));
+  }
+
+  function runTouchesWalls(run, walls) {
+    const set = new Set(walls);
+    return runPointsNorm(run).some((p) => set.has(p.wall));
+  }
+
+  function stripXY(pt) {
+    const { panels, roomH } = elevStripLayout();
+    const panel = panels.find((p) => p.wall === pt.wall);
+    if (!panel) return null;
+    return { x: alongToStripX(panel, pt.along), y: yFromFloor(pt.h, roomH), panel };
   }
 
   function addElecPoint({ type, x, y, h, name, circuitId }) {
@@ -1054,16 +1214,22 @@
     }
     ensureElectroVisible();
     const cable = CABLE_TYPES.includes(state.elecCableType) ? state.elecCableType : KIND_TO_CABLE[circ.kind];
+    const points = draft.map((p) => {
+      const wall = ELEV_WALL_ORDER.includes(p.wall) ? p.wall : (state.elevWalls[0] || "north");
+      const len = elevWallMeta(wall).len;
+      return {
+        wall,
+        along: Math.min(len, Math.max(0, p.along)),
+        h: Math.min(state.roomClearH, Math.max(0, p.h)),
+      };
+    });
     const run = {
       id: newElecId("er"),
-      wall: state.elevWall,
+      wall: points[0].wall, // legacy hint
       cableType: cable,
       circuitId: circ.id,
       name: "",
-      points: draft.map((p) => ({
-        along: Math.min(elevWallMeta(state.elevWall).len, Math.max(0, p.along)),
-        h: Math.min(state.roomClearH, Math.max(0, p.h)),
-      })),
+      points,
     };
     state.elecElevRuns.push(run);
     state.elecSelectedId = run.id;
@@ -1903,131 +2069,200 @@
     return roomH - hFromFloor;
   }
 
-  function renderElevationView() {
-    const wall = state.elevWall;
-    const meta = elevWallMeta(wall);
-    const roomH = state.roomClearH;
-    const pad = 36;
-    const svg = el("svg", {
-      viewBox: `${-pad} ${-pad} ${meta.len + pad * 2} ${roomH + pad * 2}`,
-      id: "plan-svg",
-    });
-    const g = el("g", { id: "plan-root" });
+  function panelAxisEnds(wall, flip) {
+    // left/right labels in display space
+    if (wall === "north" || wall === "south") {
+      return flip ? ["V", "Z"] : ["Z", "V"];
+    }
+    return flip ? ["J", "S"] : ["S", "J"];
+  }
 
-    // stěna (výplň)
+  function drawOneElevPanel(parent, panel, roomH) {
+    const wall = panel.wall;
+    const meta = elevWallMeta(wall);
+    const g = el("g", {
+      transform: `translate(${panel.x0},0)`,
+      "data-elev-wall": wall,
+    });
+
     g.appendChild(el("rect", {
-      x: 0, y: 0, width: meta.len, height: roomH,
+      x: 0, y: 0, width: panel.len, height: roomH,
       fill: "#f4f6f7", stroke: "#111111", "stroke-width": 2,
     }));
-    // podlaha / strop
     g.appendChild(el("line", {
-      x1: 0, y1: roomH, x2: meta.len, y2: roomH,
+      x1: 0, y1: roomH, x2: panel.len, y2: roomH,
       stroke: "#111111", "stroke-width": 2.5,
     }));
     g.appendChild(el("line", {
-      x1: 0, y1: 0, x2: meta.len, y2: 0,
+      x1: 0, y1: 0, x2: panel.len, y2: 0,
       stroke: "#111111", "stroke-width": 1.5,
     }));
 
     const doorOpen = Math.min(state.doorOpeningH, roomH);
     const doorLeaf = Math.min(state.doorLeafH, doorOpen);
-    let dimSill = state.windowSillH;
-    let dimHead = state.windowSillH + WIN_OPEN_H;
+
+    const mapX = (along) => (panel.flip ? panel.len - along : along);
 
     for (const span of elevOpeningSpans(meta.segs)) {
-      const w = span.b - span.a;
+      const a = mapX(span.a);
+      const b = mapX(span.b);
+      const x = Math.min(a, b);
+      const w = Math.abs(b - a);
       if (span.t === "win") {
         const band = elevWindowBand(span);
         const sill = Math.min(band.sill, roomH - 10);
         const winHead = Math.min(band.head, roomH);
         const h = Math.max(4, winHead - sill);
         const y = yFromFloor(winHead, roomH);
-        if (!span.kitchen) {
-          dimSill = sill;
-          dimHead = winHead;
-        }
         g.appendChild(el("rect", {
-          x: span.a, y, width: w, height: h,
+          x, y, width: w, height: h,
           fill: "rgba(0,168,255,0.12)", stroke: "#00a8ff", "stroke-width": 2,
         }));
         g.appendChild(el("line", {
-          x1: span.a + w / 2, y1: y, x2: span.a + w / 2, y2: y + h,
+          x1: x + w / 2, y1: y, x2: x + w / 2, y2: y + h,
           stroke: "#00a8ff", "stroke-width": 1,
         }));
         g.appendChild(el("line", {
-          x1: span.a, y1: y + h / 2, x2: span.b, y2: y + h / 2,
+          x1: x, y1: y + h / 2, x2: x + w, y2: y + h / 2,
           stroke: "#00a8ff", "stroke-width": 1,
         }));
-        if (span.kitchen) {
-          const lab = el("text", {
-            x: span.a + w / 2, y: y + h / 2 + 3,
-            fill: "#1a5276", "font-size": 8, "font-family": PLAN_FONT,
-            "text-anchor": "middle", "pointer-events": "none",
-          });
-          lab.textContent = `${WIN_KITCHEN_OPEN_H}`;
-          g.appendChild(lab);
-        }
       } else {
         const yOpen = yFromFloor(doorOpen, roomH);
         g.appendChild(el("rect", {
-          x: span.a, y: yOpen, width: w, height: doorOpen,
+          x, y: yOpen, width: w, height: doorOpen,
           fill: "rgba(225,177,44,0.18)", stroke: "#d35400", "stroke-width": 2,
         }));
         const yLeaf = yFromFloor(doorLeaf, roomH);
         g.appendChild(el("rect", {
-          x: span.a + 3, y: yLeaf, width: Math.max(4, w - 6), height: doorLeaf,
+          x: x + 3, y: yLeaf, width: Math.max(4, w - 6), height: doorLeaf,
           fill: "none", stroke: "#e1b12c", "stroke-width": 1.5, "stroke-dasharray": "5,3",
         }));
       }
     }
 
     for (const hit of elevPartitionHits(wall)) {
+      const hx = mapX(hit.x);
       g.appendChild(el("line", {
-        x1: hit.x, y1: 0, x2: hit.x, y2: roomH,
+        x1: hx, y1: 0, x2: hx, y2: roomH,
         stroke: "#2c3e50", "stroke-width": 2, "stroke-dasharray": "6,4",
       }));
       const t = el("text", {
-        x: hit.x + 3, y: 14,
+        x: hx + 3, y: 14,
         fill: "#2c3e50", "font-size": 8, "font-family": PLAN_FONT,
       });
       t.textContent = hit.label;
       g.appendChild(t);
     }
 
-    // titul + osa
     const title = el("text", {
-      x: meta.len / 2, y: -18,
-      fill: "#1f4e6b", "font-size": 12, "font-family": PLAN_FONT,
+      x: panel.len / 2, y: -10,
+      fill: "#1f4e6b", "font-size": 11, "font-family": PLAN_FONT,
       "text-anchor": "middle",
     });
-    title.textContent = `${meta.title} · ${meta.axis} · světlá výška ${roomH} cm`;
+    const flipNote = panel.flip ? " · otočeno" : "";
+    title.textContent = `${ELEV_WALL_LABELS[wall]}${flipNote}`;
     g.appendChild(title);
 
     if (state.showDims) {
-      dimH(g, 0, meta.len, roomH + 16, `${round1(meta.len)}`, "#c0392b");
-      dimV(g, 0, roomH, -14, `${roomH}`, "#c0392b");
-      dimV(g, yFromFloor(dimSill, roomH), roomH, meta.len + 14, `${Math.round(dimSill)}`, "#7f8c8d");
-      dimV(g, yFromFloor(dimHead, roomH), yFromFloor(dimSill, roomH), meta.len + 28, `${Math.round(dimHead - dimSill)}`, "#00a8ff");
-      const doorSpan = elevOpeningSpans(meta.segs).find((s) => s.t === "door");
-      if (doorSpan) {
-        dimV(g, yFromFloor(doorOpen, roomH), roomH, doorSpan.a - 12, `${doorOpen}`, "#d35400");
+      dimH(g, 0, panel.len, roomH + 14, `${round1(panel.len)}`, "#c0392b");
+    }
+
+    const [labL, labR] = panelAxisEnds(wall, panel.flip);
+    const tL = el("text", {
+      x: 0, y: roomH + 28, fill: "#7f8c8d", "font-size": 9, "font-family": PLAN_FONT,
+    });
+    tL.textContent = labL;
+    g.appendChild(tL);
+    const tR = el("text", {
+      x: panel.len, y: roomH + 28, fill: "#7f8c8d", "font-size": 9, "font-family": PLAN_FONT,
+      "text-anchor": "end",
+    });
+    tR.textContent = labR;
+    g.appendChild(tR);
+
+    // body na této stěně (lokální souřadnice)
+    if (state.showElectro) {
+      const editable = state.tab === "electro" && state.elecStep === "elev";
+      for (const pt of state.elecPoints) {
+        if (!kindVisible(pointKind(pt))) continue;
+        const on = elecPointOnWall(pt, wall);
+        if (!on) continue;
+        const color = ELEC_COLORS[pt.type] || "#2980b9";
+        const sel = state.elecSelectedKind === "point" && pt.id === state.elecSelectedId;
+        const cx = mapX(on.along);
+        const cy = yFromFloor(on.h, roomH);
+        g.appendChild(el("circle", {
+          class: "elec-point",
+          "data-elec": pt.id,
+          "data-elec-kind": "point",
+          "data-elev-wall": wall,
+          cx, cy, r: sel ? 7 : 5.5,
+          fill: color, stroke: sel ? "#111" : "#fff", "stroke-width": sel ? 2 : 1.2,
+          "pointer-events": editable ? "all" : "none",
+        }));
+        const label = el("text", {
+          x: cx + 8, y: cy - 6,
+          fill: color, "font-size": 8, "font-family": PLAN_FONT,
+          "pointer-events": "none",
+        });
+        label.textContent = `${ELEC_LABELS[pt.type]} · ${Math.round(pt.h)}`;
+        g.appendChild(label);
       }
     }
 
-    // popisky rohů osy
-    const labL = el("text", {
-      x: 0, y: roomH + 30, fill: "#7f8c8d", "font-size": 9, "font-family": PLAN_FONT,
-    });
-    labL.textContent = wall === "west" || wall === "east" ? "S" : "Z";
-    g.appendChild(labL);
-    const labR = el("text", {
-      x: meta.len, y: roomH + 30, fill: "#7f8c8d", "font-size": 9, "font-family": PLAN_FONT,
-      "text-anchor": "end",
-    });
-    labR.textContent = wall === "west" || wall === "east" ? "J" : "V";
-    g.appendChild(labR);
+    parent.appendChild(g);
+  }
 
-    drawElectroOnElevation(g, wall, roomH);
+  function renderElevationView() {
+    const { panels, totalW, roomH } = elevStripLayout();
+    const pad = 36;
+    const svg = el("svg", {
+      viewBox: `${-pad} ${-pad} ${Math.max(totalW, 40) + pad * 2} ${roomH + pad * 2 + 10}`,
+      id: "plan-svg",
+    });
+    const g = el("g", { id: "plan-root" });
+
+    const banner = el("text", {
+      x: totalW / 2, y: -22,
+      fill: "#1f4e6b", "font-size": 12, "font-family": PLAN_FONT,
+      "text-anchor": "middle",
+    });
+    banner.textContent = panels.length > 1
+      ? `Rozvinutý pás · ${panels.map((p) => ELEV_WALL_LABELS[p.wall]).join(" → ")} · výška ${roomH} cm`
+      : `${elevWallMeta(panels[0]?.wall || "north").title} · světlá výška ${roomH} cm`;
+    g.appendChild(banner);
+
+    dimV(g, 0, roomH, -14, `${roomH}`, "#c0392b");
+
+    for (let i = 0; i < panels.length; i++) {
+      const panel = panels[i];
+      drawOneElevPanel(g, panel, roomH);
+      if (panel.cornerAfter) {
+        const cx = panel.x1 + ELEV_CORNER_GAP / 2;
+        g.appendChild(el("line", {
+          x1: cx, y1: -4, x2: cx, y2: roomH + 4,
+          stroke: "#c0392b", "stroke-width": 3,
+        }));
+        g.appendChild(el("rect", {
+          x: cx - 14, y: roomH / 2 - 12, width: 28, height: 18,
+          fill: "#c0392b", rx: 3,
+        }));
+        const ct = el("text", {
+          x: cx, y: roomH / 2 + 1,
+          fill: "#fff", "font-size": 9, "font-family": PLAN_FONT,
+          "text-anchor": "middle", "font-weight": "700",
+        });
+        ct.textContent = panel.cornerAfter;
+        g.appendChild(ct);
+        // spojovací „roh“ podlahy
+        g.appendChild(el("line", {
+          x1: panel.x1, y1: roomH, x2: panels[i + 1].x0, y2: roomH,
+          stroke: "#c0392b", "stroke-width": 2, "stroke-dasharray": "3,2",
+        }));
+      }
+    }
+
+    drawElectroOnElevationStrip(g, panels, roomH);
 
     svg.appendChild(g);
     if (state.tab === "electro" && state.elecStep === "elev" && state.elecMode === "run") {
@@ -2230,17 +2465,20 @@
     const ul = document.getElementById("elec-elev-list");
     if (!ul) return;
     ul.innerHTML = "";
+    const walls = normalizeElevWalls(state.elevWalls);
     state.elecElevRuns
-      .filter((r) => r.wall === state.elevWall)
-      .forEach((run, idx) => {
+      .filter((r) => runTouchesWalls(r, walls))
+      .forEach((run) => {
         const circ = findElecCircuit(run.circuitId);
         if (circ && !kindVisible(circ.kind)) return;
+        const pts = runPointsNorm(run);
+        const wallSet = [...new Set(pts.map((p) => ELEV_WALL_LABELS[p.wall] || p.wall))];
         const li = document.createElement("li");
         if (state.elecSelectedKind === "elev-run" && run.id === state.elecSelectedId) li.classList.add("selected");
         const row = document.createElement("div");
         row.className = "elec-row";
         const lab = document.createElement("span");
-        lab.textContent = `${CABLE_LABELS[run.cableType] || run.cableType} · ${circ ? circ.name : "?"} · ${run.points.length}b`;
+        lab.textContent = `${CABLE_LABELS[run.cableType] || run.cableType} · ${circ ? circ.name : "?"} · ${wallSet.join("+")} · ${pts.length}b`;
         const del = document.createElement("button");
         del.type = "button";
         del.className = "btn";
@@ -2262,21 +2500,27 @@
       });
   }
 
-  function drawElectroOnElevation(g, wall, roomH) {
+  function drawElectroOnElevationStrip(g, panels, roomH) {
     if (!state.showElectro) return;
     const editable = state.tab === "electro" && state.elecStep === "elev";
+    const wallSet = new Set(panels.map((p) => p.wall));
+
+    const toStrip = (pt) => {
+      const panel = panels.find((p) => p.wall === pt.wall);
+      if (!panel) return null;
+      return { x: alongToStripX(panel, pt.along), y: yFromFloor(pt.h, roomH) };
+    };
 
     for (const run of state.elecElevRuns) {
-      if (run.wall !== wall) continue;
       const circ = findElecCircuit(run.circuitId);
       if (circ && !kindVisible(circ.kind)) continue;
+      const pts = runPointsNorm(run).filter((p) => wallSet.has(p.wall));
+      if (pts.length < 2) continue;
+      const mapped = pts.map(toStrip).filter(Boolean);
+      if (mapped.length < 2) continue;
       const sel = state.elecSelectedKind === "elev-run" && run.id === state.elecSelectedId;
       const color = CABLE_COLORS[run.cableType] || "#e67e22";
-      const pts = run.points.map((p) => ({
-        x: p.along,
-        y: yFromFloor(p.h, roomH),
-      }));
-      const d = pts.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" ");
+      const d = mapped.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" ");
       g.appendChild(el("path", {
         class: "elec-run",
         "data-elec": run.id,
@@ -2287,67 +2531,43 @@
         "stroke-dasharray": run.cableType === "slaboproud" ? "2,2" : "5,3",
         "pointer-events": editable ? "stroke" : "none",
       }));
-      if (pts.length >= 2) {
-        const mid = pts[Math.floor(pts.length / 2)];
-        const t = el("text", {
-          x: mid.x + 4, y: mid.y - 4,
-          fill: color, "font-size": 7.5, "font-family": PLAN_FONT,
-          "pointer-events": "none",
-        });
-        const circName = circ ? circ.name : "";
-        t.textContent = `${CABLE_LABELS[run.cableType]}${circName ? ` · ${circName}` : ""}`;
-        g.appendChild(t);
-      }
+      const mid = mapped[Math.floor(mapped.length / 2)];
+      const t = el("text", {
+        x: mid.x + 4, y: mid.y - 4,
+        fill: color, "font-size": 7.5, "font-family": PLAN_FONT,
+        "pointer-events": "none",
+      });
+      const circName = circ ? circ.name : "";
+      t.textContent = `${CABLE_LABELS[run.cableType]}${circName ? ` · ${circName}` : ""}`;
+      g.appendChild(t);
     }
 
-    // draft + rubber-band preview
     if (state.elecRunDraft && state.elecStep === "elev" && state.elecRunDraft.length) {
       const color = CABLE_COLORS[state.elecCableType] || "#e67e22";
       const draftPts = [...state.elecRunDraft];
       if (state.elecCursor) draftPts.push(state.elecCursor);
-      const d = draftPts.map((p, i) => {
-        const y = yFromFloor(p.h, roomH);
-        return `${i ? "L" : "M"}${p.along},${y}`;
-      }).join(" ");
-      g.appendChild(el("path", {
-        d, fill: "none", stroke: color, "stroke-width": 1.1, "stroke-dasharray": "3,2",
-        "pointer-events": "none",
-      }));
-      const last = state.elecRunDraft[state.elecRunDraft.length - 1];
-      const tip = state.elecCursor || last;
-      const ht = el("text", {
-        x: tip.along + 6, y: yFromFloor(tip.h, roomH) - 6,
-        fill: color, "font-size": 8, "font-family": PLAN_FONT,
-        "pointer-events": "none",
-      });
-      const sameH = state.elecRunDraft.length && Math.abs(tip.h - last.h) < 0.5;
-      ht.textContent = `h=${Math.round(tip.h)} cm${sameH ? " · vodorovně" : ""}`;
-      g.appendChild(ht);
-    }
-
-    for (const pt of state.elecPoints) {
-      if (!kindVisible(pointKind(pt))) continue;
-      const on = elecPointOnWall(pt, wall);
-      if (!on) continue;
-      const color = ELEC_COLORS[pt.type] || "#2980b9";
-      const sel = state.elecSelectedKind === "point" && pt.id === state.elecSelectedId;
-      const cx = on.along;
-      const cy = yFromFloor(on.h, roomH);
-      g.appendChild(el("circle", {
-        class: "elec-point",
-        "data-elec": pt.id,
-        "data-elec-kind": "point",
-        cx, cy, r: sel ? 7 : 5.5,
-        fill: color, stroke: sel ? "#111" : "#fff", "stroke-width": sel ? 2 : 1.2,
-        "pointer-events": editable ? "all" : "none",
-      }));
-      const label = el("text", {
-        x: cx + 8, y: cy - 6,
-        fill: color, "font-size": 8, "font-family": PLAN_FONT,
-        "pointer-events": "none",
-      });
-      label.textContent = `${ELEC_LABELS[pt.type]} · ${Math.round(pt.h)}`;
-      g.appendChild(label);
+      const mapped = draftPts.map(toStrip).filter(Boolean);
+      if (mapped.length) {
+        const d = mapped.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" ");
+        g.appendChild(el("path", {
+          d, fill: "none", stroke: color, "stroke-width": 1.1, "stroke-dasharray": "3,2",
+          "pointer-events": "none",
+        }));
+        const last = state.elecRunDraft[state.elecRunDraft.length - 1];
+        const tip = state.elecCursor || last;
+        const tipXY = toStrip(tip);
+        if (tipXY) {
+          const ht = el("text", {
+            x: tipXY.x + 6, y: tipXY.y - 6,
+            fill: color, "font-size": 8, "font-family": PLAN_FONT,
+            "pointer-events": "none",
+          });
+          const sameH = Math.abs(tip.h - last.h) < 0.5;
+          const wallBit = tip.wall ? ` · ${ELEV_WALL_LABELS[tip.wall]}` : "";
+          ht.textContent = `h=${Math.round(tip.h)} cm${sameH ? " · vodorovně" : ""}${wallBit}`;
+          g.appendChild(ht);
+        }
+      }
     }
   }
 
@@ -2472,8 +2692,22 @@
     wrap.innerHTML = "";
     const showElev = state.tab === "electro" && state.elecStep === "elev";
     wrap.appendChild(showElev ? renderElevationView() : renderCabinView());
-    updateStatus();
-    if (state.tab === "cabin") syncSideHints();
+    const showCabinMeta = state.tab === "cabin";
+    const legend = document.getElementById("legend");
+    const statusEl = document.getElementById("status");
+    if (legend) {
+      legend.hidden = !showCabinMeta;
+      if (showCabinMeta) {
+        legend.innerHTML =
+          `Světlost: <strong>${CLEAR.w} × ${CLEAR.h} cm</strong> (od SDK)<br>` +
+          `Obvod: <strong>${String(WALL_REAL).replace(".", ",")} cm</strong> (v půdorysu zjednodušeně) · SDK: <strong>12,5 cm</strong>`;
+      }
+    }
+    if (statusEl) statusEl.hidden = !showCabinMeta;
+    if (showCabinMeta) {
+      updateStatus();
+      syncSideHints();
+    }
     renderFurnList();
     renderElecList();
     renderElecElevList();
@@ -2488,25 +2722,12 @@
       cabin: ["Půdorys", "Táhni příčky · sekce vpravo rozbal dle potřeby"],
       furniture: ["Nábytek", "Vrstvy obdélníků ve světlosti · kolize = červená"],
       electro: state.elecStep === "elev"
-        ? ["Elektro · pohledy", "Body u stěny · trasy kabelů (Slaboproud / CYKY)"]
-        : ["Elektro · půdorys", "Body ve složkách okruhů · + Bod = jeden kus"],
+        ? ["Elektro · pohledy", "Rozvinutý pás stěn · trasy přes rohy"]
+        : ["Elektro · půdorys", "Okruhy (složky) · body · pak pohledy"],
     };
     const [t, sub] = titles[state.tab] || titles.cabin;
     document.getElementById("side-title").textContent = t;
     document.getElementById("side-sub").textContent = sub;
-    const legend = document.getElementById("legend");
-    if (legend) {
-      if (showElev) {
-        const m = elevWallMeta(state.elevWall);
-        legend.innerHTML =
-          `${m.title}<br>` +
-          `Body z půdorysu u stěny (≤${ELEC_WALL_PROX} cm) · filtr okruhů · trasy: Slaboproud / CYKY 1,5 / 2,5`;
-      } else {
-        legend.innerHTML =
-          `Světlost: <strong>${CLEAR.w} × ${CLEAR.h} cm</strong> (od SDK)<br>` +
-          `Obvod: <strong>${String(WALL_REAL).replace(".", ",")} cm</strong> (v půdorysu zjednodušeně) · SDK: <strong>12,5 cm</strong>`;
-      }
-    }
     const modeHint = document.getElementById("furn-mode-hint");
     if (modeHint) {
       if (state.furnMode === "draw") modeHint.textContent = "Táhni obdélník na půdorysu…";
@@ -2539,12 +2760,14 @@
       if (!act) elevHint.textContent = "Vyber aktivní okruh na kroku 1.";
       else if (state.elecMode === "run") {
         const n = state.elecRunDraft?.length || 0;
-        const ch = state.elecCursor ? ` · kurzor h=${Math.round(state.elecCursor.h)}` : "";
+        const cw = state.elecCursor
+          ? ` · ${ELEV_WALL_LABELS[state.elecCursor.wall] || "?"} h=${Math.round(state.elecCursor.h)}`
+          : "";
         elevHint.textContent = n
-          ? `${CABLE_LABELS[state.elecCableType]}: ${n} bodů${ch} · ortho ${state.elecOrtho ? "zap" : "vyp"} · Ukončit / dvojklik`
+          ? `${CABLE_LABELS[state.elecCableType]}: ${n} bodů${cw} · ortho ${state.elecOrtho ? "zap" : "vyp"} · Ukončit / dvojklik`
           : `První bod trasy (${CABLE_LABELS[state.elecCableType]}, okruh ${act.name})…`;
       } else {
-        elevHint.textContent = "+ Trasa v aktivním okruhu · náhled k kurzoru · pravé úhly.";
+        elevHint.textContent = "+ Trasa · přes roh jedním tahem · zapni Sever+Východ…";
       }
     }
     const elecHLab = document.getElementById("elec-h-val");
@@ -2565,8 +2788,10 @@
     document.querySelectorAll("#elec-cable button").forEach((b) => {
       b.classList.toggle("active", b.dataset.v === state.elecCableType);
     });
-    document.querySelectorAll("#elev-wall button").forEach((b) => {
-      b.classList.toggle("active", b.dataset.v === state.elevWall);
+    const elevWalls = normalizeElevWalls(state.elevWalls);
+    state.elevWalls = elevWalls;
+    document.querySelectorAll("#elev-wall input[data-wall]").forEach((cb) => {
+      cb.checked = elevWalls.includes(cb.dataset.wall);
     });
     const orthoCb = document.getElementById("elec-ortho");
     if (orthoCb) orthoCb.checked = !!state.elecOrtho;
@@ -2637,7 +2862,9 @@
     if (d.type === "elec-elev-move") {
       const pt = findElecPoint(d.elecId);
       if (pt) {
-        applyElevToPlanPoint(pt, d.wall, d.origAlong + dx, d.origH - dy);
+        const panel = elevStripLayout().panels.find((p) => p.wall === d.wall);
+        const dAlong = panel?.flip ? -dx : dx;
+        applyElevToPlanPoint(pt, d.wall, d.origAlong + dAlong, d.origH - dy);
       }
       render();
       return;
@@ -2769,13 +2996,14 @@
           state.elecSelectedKind = kind;
           if (kind === "point") {
             const pt = findElecPoint(id);
-            const on = pt && elecPointOnWall(pt, state.elevWall);
-            if (pt && on) {
+            const wall = elecEl.getAttribute("data-elev-wall") || elevHit(p.x, p.y)?.wall;
+            const on = pt && wall && elecPointOnWall(pt, wall);
+            if (pt && on && wall) {
               if (pt.circuitId) state.elecActiveCircuitId = pt.circuitId;
               state.drag = {
                 type: "elec-elev-move",
                 elecId: id,
-                wall: state.elevWall,
+                wall,
                 start: p,
                 origAlong: on.along,
                 origH: on.h,
@@ -2793,16 +3021,17 @@
             render();
             return;
           }
-          let along = Math.min(elevWallMeta(state.elevWall).len, Math.max(0, p.x));
-          let h = Math.min(state.roomClearH, Math.max(0, state.roomClearH - p.y));
+          const hit = elevHit(p.x, p.y);
+          if (!hit) return;
+          let { wall, along, h } = hit;
           if (!state.elecRunDraft) state.elecRunDraft = [];
           const prev = state.elecRunDraft[state.elecRunDraft.length - 1];
-          ({ along, h } = orthoSnapElev(prev, along, h));
+          ({ along, h } = orthoSnapElev(prev, wall, along, h));
           if (evt.detail >= 2 && state.elecRunDraft.length >= 1) {
-            state.elecRunDraft.push({ along, h });
+            state.elecRunDraft.push({ wall, along, h });
             finishElecRunDraft();
           } else {
-            state.elecRunDraft.push({ along, h });
+            state.elecRunDraft.push({ wall, along, h });
           }
           state.elecCursor = null;
           evt.preventDefault();
@@ -2863,16 +3092,18 @@
       return;
     }
     if (state.tab === "electro" && state.elecStep === "elev" && state.elecMode === "run") {
-      let along = Math.min(elevWallMeta(state.elevWall).len, Math.max(0, p.x));
-      let h = Math.min(state.roomClearH, Math.max(0, state.roomClearH - p.y));
-      const prev = state.elecRunDraft?.[state.elecRunDraft.length - 1];
-      ({ along, h } = orthoSnapElev(prev, along, h));
-      state.elecCursor = { along, h };
-      if (!hoverRaf) {
-        hoverRaf = requestAnimationFrame(() => {
-          hoverRaf = 0;
-          render();
-        });
+      const hit = elevHit(p.x, p.y);
+      if (hit) {
+        let { wall, along, h } = hit;
+        const prev = state.elecRunDraft?.[state.elecRunDraft.length - 1];
+        ({ along, h } = orthoSnapElev(prev, wall, along, h));
+        state.elecCursor = { wall, along, h };
+        if (!hoverRaf) {
+          hoverRaf = requestAnimationFrame(() => {
+            hoverRaf = 0;
+            render();
+          });
+        }
       }
       return;
     }
@@ -2889,10 +3120,16 @@
   });
 
   wrapEl.addEventListener("mouseleave", () => {
+    let dirty = false;
     if (!state.drag && state.hoverCm) {
       state.hoverCm = null;
-      render();
+      dirty = true;
     }
+    if (state.elecCursor) {
+      state.elecCursor = null;
+      dirty = true;
+    }
+    if (dirty) render();
   });
 
   window.addEventListener("mouseup", () => {
@@ -3071,7 +3308,22 @@
   bindRange("sill-h", "windowSillH", "sill-h-val");
   bindRange("door-open-h", "doorOpeningH", "door-open-h-val");
   bindRange("door-leaf-h", "doorLeafH", "door-leaf-h-val");
-  bindSeg("elev-wall", "elevWall");
+  document.getElementById("elev-wall")?.addEventListener("change", (e) => {
+    const inp = e.target.closest("input[data-wall]");
+    if (!inp) return;
+    const wall = inp.dataset.wall;
+    const set = new Set(normalizeElevWalls(state.elevWalls));
+    if (inp.checked) set.add(wall);
+    else set.delete(wall);
+    if (!set.size) {
+      set.add(wall);
+      inp.checked = true;
+    }
+    state.elevWalls = normalizeElevWalls([...set]);
+    state.elecRunDraft = null;
+    state.elecCursor = null;
+    render();
+  });
   bindSeg("elec-step", "elecStep", (v) => v, () => {
     state.elecMode = null;
     state.elecRunDraft = null;
@@ -3244,14 +3496,18 @@
         name: r.name || "",
         points: r.points.map((p) => ({ x: p.x, y: p.y })),
       })),
-      elecElevRuns: state.elecElevRuns.map((r) => ({
-        id: r.id,
-        wall: r.wall,
-        cableType: r.cableType,
-        circuitId: r.circuitId,
-        name: r.name || "",
-        points: r.points.map((p) => ({ along: p.along, h: p.h })),
-      })),
+      elevWalls: normalizeElevWalls(state.elevWalls),
+      elecElevRuns: state.elecElevRuns.map((r) => {
+        const pts = runPointsNorm(r);
+        return {
+          id: r.id,
+          wall: pts[0]?.wall || r.wall || "north",
+          cableType: r.cableType,
+          circuitId: r.circuitId,
+          name: r.name || "",
+          points: pts.map((p) => ({ wall: p.wall, along: p.along, h: p.h })),
+        };
+      }),
       elecFilter: { ...state.elecFilter },
       appVersion: APP_VERSION,
       appBuild: APP_BUILD,
@@ -3354,15 +3610,21 @@
         const legacyKind = ELEC_KINDS.includes(r.circuit) ? r.circuit : (cableToKind[cable] || "sockets");
         circuitId = ensureKindCircuit(circuits, kindMap, legacyKind);
       }
+      const fallbackWall = ELEV_WALL_ORDER.includes(r.wall) ? r.wall : "north";
+      const points = Array.isArray(r.points)
+        ? r.points.map((p) => ({
+          wall: ELEV_WALL_ORDER.includes(p.wall) ? p.wall : fallbackWall,
+          along: Number(p.along) || 0,
+          h: Number(p.h) || 0,
+        }))
+        : [];
       return {
         id: typeof r.id === "string" ? r.id : newElecId("er"),
-        wall: ["north", "south", "west", "east"].includes(r.wall) ? r.wall : "north",
+        wall: points[0]?.wall || fallbackWall,
         cableType: cable,
         circuitId,
         name: (r.name && String(r.name).trim()) || "",
-        points: Array.isArray(r.points)
-          ? r.points.map((p) => ({ along: Number(p.along) || 0, h: Number(p.h) || 0 }))
-          : [],
+        points,
       };
     }).filter((r) => r.points.length >= 2);
   }
@@ -3421,7 +3683,8 @@
     if (state.windowSillH == null) state.windowSillH = 90;
     if (state.doorOpeningH == null) state.doorOpeningH = 200;
     if (state.doorLeafH == null) state.doorLeafH = 190;
-    if (!state.elevWall) state.elevWall = "north";
+    state.elevWalls = normalizeElevWalls(state.elevWalls, data.elevWall || state.elevWall);
+    delete state.elevWall;
     syncSlidersFromState();
     if (state.showFurniture == null) state.showFurniture = true;
     if (state.showElectro == null) state.showElectro = true;
@@ -3441,7 +3704,6 @@
       ["bed-variant", "bedVariant"], ["tv-variant", "tvVariant"],
       ["door-width", "doorWidth"], ["door-type", "doorType"], ["pocket-dir", "pocketDir"],
       ["shower-preset", "showerPreset"], ["shower-full-depth", "showerFullDepth"],
-      ["elev-wall", "elevWall"],
     ]) {
       const root = document.getElementById(id);
       if (!root) continue;
@@ -3503,6 +3765,20 @@
     saveVariants(list.slice(0, 30));
     document.getElementById("variant-name").value = "";
     renderVariants();
+  });
+
+  document.getElementById("btn-export-json").addEventListener("click", () => {
+    const payload = {
+      v: 1,
+      app: "chata-kamyk-planner",
+      data: snapshot(),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `chata-kamyk-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   });
 
   // Export SVG (grafika + JSON stav pro import na jiném PC)
