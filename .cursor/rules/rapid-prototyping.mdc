@@ -8,17 +8,16 @@ alwaysApply: true
 After completing user-requested code/docs changes in this repo:
 
 1. **Commit** immediately (concise message, why-focused).
-2. **Stamp build** into `koupelna/index.html` via `scripts/stamp-build.sh` (sets `APP_BUILD` = commit count, `APP_COMMIT` = short SHA). Then **amend** that stamp into the commit you just made (`git commit --amend --no-edit`) — only when the commit is yours, not pushed yet.
+2. Run `./scripts/stamp-build.sh` and make a tiny follow-up commit if `APP_BUILD` changed (build = `git rev-list --count HEAD`). Do **not** amend just to stamp — `APP_COMMIT` is injected at deploy time.
 3. **Push** to `origin` (`main` unless told otherwise).
-4. **Deploy** with `scripts/deploy.sh` (Cloudflare Pages project `chata-kamyk`).
+4. **Deploy** with `./scripts/deploy.sh` (stamps version/build/commit into the upload copy).
 
-UI shows `v{APP_VERSION} · build {APP_BUILD}` in the planner toolbar (`#app-meta`). Bump `APP_VERSION` in the `BUILD_META` block when shipping a meaningful feature cut.
+Toolbar `#app-meta` shows `v{APP_VERSION} · build {APP_BUILD} · {APP_COMMIT}`. Bump `APP_VERSION` in the `BUILD_META` block when shipping a meaningful feature cut.
 
 Deploy notes:
 
-- `scripts/deploy.sh` excludes `.tools/`, `.git/`, `.wrangler/`, `docs/`, `.cursor/`.
+- `scripts/deploy.sh` excludes `.tools/`, `.git/`, `.wrangler/`, `docs/`, `.cursor/`, `scripts/`.
 - Use ambient `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` when set.
-- TLS workaround is inside `deploy.sh` (`NODE_TLS_REJECT_UNAUTHORIZED=0`).
 - Return the live URL (`https://chata-kamyk.pages.dev/…`) when done.
 
 Do not ask “chceš commit/deploy?” — just do it unless the user explicitly says not to.
