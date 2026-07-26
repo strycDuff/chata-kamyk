@@ -922,8 +922,8 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.9.0";
-  const APP_BUILD = 41;
+  const APP_VERSION = "3.9.1";
+  const APP_BUILD = 42;
   const APP_COMMIT = "";
   // BUILD_META_END
 
@@ -1035,6 +1035,10 @@
   const KIND_TO_POINT = { data: "panel", lights: "switch", sockets: "socket" };
   const DEFAULT_ELEC_ROOMS = ["Ložnice", "Chodba", "Kuchyně", "Obývak", "Venek"];
   const DEFAULT_ELEC_KINDS = ["lights", "sockets", "data"];
+  /** Výchozí rozvaděč (clear cm) — z naměřené polohy, lze přesunout. */
+  const DEFAULT_PANEL = { x: 548, y: 2, h: 150, name: "Rozvaděč" };
+  /** Body smí jít i mimo světlost (venkovní zásuvky / světla). */
+  const ELEC_OUT_PAD = 60;
   const ROOM_ICON = "🏠";
   const CABLE_TYPES = ["slaboproud", "cyky15", "cyky25"];
   const CABLE_LABELS = { slaboproud: "Slaboproud", cyky15: "CYKY 1,5", cyky25: "CYKY 2,5" };
@@ -1218,9 +1222,16 @@
   }
 
   function clampElecXY(pt) {
-    pt.x = Math.min(CLEAR.w, Math.max(0, pt.x));
-    pt.y = Math.min(CLEAR.h, Math.max(0, pt.y));
+    pt.x = Math.min(CLEAR.w + ELEC_OUT_PAD, Math.max(-ELEC_OUT_PAD, pt.x));
+    pt.y = Math.min(CLEAR.h + ELEC_OUT_PAD, Math.max(-ELEC_OUT_PAD, pt.y));
     return pt;
+  }
+
+  function planToElecClear(p) {
+    return clampElecXY({
+      x: p.x - INNER.x,
+      y: p.y - INNER.y,
+    });
   }
 
   function findElecPoint(id) {
@@ -1263,7 +1274,8 @@
     if (!circ) return;
     state.elecActiveCircuitId = circ.id;
     state.elecCableType = KIND_TO_CABLE[circ.kind];
-    state.elecType = KIND_TO_POINT[circ.kind];
+    const isPanel = circ.name === "Rozvaděč" || circ.room === "Rozvaděč";
+    state.elecType = isPanel ? "panel" : KIND_TO_POINT[circ.kind];
     state.elecH = ELEC_DEFAULT_H[state.elecType] ?? 30;
     if (state.elecType === "light") state.elecH = state.roomClearH;
   }
@@ -1283,7 +1295,7 @@
     return c;
   }
 
-  /** Prázdný stav → předpřipravené okruhy Světla/Zásuvky × místnosti. */
+  /** Prázdný stav → předpřipravené okruhy Světla/Zásuvky/Datové × místnosti. */
   function ensureDefaultElecCircuits() {
     if (state.elecCircuits.length) return false;
     for (const kind of DEFAULT_ELEC_KINDS) {
@@ -1293,6 +1305,29 @@
     }
     const first = state.elecCircuits[0];
     if (first) activateElecCircuit(first);
+    return true;
+  }
+
+  /** Jeden rozvaděč na půdorysu (default poloha), lze přesunout / smazat. */
+  function ensureDefaultPanel() {
+    if (state.elecPoints.some((p) => p.type === "panel")) return false;
+    let circ = state.elecCircuits.find((c) => c.name === "Rozvaděč" || c.room === "Rozvaděč");
+    if (!circ) {
+      circ = createElecCircuit({
+        kind: "sockets",
+        name: DEFAULT_PANEL.name,
+        room: DEFAULT_PANEL.name,
+        activate: false,
+      });
+    }
+    addElecPoint({
+      type: "panel",
+      x: DEFAULT_PANEL.x,
+      y: DEFAULT_PANEL.y,
+      h: DEFAULT_PANEL.h,
+      name: DEFAULT_PANEL.name,
+      circuitId: circ.id,
+    });
     return true;
   }
 
@@ -2928,7 +2963,8 @@
   }
 
   function renderCabinView() {
-    const pad = 36;
+    // větší pad u Elektro — body mohou být mimo světlost (venek)
+    const pad = state.tab === "electro" ? 72 : 36;
     const svg = el("svg", {
       viewBox: `${-pad} ${-pad} ${OUTER.w + pad * 2} ${OUTER.h + pad * 2}`,
       id: "plan-svg",
@@ -3108,8 +3144,11 @@
     const elecHint = document.getElementById("elec-mode-hint");
     if (elecHint) {
       if (!act) elecHint.textContent = "Bez aktivního okruhu nejde přidávat body.";
-      else if (state.elecMode === "point") elecHint.textContent = "Klikni jednou do půdorysu — bod do aktivního okruhu, pak dorovnej.";
-      else elecHint.textContent = `${state.elecCircuits.length} okruhů · ${state.elecPoints.length} bodů.`;
+      else if (state.elecMode === "point") {
+        elecHint.textContent = "Klikni do půdorysu (i mimo světlost = venek) — bod do aktivního okruhu, pak dorovnej.";
+      } else {
+        elecHint.textContent = `${state.elecCircuits.length} okruhů · ${state.elecPoints.length} bodů · venek ±${ELEC_OUT_PAD} cm.`;
+      }
     }
     const elevHint = document.getElementById("elec-elev-hint");
     if (elevHint) {
@@ -3325,8 +3364,7 @@
             render();
             return;
           }
-          const cx = Math.min(CLEAR.w, Math.max(0, p.x - INNER.x));
-          const cy = Math.min(CLEAR.h, Math.max(0, p.y - INNER.y));
+          const { x: cx, y: cy } = planToElecClear(p);
           const pt = addElecPoint({
             type: state.elecType,
             x: cx, y: cy, h: state.elecH,
@@ -4041,6 +4079,7 @@
     state.elecElevRuns = normalizeElecElevRuns(elecElevRuns, circuits);
     state.elecCircuits = circuits;
     ensureDefaultElecCircuits();
+    ensureDefaultPanel();
     if (!findElecCircuit(state.elecActiveCircuitId)) {
       const first = state.elecCircuits[0];
       if (first) activateElecCircuit(first);
@@ -4225,6 +4264,7 @@
   });
 
   ensureDefaultElecCircuits();
+  ensureDefaultPanel();
   syncSlidersFromState();
   renderVariants();
   render();
