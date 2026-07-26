@@ -278,42 +278,60 @@
     border-radius: 6px;
     background: #fff;
     padding: 4px 0;
-    max-height: min(58vh, 640px);
+    max-height: min(36vh, 360px);
     overflow: auto;
   }
-  .elec-tree .elec-points-tree {
-    list-style: none;
-    margin: 0 0 4px;
-    padding: 0 0 0 8px;
+  .elec-points-panel {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #f7fafc;
+    margin: 8px 0 4px;
+    padding: 8px 8px 6px;
   }
-  .elec-tree .elec-points-tree li {
+  .elec-points-panel > .head {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 6px;
-    margin: 0 0 2px;
-    border: 1px solid transparent;
+    font-size: 0.82rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .elec-points-panel > .head .muted {
+    font-weight: 500;
+    color: var(--muted);
+    font-size: 0.72rem;
+    margin-left: auto;
+  }
+  .elec-points-panel .elec-points-tree {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: min(28vh, 240px);
+    overflow: auto;
+  }
+  .elec-points-panel .elec-points-tree li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 6px;
+    margin: 0 0 3px;
+    border: 1px solid var(--line);
     border-radius: 4px;
     font-size: 0.78rem;
     cursor: pointer;
-    background: #fafbfc;
+    background: #fff;
   }
-  .elec-tree .elec-points-tree li:hover { background: #eef5f9; }
-  .elec-tree .elec-points-tree li.selected {
+  .elec-points-panel .elec-points-tree li:hover { background: #eef5f9; }
+  .elec-points-panel .elec-points-tree li.selected {
     border-color: var(--accent);
     background: #e8eef3;
   }
-  .elec-tree .elec-points-tree .pt-label { flex: 1; min-width: 0; }
-  .elec-tree .elec-points-tree .pt-h { color: var(--muted); white-space: nowrap; }
-  .elec-tree .elec-empty-pts {
-    font-size: 0.72rem;
+  .elec-points-panel .elec-points-tree .pt-label { flex: 1; min-width: 0; }
+  .elec-points-panel .elec-points-tree .pt-h { color: var(--muted); white-space: nowrap; }
+  .elec-points-panel .elec-empty-pts {
+    font-size: 0.75rem;
     color: var(--muted);
-    padding: 2px 8px 6px;
-  }
-  .elec-tree .elec-runs-meta {
-    font-size: 0.72rem;
-    color: var(--muted);
-    padding: 0 8px 6px;
+    padding: 4px 2px;
   }
   .elec-tree details.elec-branch {
     border: none;
@@ -842,6 +860,7 @@
             <button type="button" class="btn-elec-new-circuit" id="btn-elec-new-circuit" title="Nový okruh">＋ okruh</button>
           </div>
           <div id="elec-list" class="elec-tree"></div>
+          <div id="elec-points-panel" class="elec-points-panel" hidden></div>
 
           <div id="elec-plan-tools">
             <label>Typ bodu</label>
@@ -948,8 +967,8 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.9.2";
-  const APP_BUILD = 43;
+  const APP_VERSION = "3.9.3";
+  const APP_BUILD = 44;
   const APP_COMMIT = "";
   // BUILD_META_END
 
@@ -2661,15 +2680,34 @@
     return rooms.concat(rest);
   }
 
-  function appendElecPointRows(parent, circ) {
+  function renderElecActivePoints() {
+    const panel = document.getElementById("elec-points-panel");
+    if (!panel) return;
+    panel.innerHTML = "";
+    const circ = activeCircuit();
+    if (!circ) {
+      panel.hidden = true;
+      return;
+    }
+    panel.hidden = false;
     const pts = state.elecPoints.filter((p) => p.circuitId === circ.id);
+    const runs = state.elecElevRuns.filter((r) => r.circuitId === circ.id);
+    const head = document.createElement("div");
+    head.className = "head";
+    head.innerHTML =
+      `<span class="elec-ico" aria-hidden="true">${ELEC_KIND_ICONS[circ.kind]}</span>` +
+      `<span>Body · ${circuitRoomKey(circ)} / ${ELEC_KIND_LABELS[circ.kind]}</span>` +
+      `<span class="muted">${pts.length} bodů${runs.length ? ` · ${runs.length} tras` : ""}</span>`;
+    panel.appendChild(head);
+
     if (!pts.length) {
       const empty = document.createElement("div");
       empty.className = "elec-empty-pts";
-      empty.textContent = "zatím žádné body";
-      parent.appendChild(empty);
+      empty.textContent = "Zatím žádné body — přidej tlačítkem ＋ Bod.";
+      panel.appendChild(empty);
       return;
     }
+
     const ul = document.createElement("ul");
     ul.className = "elec-points-tree";
     pts.forEach((pt) => {
@@ -2698,17 +2736,16 @@
       });
       li.append(ico, lab, h, del);
       li.addEventListener("click", () => {
-        activateElecCircuit(circ);
         state.elecSelectedId = pt.id;
         state.elecSelectedKind = "point";
         render();
       });
       ul.appendChild(li);
     });
-    parent.appendChild(ul);
+    panel.appendChild(ul);
   }
 
-  function appendElecCircuitCard(parent, circ, { leafLabel, alwaysShowPoints = true } = {}) {
+  function appendElecCircuitCard(parent, circ, { leafLabel } = {}) {
     const pts = state.elecPoints.filter((p) => p.circuitId === circ.id);
     const runs = state.elecElevRuns.filter((r) => r.circuitId === circ.id);
     const isActive = circ.id === state.elecActiveCircuitId;
@@ -2718,10 +2755,12 @@
     const head = document.createElement("div");
     head.className = "elec-circ-head";
     const label = leafLabel || circ.name;
+    const metaBits = [`${pts.length}b`];
+    if (runs.length) metaBits.push(`${runs.length}t`);
     head.innerHTML =
       `<span class="elec-ico" aria-hidden="true">${ELEC_KIND_ICONS[circ.kind]}</span>` +
       `<span class="name">${label}</span>` +
-      `<span class="meta">${pts.length} bodů</span>`;
+      `<span class="meta">${isActive ? "● " : ""}${metaBits.join(" · ")}</span>`;
     head.title = `${ELEC_KIND_LABELS[circ.kind]} / ${circ.name} — kliknutím aktivovat`;
     head.addEventListener("click", () => {
       activateElecCircuit(circ);
@@ -2731,13 +2770,6 @@
 
     const actions = document.createElement("div");
     actions.className = "elec-circ-actions";
-    if (isActive) {
-      const badge = document.createElement("span");
-      badge.className = "meta";
-      badge.style.cssText = "align-self:center;color:var(--accent);font-weight:600;font-size:0.75rem";
-      badge.textContent = "● aktivní";
-      actions.appendChild(badge);
-    }
     const delC = document.createElement("button");
     delC.type = "button";
     delC.className = "btn";
@@ -2757,17 +2789,6 @@
     });
     actions.appendChild(delC);
     card.appendChild(actions);
-
-    if (runs.length) {
-      const rm = document.createElement("div");
-      rm.className = "elec-runs-meta";
-      rm.textContent = `${runs.length} trasa${runs.length === 1 ? "" : runs.length < 5 ? "y" : ""} v pohledech`;
-      card.appendChild(rm);
-    }
-
-    if (alwaysShowPoints || isActive) {
-      appendElecPointRows(card, circ);
-    }
 
     parent.appendChild(card);
   }
@@ -2810,7 +2831,6 @@
           .sort((a, b) => circuitRoomKey(a).localeCompare(circuitRoomKey(b), "cs"))
           .forEach((circ) => appendElecCircuitCard(body, circ, {
             leafLabel: circuitRoomKey(circ),
-            alwaysShowPoints: circ.id === state.elecActiveCircuitId,
           }));
         branch.appendChild(body);
         root.appendChild(branch);
@@ -2818,7 +2838,7 @@
       return;
     }
 
-    // I. místnost → typ okruhu → II. body
+    // I. místnost → typ okruhu (body jsou v odděleném panelu)
     for (const room of orderedElecRooms()) {
       const circuits = state.elecCircuits.filter((c) => circuitRoomKey(c) === room);
       if (!circuits.length) continue;
@@ -2839,7 +2859,6 @@
           .filter((c) => c.kind === kind)
           .forEach((circ) => appendElecCircuitCard(body, circ, {
             leafLabel: ELEC_KIND_LABELS[circ.kind],
-            alwaysShowPoints: true,
           }));
       }
       branch.appendChild(body);
@@ -3128,6 +3147,7 @@
     }
     renderFurnList();
     renderElecList();
+    renderElecActivePoints();
     renderElecElevList();
     document.getElementById("panel-cabin").hidden = state.tab !== "cabin";
     document.getElementById("panel-furniture").hidden = state.tab !== "furniture";
