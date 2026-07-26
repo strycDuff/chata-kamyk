@@ -499,10 +499,9 @@
           </div>
           <label>Světlá výška: <strong id="room-h-val">210</strong> cm</label>
           <input type="range" id="room-h" min="200" max="280" value="210" step="1">
-          <label>Parapet okna: <strong id="sill-h-val">90</strong> cm</label>
+          <label>Parapet běžného okna: <strong id="sill-h-val">90</strong> cm</label>
           <input type="range" id="sill-h" min="40" max="140" value="90" step="1">
-          <label>Nadpraží okna: <strong id="win-head-val">200</strong> cm</label>
-          <input type="range" id="win-head" min="150" max="280" value="200" step="1">
+          <p class="hint" id="win-h-hint">Otvor okna 83 cm · kuchyňské 62 cm (stejné nadpraží, parapet nad linkou)</p>
           <label>Otvor dveří (výška): <strong id="door-open-h-val">200</strong> cm</label>
           <input type="range" id="door-open-h" min="180" max="220" value="200" step="1">
           <label>Křídlo dveří (výška): <strong id="door-leaf-h-val">190</strong> cm</label>
@@ -536,7 +535,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.2.0";
+  const APP_VERSION = "3.2.1";
   const APP_BUILD = 28;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -582,8 +581,11 @@
   ];
   const SOUTH_SEGS = [
     { t: "wall", l: 204 }, { t: "door", l: 103 }, { t: "wall", l: 79 },
-    { t: "win", l: 87 }, { t: "wall", l: 434.5 },
+    { t: "win", l: 87, kitchen: true }, { t: "wall", l: 434.5 },
   ];
+  /** Výška stavebního otvoru okna (cm). Kuchyňské kratší, stejné nadpraží. */
+  const WIN_OPEN_H = 83;
+  const WIN_KITCHEN_OPEN_H = 62;
   const WEST_SEGS = [
     { t: "wall", l: 56 }, { t: "win", l: 83 }, { t: "wall", l: 50 },
     { t: "win", l: 83 }, { t: "wall", l: 61 },
@@ -674,7 +676,6 @@
     elevWall: "north", // north | south | west | east
     roomClearH: 210,
     windowSillH: 90,
-    windowHeadH: 200,
     doorOpeningH: 200,
     doorLeafH: 190,
   };
@@ -1553,10 +1554,21 @@
     let c = 0;
     const spans = [];
     for (const s of segs) {
-      if (s.t === "win" || s.t === "door") spans.push({ t: s.t, a: c, b: c + s.l });
+      if (s.t === "win" || s.t === "door") {
+        spans.push({ t: s.t, a: c, b: c + s.l, kitchen: !!s.kitchen });
+      }
       c += s.l;
     }
     return spans;
+  }
+
+  /** Vertikální pás okna: běžné 83 cm od parapetu; kuchyň 62 cm se stejným nadpražím. */
+  function elevWindowBand(span) {
+    const sill0 = state.windowSillH;
+    const head = sill0 + WIN_OPEN_H;
+    const openH = span.kitchen ? WIN_KITCHEN_OPEN_H : WIN_OPEN_H;
+    const sill = span.kitchen ? head - openH : sill0;
+    return { sill, head, openH };
   }
 
   /** Svislé napojení příček na obvod (clear cm podél stěny). */
@@ -1612,21 +1624,27 @@
       stroke: "#111111", "stroke-width": 1.5,
     }));
 
-    const sill = Math.min(state.windowSillH, roomH - 10);
-    const winHead = Math.min(Math.max(state.windowHeadH, sill + 20), roomH);
     const doorOpen = Math.min(state.doorOpeningH, roomH);
     const doorLeaf = Math.min(state.doorLeafH, doorOpen);
+    let dimSill = state.windowSillH;
+    let dimHead = state.windowSillH + WIN_OPEN_H;
 
     for (const span of elevOpeningSpans(meta.segs)) {
       const w = span.b - span.a;
       if (span.t === "win") {
+        const band = elevWindowBand(span);
+        const sill = Math.min(band.sill, roomH - 10);
+        const winHead = Math.min(band.head, roomH);
+        const h = Math.max(4, winHead - sill);
         const y = yFromFloor(winHead, roomH);
-        const h = winHead - sill;
+        if (!span.kitchen) {
+          dimSill = sill;
+          dimHead = winHead;
+        }
         g.appendChild(el("rect", {
           x: span.a, y, width: w, height: h,
           fill: "rgba(0,168,255,0.12)", stroke: "#00a8ff", "stroke-width": 2,
         }));
-        // kříž okna
         g.appendChild(el("line", {
           x1: span.a + w / 2, y1: y, x2: span.a + w / 2, y2: y + h,
           stroke: "#00a8ff", "stroke-width": 1,
@@ -1635,6 +1653,15 @@
           x1: span.a, y1: y + h / 2, x2: span.b, y2: y + h / 2,
           stroke: "#00a8ff", "stroke-width": 1,
         }));
+        if (span.kitchen) {
+          const lab = el("text", {
+            x: span.a + w / 2, y: y + h / 2 + 3,
+            fill: "#1a5276", "font-size": 8, "font-family": PLAN_FONT,
+            "text-anchor": "middle", "pointer-events": "none",
+          });
+          lab.textContent = `${WIN_KITCHEN_OPEN_H}`;
+          g.appendChild(lab);
+        }
       } else {
         const yOpen = yFromFloor(doorOpen, roomH);
         g.appendChild(el("rect", {
@@ -1674,7 +1701,8 @@
     if (state.showDims) {
       dimH(g, 0, meta.len, roomH + 16, `${round1(meta.len)}`, "#c0392b");
       dimV(g, 0, roomH, -14, `${roomH}`, "#c0392b");
-      dimV(g, yFromFloor(sill, roomH), roomH, meta.len + 14, `${sill}`, "#7f8c8d");
+      dimV(g, yFromFloor(dimSill, roomH), roomH, meta.len + 14, `${Math.round(dimSill)}`, "#7f8c8d");
+      dimV(g, yFromFloor(dimHead, roomH), yFromFloor(dimSill, roomH), meta.len + 28, `${Math.round(dimHead - dimSill)}`, "#00a8ff");
       const doorSpan = elevOpeningSpans(meta.segs).find((s) => s.t === "door");
       if (doorSpan) {
         dimV(g, yFromFloor(doorOpen, roomH), roomH, doorSpan.a - 12, `${doorOpen}`, "#d35400");
@@ -1803,7 +1831,6 @@
     clampSink();
     clampKitchen();
     clampDoorOffset();
-    state.windowHeadH = Math.min(state.roomClearH, Math.max(state.windowSillH + 20, state.windowHeadH));
     state.doorOpeningH = Math.min(state.roomClearH, state.doorOpeningH);
     state.doorLeafH = Math.min(state.doorOpeningH, state.doorLeafH);
     syncAppMeta();
@@ -1828,10 +1855,12 @@
     if (legend) {
       if (state.tab === "elevations") {
         const m = elevWallMeta(state.elevWall);
+        const head = state.windowSillH + WIN_OPEN_H;
+        const kitSill = head - WIN_KITCHEN_OPEN_H;
         legend.innerHTML =
           `${m.title}<br>` +
-          `Výška <strong>${state.roomClearH}</strong> · parapet <strong>${state.windowSillH}</strong> · ` +
-          `okno do <strong>${state.windowHeadH}</strong> · otvor dveří <strong>${state.doorOpeningH}</strong> / křídlo <strong>${state.doorLeafH}</strong> cm`;
+          `Výška <strong>${state.roomClearH}</strong> · okno ${WIN_OPEN_H} (parapet ${state.windowSillH}→${head}) · ` +
+          `kuchyň ${WIN_KITCHEN_OPEN_H} (parapet ${kitSill}→${head}) · dveře ${state.doorOpeningH}/${state.doorLeafH} cm`;
       } else {
         legend.innerHTML =
           `Světlost: <strong>${CLEAR.w} × ${CLEAR.h} cm</strong> (od SDK)<br>` +
@@ -2075,7 +2104,6 @@
       ["sink-offset", "sinkOffset", "sink-off-val"],
       ["room-h", "roomClearH", "room-h-val"],
       ["sill-h", "windowSillH", "sill-h-val"],
-      ["win-head", "windowHeadH", "win-head-val"],
       ["door-open-h", "doorOpeningH", "door-open-h-val"],
       ["door-leaf-h", "doorLeafH", "door-leaf-h-val"],
     ];
@@ -2206,7 +2234,6 @@
   bindRange("sink-offset", "sinkOffset", "sink-off-val");
   bindRange("room-h", "roomClearH", "room-h-val");
   bindRange("sill-h", "windowSillH", "sill-h-val");
-  bindRange("win-head", "windowHeadH", "win-head-val");
   bindRange("door-open-h", "doorOpeningH", "door-open-h-val");
   bindRange("door-leaf-h", "doorLeafH", "door-leaf-h-val");
   bindSeg("elev-wall", "elevWall");
@@ -2319,7 +2346,6 @@
     if (tab === "cabin" || tab === "furniture" || tab === "elevations") state.tab = tab;
     if (state.roomClearH == null) state.roomClearH = 210;
     if (state.windowSillH == null) state.windowSillH = 90;
-    if (state.windowHeadH == null) state.windowHeadH = 200;
     if (state.doorOpeningH == null) state.doorOpeningH = 200;
     if (state.doorLeafH == null) state.doorLeafH = 190;
     if (!state.elevWall) state.elevWall = "north";

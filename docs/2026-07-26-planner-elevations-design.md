@@ -11,8 +11,9 @@ Z půdorysu vygenerovat **čelní pohledy vnitřních líčů** obvodových stě
 | Parametr | cm |
 |----------|-----|
 | Světlá výška místnosti | 210 |
-| Parapet okna | 90 |
-| Nadpraží okna (hlava) | 200 |
+| Parapet běžného okna | 90 |
+| Stavební otvor okna (většina) | 83 → nadpraží 173 |
+| Stavební otvor okna u kuchyně (jih) | 62 · stejné nadpraží 173 · parapet 111 (nad linkou) |
 | Otvor dveří (výška) | 200 |
 | Křídlo dveří (výška) | 190 |
 
