@@ -659,7 +659,7 @@
             <div id="elec-new-circuit-form" hidden style="border:1px solid var(--line);border-radius:4px;padding:8px;margin-bottom:8px;background:#fff">
               <label>Typ okruhu</label>
               <div class="row seg" id="elec-new-kind">
-                <button type="button" data-v="data"><span class="elec-ico">📡</span> Datové</button>
+                <button type="button" data-v="data"><span class="elec-ico">🖧</span> Datové</button>
                 <button type="button" data-v="lights"><span class="elec-ico">💡</span> Světla</button>
                 <button type="button" data-v="sockets" class="active"><span class="elec-ico">🔌</span> Zásuvky</button>
               </div>
@@ -674,7 +674,7 @@
               <button type="button" data-v="socket" class="active"><span class="elec-ico">🔌</span> Zásuvka</button>
               <button type="button" data-v="switch"><span class="elec-ico">⏻</span> Vypínač</button>
               <button type="button" data-v="light"><span class="elec-ico">💡</span> Světlo</button>
-              <button type="button" data-v="panel"><span class="elec-ico">▣</span> Rozvaděč</button>
+              <button type="button" data-v="panel"><span class="elec-ico">🖧</span> Rozvaděč</button>
             </div>
             <label>Výška bodu: <strong id="elec-h-val">30</strong> cm</label>
             <input type="range" id="elec-h" min="10" max="220" value="30" step="1">
@@ -696,13 +696,13 @@
             </div>
             <label>Filtr typů</label>
             <div class="elec-filters">
-              <label class="chk"><input type="checkbox" id="filt-data" checked> <span class="elec-ico">📡</span> Datové</label>
+              <label class="chk"><input type="checkbox" id="filt-data" checked> <span class="elec-ico">🖧</span> Datové</label>
               <label class="chk"><input type="checkbox" id="filt-lights" checked> <span class="elec-ico">💡</span> Světla</label>
               <label class="chk"><input type="checkbox" id="filt-sockets" checked> <span class="elec-ico">🔌</span> Zásuvky</label>
             </div>
             <label>Typ kabelu</label>
             <div class="row seg" id="elec-cable">
-              <button type="button" data-v="slaboproud"><span class="elec-ico">📡</span> Slaboproud</button>
+              <button type="button" data-v="slaboproud"><span class="elec-ico">🖧</span> Slaboproud</button>
               <button type="button" data-v="cyky15"><span class="elec-ico">💡</span> CYKY 1,5</button>
               <button type="button" data-v="cyky25" class="active"><span class="elec-ico">🔌</span> CYKY 2,5</button>
             </div>
@@ -756,8 +756,8 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.7.0";
-  const APP_BUILD = 36;
+  const APP_VERSION = "3.7.1";
+  const APP_BUILD = 37;
   const APP_COMMIT = "";
   // BUILD_META_END
 
@@ -863,14 +863,15 @@
   const ELEC_COLORS = { socket: "#2980b9", switch: "#8e44ad", light: "#f39c12", panel: "#c0392b" };
   const ELEC_KINDS = ["data", "lights", "sockets"];
   const ELEC_KIND_LABELS = { data: "Datové", lights: "Světla", sockets: "Zásuvky" };
-  const ELEC_KIND_ICONS = { data: "📡", lights: "💡", sockets: "🔌" };
-  const ELEC_TYPE_ICONS = { socket: "🔌", switch: "⏻", light: "💡", panel: "▣" };
+  const ELEC_KIND_ICONS = { data: "🖧", lights: "💡", sockets: "🔌" };
+  const ELEC_TYPE_ICONS = { socket: "🔌", switch: "⏻", light: "💡", panel: "🖧" };
   const KIND_TO_CABLE = { data: "slaboproud", lights: "cyky15", sockets: "cyky25" };
   const KIND_TO_POINT = { data: "panel", lights: "switch", sockets: "socket" };
   const DEFAULT_ELEC_ROOMS = ["Ložnice", "Chodba", "Kuchyně", "Obývak", "Venek"];
   const DEFAULT_ELEC_KINDS = ["lights", "sockets"];
   const CABLE_TYPES = ["slaboproud", "cyky15", "cyky25"];
   const CABLE_LABELS = { slaboproud: "Slaboproud", cyky15: "CYKY 1,5", cyky25: "CYKY 2,5" };
+  const CABLE_ICONS = { slaboproud: "🖧", cyky15: "💡", cyky25: "🔌" };
   const CABLE_COLORS = { slaboproud: "#8e44ad", cyky15: "#f39c12", cyky25: "#2980b9" };
   const ELEC_WALL_PROX = 45;
   const ELEV_WALL_ORDER = ["north", "east", "south", "west"];
@@ -2573,7 +2574,7 @@
         const row = document.createElement("div");
         row.className = "elec-row";
         const lab = document.createElement("span");
-        const kindIco = circ ? (ELEC_KIND_ICONS[circ.kind] || "") : "";
+        const kindIco = circ ? (ELEC_KIND_ICONS[circ.kind] || CABLE_ICONS[run.cableType] || "") : (CABLE_ICONS[run.cableType] || "");
         lab.textContent = `${kindIco} ${CABLE_LABELS[run.cableType] || run.cableType} · ${circ ? circ.name : "?"} · ${wallSet.join("+")} · ${pts.length}b`.trim();
         const del = document.createElement("button");
         del.type = "button";
