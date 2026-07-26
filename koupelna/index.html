@@ -860,27 +860,6 @@
     return "#c0392b";
   }
 
-  function drawNorthArrow(g, cx, cy) {
-    const s = 18;
-    g.appendChild(el("circle", {
-      cx, cy, r: s + 4, fill: "#ffffff", stroke: "#bdc3c7", "stroke-width": 1,
-    }));
-    g.appendChild(el("polygon", {
-      points: `${cx},${cy - s} ${cx + 6},${cy + 4} ${cx},${cy - 2} ${cx - 6},${cy + 4}`,
-      fill: "#c0392b",
-    }));
-    g.appendChild(el("polygon", {
-      points: `${cx},${cy + s} ${cx + 6},${cy - 4} ${cx},${cy + 2} ${cx - 6},${cy - 4}`,
-      fill: "#7f8c8d",
-    }));
-    const t = el("text", {
-      x: cx, y: cy - s - 8, fill: "#c0392b", "font-size": 11, "font-weight": "bold",
-      "font-family": PLAN_FONT, "text-anchor": "middle",
-    });
-    t.textContent = "S";
-    g.appendChild(t);
-  }
-
   function drawFurnitureCabin(g) {
     if (state.showSofa) {
       const s = sofaPolylines();
@@ -1138,13 +1117,13 @@
     if (state.showDims) {
       const o = bathOuter();
       const bi = bathInner();
-      dimH(g, o.x, o.x + o.w, o.y - 12, `${round1(o.w)}`, "#c0392b");
+      // nad severní stěnou (ne uvnitř pásu obvodu)
+      dimH(g, o.x, o.x + o.w, -14, `${round1(o.w)}`, "#c0392b");
       dimH(g, bi.x, bi.x + bi.w, o.y + o.d + 12, `${round1(bi.w)}`, "#c0392b");
     }
 
     drawHoverDims(g);
     drawMeasure(g);
-    drawNorthArrow(g, OUTER.w - 22, 22);
 
     svg.appendChild(g);
     return svg;
