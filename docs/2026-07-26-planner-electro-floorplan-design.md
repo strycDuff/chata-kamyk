@@ -1,7 +1,7 @@
 # Design: Planner — tab Elektro
 
 **Datum:** 2026-07-27  
-**Verze:** 3.6.0
+**Verze:** 3.7.0
 
 ## Struktura
 - Tab **3 · Elektro**
@@ -9,8 +9,12 @@
 - Legenda + status kolizí jen na tabu **1 · Půdorys** (ne u Elektro / Nábytek)
 
 ## Okruhy (pojmenované složky)
+Default při prázdném stavu:
+- **Světla:** Ložnice, Chodba, Kuchyně, Obývak, Venek
+- **Zásuvky:** Ložnice, Chodba, Kuchyně, Obývak, Venek
+
 **+ Nový okruh** → typ + název + volitelná místnost.  
-Body a trasy patří do aktivního okruhu.
+Body a trasy patří do aktivního okruhu. UI: ikony typů (💡/🔌/📡), aktivní okruh nahoře.
 
 ## Pohledy — rozvinutý pás
 - Multi-select stěn (Sever / Východ / Jih / Západ)
