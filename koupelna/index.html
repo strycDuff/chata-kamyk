@@ -97,6 +97,29 @@
     border-radius: 3px;
     margin-bottom: 4px;
   }
+  .furn-list .furn-dims {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .furn-list .furn-dims label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+    font-weight: 500;
+  }
+  .furn-list .furn-dims input {
+    width: 68px;
+    font: inherit;
+    padding: 3px 5px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+  }
   .furn-list .furn-meta {
     display: flex;
     justify-content: space-between;
@@ -313,6 +336,7 @@
       <div class="spacer"></div>
       <label class="chk"><input type="checkbox" id="show-sofa" checked> Gauč</label>
       <label class="chk"><input type="checkbox" id="show-bed" checked> Postel</label>
+      <label class="chk"><input type="checkbox" id="show-furniture" checked> Ostatní nábytek</label>
       <label class="chk"><input type="checkbox" id="show-dims" checked> Kóty</label>
       <button type="button" class="btn" id="btn-export" title="SVG včetně stavu pro import na jiném PC">Export SVG</button>
       <button type="button" class="btn" id="btn-import" title="Načíst SVG (nebo JSON) exportovaný z tohoto nástroje">Import</button>
@@ -455,7 +479,7 @@
         </div>
 
         <div id="panel-furniture" hidden>
-          <p class="hint">Obdélníky jen ve světlosti. Kolize s nábytkem / příčkami = červená (povolené).</p>
+          <p class="hint">Obdélníky jen ve světlosti. V seznamu upravíš název i Š×H. Kolize = červená (povolené). Zobrazit/skrýt: checkbox „Ostatní nábytek“.</p>
           <button type="button" class="btn" id="btn-furn-add" style="width:100%;margin-bottom:8px">+ Nová vrstva</button>
           <div class="row" style="margin-bottom:8px">
             <button type="button" class="btn" id="btn-furn-draw">Kreslit tahem</button>
@@ -576,6 +600,7 @@
     tvVariant: 55,
     showSofa: true,
     showBed: true,
+    showFurniture: true,
     showDims: true,
     doorWidth: 70,
     doorOffset: 90,
@@ -666,7 +691,15 @@
     return state.furnitureLayers.find((l) => l.id === id);
   }
 
+  function ensureFurnitureVisible() {
+    if (state.showFurniture) return;
+    state.showFurniture = true;
+    const cb = document.getElementById("show-furniture");
+    if (cb) cb.checked = true;
+  }
+
   function addFurnitureLayer({ name, x, y, w, d }) {
+    ensureFurnitureVisible();
     const layer = clampFurnLayer({
       id: newFurnId(),
       name: (name || "Kus").trim() || "Kus",
@@ -1318,44 +1351,46 @@
   }
 
   function drawFurnitureLayers(g) {
-    for (const layer of state.furnitureLayers) {
-      const box = furnAbsBox(layer);
-      const hit = furnCollides(layer);
-      const selected = layer.id === state.furnSelectedId;
-      const fill = hit ? "rgba(192,57,43,0.28)" : "rgba(52,152,219,0.22)";
-      const stroke = hit ? "#c0392b" : selected ? "#1f4e6b" : "#2980b9";
-      g.appendChild(el("rect", {
-        class: "furn-move",
-        "data-furn": layer.id,
-        "data-furn-act": "move",
-        x: box.x, y: box.y, width: box.w, height: box.d,
-        fill, stroke, "stroke-width": selected ? 2.2 : 1.4, rx: 3,
-      }));
-      const t1 = el("text", {
-        x: box.x + box.w / 2, y: box.y + box.d / 2 - 5,
-        fill: hit ? "#c0392b" : "#1a5276",
-        "font-size": 9, "font-family": PLAN_FONT,
-        "text-anchor": "middle", "pointer-events": "none",
-      });
-      t1.textContent = layer.name;
-      g.appendChild(t1);
-      const t2 = el("text", {
-        x: box.x + box.w / 2, y: box.y + box.d / 2 + 7,
-        fill: hit ? "#c0392b" : "#1a5276",
-        "font-size": 8, "font-family": PLAN_FONT,
-        "text-anchor": "middle", "pointer-events": "none",
-      });
-      t2.textContent = `${round1(layer.w)}×${round1(layer.d)}`;
-      g.appendChild(t2);
-      if (selected && state.tab === "furniture") {
-        const hs = 10;
+    if (state.showFurniture) {
+      for (const layer of state.furnitureLayers) {
+        const box = furnAbsBox(layer);
+        const hit = furnCollides(layer);
+        const selected = layer.id === state.furnSelectedId;
+        const fill = hit ? "rgba(192,57,43,0.28)" : "rgba(52,152,219,0.22)";
+        const stroke = hit ? "#c0392b" : selected ? "#1f4e6b" : "#2980b9";
         g.appendChild(el("rect", {
-          class: "furn-se",
+          class: "furn-move",
           "data-furn": layer.id,
-          "data-furn-act": "se",
-          x: box.x + box.w - hs, y: box.y + box.d - hs, width: hs, height: hs,
-          fill: stroke, stroke: "#fff", "stroke-width": 1,
+          "data-furn-act": "move",
+          x: box.x, y: box.y, width: box.w, height: box.d,
+          fill, stroke, "stroke-width": selected ? 2.2 : 1.4, rx: 3,
         }));
+        const t1 = el("text", {
+          x: box.x + box.w / 2, y: box.y + box.d / 2 - 5,
+          fill: hit ? "#c0392b" : "#1a5276",
+          "font-size": 9, "font-family": PLAN_FONT,
+          "text-anchor": "middle", "pointer-events": "none",
+        });
+        t1.textContent = layer.name;
+        g.appendChild(t1);
+        const t2 = el("text", {
+          x: box.x + box.w / 2, y: box.y + box.d / 2 + 7,
+          fill: hit ? "#c0392b" : "#1a5276",
+          "font-size": 8, "font-family": PLAN_FONT,
+          "text-anchor": "middle", "pointer-events": "none",
+        });
+        t2.textContent = `${round1(layer.w)}×${round1(layer.d)}`;
+        g.appendChild(t2);
+        if (selected && state.tab === "furniture") {
+          const hs = 10;
+          g.appendChild(el("rect", {
+            class: "furn-se",
+            "data-furn": layer.id,
+            "data-furn-act": "se",
+            x: box.x + box.w - hs, y: box.y + box.d - hs, width: hs, height: hs,
+            fill: stroke, stroke: "#fff", "stroke-width": 1,
+          }));
+        }
       }
     }
     if (state.furnDraw) {
@@ -1386,9 +1421,36 @@
         render();
       });
       name.addEventListener("click", (e) => e.stopPropagation());
+      const dims = document.createElement("div");
+      dims.className = "furn-dims";
+      const mkNum = (labelText, key, max) => {
+        const lab = document.createElement("label");
+        lab.append(document.createTextNode(labelText));
+        const inp = document.createElement("input");
+        inp.type = "number";
+        inp.min = String(FURN_MIN);
+        inp.max = String(max);
+        inp.step = "1";
+        inp.value = String(Math.round(layer[key]));
+        inp.addEventListener("click", (e) => e.stopPropagation());
+        inp.addEventListener("change", () => {
+          layer[key] = Number(inp.value) || FURN_MIN;
+          clampFurnLayer(layer);
+          render();
+        });
+        lab.appendChild(inp);
+        return lab;
+      };
+      dims.appendChild(mkNum("Š", "w", CLEAR.w));
+      dims.appendChild(mkNum("H", "d", CLEAR.h));
+      if (furnCollides(layer)) {
+        const hit = document.createElement("span");
+        hit.textContent = "kolize";
+        hit.style.color = "var(--bad)";
+        dims.appendChild(hit);
+      }
       const meta = document.createElement("div");
       meta.className = "furn-meta";
-      meta.innerHTML = `<span>${round1(layer.w)}×${round1(layer.d)} cm${furnCollides(layer) ? " · kolize" : ""}</span>`;
       const del = document.createElement("button");
       del.type = "button";
       del.className = "btn";
@@ -1401,6 +1463,7 @@
       });
       meta.appendChild(del);
       li.appendChild(name);
+      li.appendChild(dims);
       li.appendChild(meta);
       li.addEventListener("click", () => {
         state.furnSelectedId = layer.id;
@@ -1662,6 +1725,7 @@
         }
       }
       if (state.furnMode === "draw") {
+        ensureFurnitureVisible();
         const cx = Math.min(INNER.x + INNER.w, Math.max(INNER.x, p.x));
         const cy = Math.min(INNER.y + INNER.h, Math.max(INNER.y, p.y));
         state.drag = { type: "furn-draw", start: { x: cx, y: cy } };
@@ -1867,6 +1931,9 @@
   document.getElementById("show-bed").addEventListener("change", (e) => {
     state.showBed = e.target.checked; render();
   });
+  document.getElementById("show-furniture").addEventListener("change", (e) => {
+    state.showFurniture = e.target.checked; render();
+  });
   document.getElementById("show-dims").addEventListener("change", (e) => {
     state.showDims = e.target.checked; render();
   });
@@ -2005,8 +2072,10 @@
     state.drag = null;
     if (tab === "cabin" || tab === "furniture") state.tab = tab;
     syncSlidersFromState();
+    if (state.showFurniture == null) state.showFurniture = true;
     document.getElementById("show-sofa").checked = !!state.showSofa;
     document.getElementById("show-bed").checked = !!state.showBed;
+    document.getElementById("show-furniture").checked = !!state.showFurniture;
     document.getElementById("show-dims").checked = !!state.showDims;
     document.getElementById("shower-rotate").checked = !!state.showerRotate;
     document.getElementById("full-depth-wrap").hidden = state.showerPreset !== "full";

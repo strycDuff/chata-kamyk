@@ -1,0 +1,21 @@
+---
+description: Rapid prototyping — always commit, push, and deploy after changes
+alwaysApply: true
+---
+
+# Rapid prototyping workflow
+
+After completing user-requested code/docs changes in this repo:
+
+1. **Commit** immediately (concise message, why-focused).
+2. **Push** to `origin` (`main` unless told otherwise).
+3. **Deploy** to Cloudflare Pages project `chata-kamyk`.
+
+Deploy notes:
+
+- Exclude `.tools/`, `.git/`, `.wrangler/` (rsync to temp dir if needed — `.tools/gh` exceeds Pages 25 MiB limit).
+- Use ambient `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` when set.
+- If TLS/proxy fails, `NODE_TLS_REJECT_UNAUTHORIZED=0` is acceptable on this machine for wrangler.
+- Return the live URL (`https://chata-kamyk.pages.dev/…`) when done.
+
+Do not ask “chceš commit/deploy?” — just do it unless the user explicitly says not to.
