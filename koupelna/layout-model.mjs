@@ -36,7 +36,9 @@ export const FURN_PRESETS = {
     { id: "230", label: "230 cm", w: 230, d: 60 },
   ],
   sofa: [
-    { id: "L", label: "Rohová L", w: 160, d: 240 },
+    { id: "L", label: "Rohová L", w: 160, d: 240, armW: 95, armD: 90 },
+    { id: "L-compact", label: "L kompakt", w: 140, d: 200, armW: 90, armD: 85 },
+    { id: "L-large", label: "L velká", w: 200, d: 280, armW: 100, armD: 95 },
   ],
   wc: [{ id: "std", label: "37×63", w: 37, d: 63 }],
   sink: [
@@ -52,6 +54,9 @@ export const FURN_PRESETS = {
 
 /** Fixed WC clear position from measured layout (bathLeft=569 axis). */
 export const WC_FIXED_CLEAR = { x: 628, y: 0, w: 37, d: 63 };
+
+export const SOFA_DEFAULTS = { w: 160, d: 240, armW: 95, armD: 90 };
+export const BED_MATTRESS_LEN = 200;
 
 let _idSeq = 1;
 export function newLayoutId(prefix = "p") {
@@ -131,6 +136,8 @@ export function applyFurnPreset(layer, presetId) {
   layer.w = preset.w;
   layer.d = preset.d;
   if (preset.matW != null) layer.matW = preset.matW;
+  if (preset.armW != null) layer.armW = preset.armW;
+  if (preset.armD != null) layer.armD = preset.armD;
   if (FURN_KINDS[kind]?.defaultH) layer.h = FURN_KINDS[kind].defaultH;
   return layer;
 }
@@ -165,7 +172,7 @@ export function normalizeOpening(raw, i = 0) {
 export function normalizeFurnitureLayer(raw, i = 0) {
   const kind = FURN_KINDS[raw.kind] ? raw.kind : "generic";
   const rot = Number(raw.rot) === 90 ? 90 : 0;
-  return {
+  const layer = {
     id: typeof raw.id === "string" ? raw.id : newLayoutId("f"),
     name: (raw.name && String(raw.name).trim()) || (FURN_KINDS[kind]?.label || `Kus ${i + 1}`),
     kind,
@@ -178,6 +185,14 @@ export function normalizeFurnitureLayer(raw, i = 0) {
     d: Number(raw.d) || 120,
     h: Number(raw.h) || FURN_KINDS[kind]?.defaultH || 75,
   };
+  if (kind === "sofa") {
+    layer.armW = Math.max(40, Number(raw.armW) || SOFA_DEFAULTS.armW);
+    layer.armD = Math.max(40, Number(raw.armD) || SOFA_DEFAULTS.armD);
+  }
+  if (kind === "bed" && layer.matW == null) {
+    layer.matW = Number(raw.preset) === 140 ? 140 : 160;
+  }
+  return layer;
 }
 
 /**
@@ -299,6 +314,8 @@ export function seedFromParametric(p = {}) {
       rot: 0,
       preset: "L",
       x: 0, y: 0, w: 160, d: 240,
+      armW: SOFA_DEFAULTS.armW,
+      armD: SOFA_DEFAULTS.armD,
       h: FURN_KINDS.sofa.defaultH,
     },
     {
@@ -457,18 +474,76 @@ export function findFurnByKind(layers, kind) {
   return (layers || []).find((l) => l.kind === kind) || null;
 }
 
-/** Sofa L arms in clear coords from furniture layer (NW anchor). */
+/** Sofa L arms in clear coords from furniture layer (NW corner of bounding box).
+ * Bounding w×d = north-arm length × west-arm length. Arm depths are armW/armD.
+ * After 90° rotate (w↔d), the L reorients with the new bounding box — no special case. */
 export function sofaArmsFromLayer(layer) {
-  const rot = Number(layer.rot) || 0;
-  if (rot === 90) {
-    // mirrored: north arm along west, west arm along north — swap
-    return {
-      west: { x: layer.x, y: layer.y, w: 90, d: 160 },
-      north: { x: layer.x, y: layer.y, w: 240, d: 95 },
-    };
-  }
+  const armW = Math.min(Math.max(40, Number(layer.armW) || SOFA_DEFAULTS.armW), Math.max(40, layer.w));
+  const armD = Math.min(Math.max(40, Number(layer.armD) || SOFA_DEFAULTS.armD), Math.max(40, layer.d));
   return {
-    west: { x: layer.x, y: layer.y, w: 95, d: Math.min(240, layer.d) },
-    north: { x: layer.x, y: layer.y, w: Math.min(160, layer.w), d: 90 },
+    west: { x: layer.x, y: layer.y, w: armW, d: layer.d },
+    north: { x: layer.x, y: layer.y, w: layer.w, d: armD },
   };
+}
+
+/** Frame + mattress AABB for a bed layer; respects 90° rotation. */
+export function bedPartsFromLayer(layer) {
+  const matW = Number(layer.matW) === 140 ? 140 : (Number(layer.matW) || 160);
+  const matL = BED_MATTRESS_LEN;
+  const rot = Number(layer.rot) === 90 ? 90 : 0;
+  const frame = { x: layer.x, y: layer.y, w: layer.w, d: layer.d };
+  const mw = rot === 90 ? matL : matW;
+  const md = rot === 90 ? matW : matL;
+  return {
+    frame,
+    mattress: {
+      x: layer.x + Math.max(0, (layer.w - mw) / 2),
+      y: layer.y + Math.max(0, (layer.d - md) / 2),
+      w: mw,
+      d: md,
+    },
+    matW,
+    matL,
+    rot,
+  };
+}
+
+/** 3D boxes for an L-sofa from clear-space arm AABBs (same topology as classic planner). */
+export function sofa3dBoxes(west, north, {
+  seatH = 42, backH = 78, backT = 18, armRestW = 16, armRestH = 58,
+} = {}) {
+  const boxes = [];
+  const seat = "#8e9eab";
+  const back = "#5d6d7e";
+  boxes.push({
+    x: west.x + backT, y: west.y,
+    w: Math.max(1, west.w - backT), d: west.d,
+    h: seatH, color: seat, matKind: "furniture",
+  });
+  const northSeatW = Math.max(0, north.w - west.w);
+  if (northSeatW > 1) {
+    boxes.push({
+      x: west.x + west.w, y: north.y + backT,
+      w: northSeatW, d: Math.max(1, north.d - backT),
+      h: seatH, color: seat, matKind: "furniture",
+    });
+  }
+  boxes.push({
+    x: west.x, y: north.y + backT,
+    w: backT, d: Math.max(1, west.d - backT),
+    h: backH, color: back, matKind: "furniture",
+  });
+  boxes.push({
+    x: north.x, y: north.y,
+    w: north.w, d: backT,
+    h: backH, color: back, matKind: "furniture",
+  });
+  if (northSeatW > armRestW + 2) {
+    boxes.push({
+      x: north.x + north.w - armRestW, y: north.y + backT,
+      w: armRestW, d: Math.max(8, north.d - backT),
+      h: armRestH, color: back, matKind: "furniture",
+    });
+  }
+  return boxes;
 }

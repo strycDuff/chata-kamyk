@@ -8,6 +8,8 @@ import {
   livingBoundaryX,
   partitionsToWallSegs,
   rotateFurniture90,
+  sofaArmsFromLayer,
+  bedPartsFromLayer,
   PART_THICK,
 } from "./layout-model.mjs";
 
@@ -67,8 +69,27 @@ describe("layout-model seed", () => {
     assert.equal(layer.rot, 90);
   });
 
-  it("partitionBox for vertical segment", () => {
-    const box = partitionBox({ x1: 100, y1: 0, x2: 100, y2: 200, thickness: 12.5 });
-    assert.deepEqual(box, { x: 100, y: 0, w: 12.5, d: 200 });
+  it("sofaArmsFromLayer follows bounding box after rotate", () => {
+    const layer = { x: 0, y: 0, w: 160, d: 240, armW: 95, armD: 90, rot: 0 };
+    const a0 = sofaArmsFromLayer(layer);
+    assert.equal(a0.west.w, 95);
+    assert.equal(a0.west.d, 240);
+    assert.equal(a0.north.w, 160);
+    assert.equal(a0.north.d, 90);
+    rotateFurniture90(layer);
+    const a1 = sofaArmsFromLayer(layer);
+    assert.equal(a1.west.d, 160);
+    assert.equal(a1.north.w, 240);
+  });
+
+  it("bedPartsFromLayer orients mattress on 90° rotate", () => {
+    const layer = { x: 100, y: 0, w: 165, d: 205, matW: 160, rot: 0 };
+    const p0 = bedPartsFromLayer(layer);
+    assert.equal(p0.mattress.w, 160);
+    assert.equal(p0.mattress.d, 200);
+    rotateFurniture90(layer);
+    const p1 = bedPartsFromLayer(layer);
+    assert.equal(p1.mattress.w, 200);
+    assert.equal(p1.mattress.d, 160);
   });
 });

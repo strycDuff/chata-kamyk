@@ -203,14 +203,42 @@ function buildPlanSvg(state, onPointer) {
       for (const a of [arms.west, arms.north]) {
         g.appendChild(el("rect", {
           x: absX(a.x), y: absY(a.y), width: a.w, height: a.d,
-          fill: "#eaeaea", stroke: "#7f8c8d", "stroke-width": 1.5, rx: 6,
+          fill: "#eaeaea", stroke: sel ? "#1f4e6b" : "#7f8c8d",
+          "stroke-width": sel ? 2.2 : 1.5, rx: 6,
           "data-furn": layer.id, class: "skica-furn",
         }));
       }
+      const t = el("text", {
+        x: absX(layer.x) + 8, y: absY(layer.y) + 16,
+        fill: "#7f8c8d", "font-size": 9, "pointer-events": "none",
+      });
+      t.textContent = `${Math.round(layer.w)}×${Math.round(layer.d)}`;
+      g.appendChild(t);
+    } else if (layer.kind === "bed") {
+      const parts = LM.bedPartsFromLayer(layer);
+      const box = furnAbs(layer);
+      g.appendChild(el("rect", {
+        x: box.x, y: box.y, width: box.w, height: box.d,
+        fill: "#f5cd79", stroke: sel ? "#1f4e6b" : "#e67e22",
+        "stroke-width": sel ? 2.2 : 1.5, rx: 3,
+        "data-furn": layer.id, class: "skica-furn",
+      }));
+      g.appendChild(el("rect", {
+        x: absX(parts.mattress.x), y: absY(parts.mattress.y),
+        width: parts.mattress.w, height: parts.mattress.d,
+        fill: "rgba(255,255,255,0.35)", stroke: "#d35400", "stroke-width": 1,
+        "pointer-events": "none",
+      }));
+      const t = el("text", {
+        x: box.x + box.w / 2, y: box.y + box.d / 2,
+        fill: "#e67e22", "font-size": 9, "text-anchor": "middle",
+        "dominant-baseline": "middle", "pointer-events": "none",
+      });
+      t.textContent = `Postel ${parts.matW}`;
+      g.appendChild(t);
     } else {
       const box = furnAbs(layer);
       const colors = {
-        bed: ["#f5cd79", "#e67e22"],
         kitchen: ["#f1f2f6", "#27ae60"],
         shower: ["rgba(0,168,255,0.2)", "#2980b9"],
         wc: ["#fff", "#2980b9"],
@@ -232,6 +260,17 @@ function buildPlanSvg(state, onPointer) {
       });
       t.textContent = layer.name || layer.kind;
       g.appendChild(t);
+    }
+    if (sel) {
+      const hs = 12;
+      const box = furnAbs(layer);
+      g.appendChild(el("rect", {
+        class: "furn-se",
+        "data-furn": layer.id,
+        "data-furn-act": "se",
+        x: box.x + box.w - hs, y: box.y + box.d - hs, width: hs, height: hs,
+        fill: "#1a5276", stroke: "#fff", "stroke-width": 1,
+      }));
     }
   }
   // Openings above furniture so they stay draggable
@@ -391,15 +430,13 @@ function build3dSpec(state) {
   for (const layer of state.furnitureLayers) {
     if (layer.kind === "sofa") {
       const arms = LM.sofaArmsFromLayer(layer);
-      boxes.push({ ...arms.west, h: 42, color: "#8e9eab", matKind: "furniture" });
-      boxes.push({ ...arms.north, h: 78, color: "#5d6d7e", matKind: "furniture" });
+      for (const b of LM.sofa3dBoxes(arms.west, arms.north)) boxes.push(b);
     } else if (layer.kind === "bed") {
-      const matW = layer.matW || 160;
-      boxes.push({ x: layer.x, y: layer.y, w: layer.w, d: layer.d, h: 25, color: "#d35400", matKind: "wood" });
-      boxes.push({
-        x: layer.x + (layer.w - matW) / 2, y: layer.y + (layer.d - 200) / 2,
-        w: matW, d: 200, h: 20, elev: 25, color: "#f5cd79", matKind: "furniture",
-      });
+      const parts = LM.bedPartsFromLayer(layer);
+      const matH = 20;
+      const baseH = 25;
+      boxes.push({ ...parts.frame, h: baseH, color: "#d35400", matKind: "wood" });
+      boxes.push({ ...parts.mattress, h: matH, elev: baseH, color: "#f5cd79", matKind: "furniture" });
     } else if (layer.kind === "kitchen") {
       boxes.push({ x: layer.x, y: layer.y, w: layer.w, d: layer.d, h: layer.h || 86, color: "#27ae60", matKind: "furniture" });
     } else if (layer.kind === "shower") {
@@ -510,6 +547,21 @@ export function createSkica(opts) {
             <div class="row" style="margin-bottom:8px;gap:6px">
               <button type="button" class="btn" id="skica-furn-rotate" style="flex:1">Otočit 90°</button>
               <button type="button" class="btn" id="skica-furn-del" style="flex:1">Smazat kus</button>
+            </div>
+            <div id="skica-size-wrap" hidden style="margin-bottom:8px">
+              <label>Šířka (V–Z) / Délka (S–J)</label>
+              <div class="row" style="gap:6px;margin-top:4px">
+                <input type="number" id="skica-furn-w" min="40" max="400" step="1" style="flex:1">
+                <input type="number" id="skica-furn-d" min="40" max="400" step="1" style="flex:1">
+              </div>
+              <div id="skica-sofa-arms" hidden style="margin-top:6px">
+                <label>Hloubka ramen (Z / S)</label>
+                <div class="row" style="gap:6px;margin-top:4px">
+                  <input type="number" id="skica-sofa-armw" min="40" max="160" step="1" style="flex:1" title="Západní rameno">
+                  <input type="number" id="skica-sofa-armd" min="40" max="160" step="1" style="flex:1" title="Severní rameno">
+                </div>
+              </div>
+              <p class="hint" style="margin-top:4px">Nebo táhni úchyt v JV rohu vybraného kusu.</p>
             </div>
             <div id="skica-presets-wrap" hidden>
               <label>Preset</label>
@@ -622,6 +674,30 @@ export function createSkica(opts) {
       persist();
       render();
     });
+    const onFurnSize = () => {
+      const layer = state.furnitureLayers.find((l) => l.id === state.furnSelectedId);
+      if (!layer) return;
+      const wEl = panel.querySelector("#skica-furn-w");
+      const dEl = panel.querySelector("#skica-furn-d");
+      const awEl = panel.querySelector("#skica-sofa-armw");
+      const adEl = panel.querySelector("#skica-sofa-armd");
+      if (wEl) layer.w = Math.min(400, Math.max(40, Number(wEl.value) || layer.w));
+      if (dEl) layer.d = Math.min(400, Math.max(40, Number(dEl.value) || layer.d));
+      if (layer.kind === "sofa") {
+        if (awEl) layer.armW = Math.min(layer.w, Math.max(40, Number(awEl.value) || layer.armW || 95));
+        if (adEl) layer.armD = Math.min(layer.d, Math.max(40, Number(adEl.value) || layer.armD || 90));
+      }
+      clampFurn(layer);
+      persist();
+      render();
+    };
+    for (const id of ["skica-furn-w", "skica-furn-d", "skica-sofa-armw", "skica-sofa-armd"]) {
+      const eln = panel.querySelector(`#${id}`);
+      eln?.addEventListener("change", onFurnSize);
+      eln?.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); onFurnSize(); }
+      });
+    }
     panel.querySelector("#skica-furn-del")?.addEventListener("click", () => {
       if (!state.furnSelectedId) return;
       state.furnitureLayers = state.furnitureLayers.filter((l) => l.id !== state.furnSelectedId);
@@ -738,6 +814,27 @@ export function createSkica(opts) {
         }
       }
     }
+    const sizeWrap = panel.querySelector("#skica-size-wrap");
+    const armsWrap = panel.querySelector("#skica-sofa-arms");
+    if (sizeWrap) {
+      if (!layer) sizeWrap.hidden = true;
+      else {
+        sizeWrap.hidden = false;
+        const wEl = panel.querySelector("#skica-furn-w");
+        const dEl = panel.querySelector("#skica-furn-d");
+        if (wEl && document.activeElement !== wEl) wEl.value = String(Math.round(layer.w));
+        if (dEl && document.activeElement !== dEl) dEl.value = String(Math.round(layer.d));
+        if (armsWrap) {
+          armsWrap.hidden = layer.kind !== "sofa";
+          if (layer.kind === "sofa") {
+            const aw = panel.querySelector("#skica-sofa-armw");
+            const ad = panel.querySelector("#skica-sofa-armd");
+            if (aw && document.activeElement !== aw) aw.value = String(Math.round(layer.armW || 95));
+            if (ad && document.activeElement !== ad) ad.value = String(Math.round(layer.armD || 90));
+          }
+        }
+      }
+    }
     const planTools = panel.querySelector("#skica-plan-tools");
     const tools3d = panel.querySelector("#skica-3d-tools");
     if (planTools) planTools.hidden = state.mode !== "plan";
@@ -781,10 +878,16 @@ export function createSkica(opts) {
     const furn = t.closest?.("[data-furn]");
     if (furn) {
       const id = furn.getAttribute("data-furn");
+      const act = furn.getAttribute("data-furn-act") || "move";
       const layer = state.furnitureLayers.find((l) => l.id === id);
       if (layer) {
         state.furnSelectedId = id;
-        state.drag = { type: "furn-move", id, start: p, ox: layer.x, oy: layer.y };
+        state.openingSelectedId = null;
+        state.drag = {
+          type: act === "se" ? "furn-se" : "furn-move",
+          id, start: p,
+          ox: layer.x, oy: layer.y, ow: layer.w, od: layer.d,
+        };
         evt.preventDefault();
         render();
         return;
@@ -870,6 +973,20 @@ export function createSkica(opts) {
       if (layer) {
         layer.x = state.drag.ox + dx;
         layer.y = state.drag.oy + dy;
+        clampFurn(layer);
+      }
+      if (!raf) raf = requestAnimationFrame(() => { raf = 0; renderPlanOnly(); });
+      return;
+    }
+    if (state.drag.type === "furn-se") {
+      const layer = state.furnitureLayers.find((l) => l.id === state.drag.id);
+      if (layer) {
+        layer.w = Math.max(40, state.drag.ow + dx);
+        layer.d = Math.max(40, state.drag.od + dy);
+        if (layer.kind === "sofa") {
+          layer.armW = Math.min(layer.w, layer.armW || 95);
+          layer.armD = Math.min(layer.d, layer.armD || 90);
+        }
         clampFurn(layer);
       }
       if (!raf) raf = requestAnimationFrame(() => { raf = 0; renderPlanOnly(); });

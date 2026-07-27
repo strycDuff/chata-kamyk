@@ -1090,6 +1090,21 @@
           </div>
         </details>
         <details class="side-block">
+          <summary>Gauč (rohová sedačka)</summary>
+          <div class="side-block-body">
+            <label>Délka severního ramene (V–Z)</label>
+            <input type="number" id="sofa-north-w" min="100" max="320" value="160" step="1">
+            <label>Délka západního ramene (S–J)</label>
+            <input type="number" id="sofa-west-d" min="120" max="360" value="240" step="1">
+            <label>Hloubka západního ramene</label>
+            <input type="number" id="sofa-arm-w" min="60" max="140" value="95" step="1">
+            <label>Hloubka severního ramene</label>
+            <input type="number" id="sofa-arm-d" min="60" max="140" value="90" step="1">
+            <p class="hint">Gauč je v SZ rohu. Rozměry jde také táhnout úchytem v JV rohu na půdorysu.</p>
+            <p class="hint" id="sofa-hint">—</p>
+          </div>
+        </details>
+        <details class="side-block">
           <summary>Postel</summary>
           <div class="side-block-body">
             <label>Matrace (šířka)</label>
@@ -1345,7 +1360,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.24.2";
+  const APP_VERSION = "3.25.0";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1509,6 +1524,10 @@
     bedOuterW: 165, // celkový rám V–Z (cm)
     bedOuterD: 205, // celkový rám S–J (cm)
     bedFrameOffset: 2.5, // legacy — migrace do bedOuter*
+    sofaNorthW: 160, // délka severního ramene (= bounding w)
+    sofaWestD: 240,  // délka západního ramene (= bounding d)
+    sofaArmW: 95,    // hloubka západního ramene do místnosti
+    sofaArmD: 90,    // hloubka severního ramene do místnosti
     tvVariant: 55,
     showSofa: true,
     showBed: true,
@@ -2517,11 +2536,40 @@
     const y1 = INNER.y + INNER.h - KITCHEN_DEPTH;
     return { x: absX(state.kitchenLeft), y: y1, w: state.kitchenLen, d: KITCHEN_DEPTH };
   }
+  function clampSofaSize() {
+    let w = Number(state.sofaNorthW);
+    let d = Number(state.sofaWestD);
+    let armW = Number(state.sofaArmW);
+    let armD = Number(state.sofaArmD);
+    if (!Number.isFinite(w)) w = 160;
+    if (!Number.isFinite(d)) d = 240;
+    if (!Number.isFinite(armW)) armW = 95;
+    if (!Number.isFinite(armD)) armD = 90;
+    state.sofaNorthW = Math.min(320, Math.max(100, Math.round(w)));
+    state.sofaWestD = Math.min(360, Math.max(120, Math.round(d)));
+    state.sofaArmW = Math.min(state.sofaNorthW, Math.max(60, Math.round(armW)));
+    state.sofaArmD = Math.min(state.sofaWestD, Math.max(60, Math.round(armD)));
+    const sync = (id, val) => {
+      const eln = document.getElementById(id);
+      if (eln && document.activeElement !== eln) eln.value = String(val);
+    };
+    sync("sofa-north-w", state.sofaNorthW);
+    sync("sofa-west-d", state.sofaWestD);
+    sync("sofa-arm-w", state.sofaArmW);
+    sync("sofa-arm-d", state.sofaArmD);
+    const hint = document.getElementById("sofa-hint");
+    if (hint) {
+      hint.textContent =
+        `Obálka ${state.sofaNorthW}×${state.sofaWestD} · ramena Z ${state.sofaArmW} / S ${state.sofaArmD} cm`;
+    }
+  }
+
   function sofaPolylines() {
+    clampSofaSize();
     const x0 = INNER.x, y0 = INNER.y;
     return {
-      west: { x: x0, y: y0, w: 95, d: 240 },
-      north: { x: x0, y: y0, w: 160, d: 90 },
+      west: { x: x0, y: y0, w: state.sofaArmW, d: state.sofaWestD },
+      north: { x: x0, y: y0, w: state.sofaNorthW, d: state.sofaArmD },
     };
   }
   function clampBedOuter() {
@@ -3008,24 +3056,41 @@
       g.appendChild(el("line", {
         x1: s.west.x + 8, y1: s.west.y + s.west.d / 3,
         x2: s.west.x + s.west.w - 8, y2: s.west.y + s.west.d / 3,
-        stroke: "#bdc3c7", "stroke-width": 1,
+        stroke: "#bdc3c7", "stroke-width": 1, "pointer-events": "none",
       }));
       g.appendChild(el("line", {
         x1: s.west.x + 8, y1: s.west.y + (2 * s.west.d) / 3,
         x2: s.west.x + s.west.w - 8, y2: s.west.y + (2 * s.west.d) / 3,
-        stroke: "#bdc3c7", "stroke-width": 1,
+        stroke: "#bdc3c7", "stroke-width": 1, "pointer-events": "none",
       }));
       g.appendChild(el("line", {
         x1: s.north.x + s.north.w / 2, y1: s.north.y + 8,
         x2: s.north.x + s.north.w / 2, y2: s.north.y + s.north.d - 8,
-        stroke: "#bdc3c7", "stroke-width": 1,
+        stroke: "#bdc3c7", "stroke-width": 1, "pointer-events": "none",
       }));
       const t = el("text", {
         x: s.north.x + 10, y: s.north.y + 20, fill: "#7f8c8d", "font-size": 10,
-        "font-family": PLAN_FONT,
+        "font-family": PLAN_FONT, "pointer-events": "none",
       });
       t.textContent = "Rohová sedačka";
       g.appendChild(t);
+      const t2 = el("text", {
+        x: s.north.x + 10, y: s.north.y + 34, fill: "#95a5a6", "font-size": 9,
+        "font-family": PLAN_FONT, "pointer-events": "none",
+      });
+      t2.textContent = `${state.sofaNorthW}×${state.sofaWestD}`;
+      g.appendChild(t2);
+      if (state.tab === "furniture") {
+        const hs = 12;
+        const bx = INNER.x + state.sofaNorthW;
+        const by = INNER.y + state.sofaWestD;
+        g.appendChild(el("rect", {
+          class: "furn-se",
+          "data-drag": "sofa-se",
+          x: bx - hs, y: by - hs, width: hs, height: hs,
+          fill: "#7f8c8d", stroke: "#fff", "stroke-width": 1,
+        }));
+      }
     }
 
     // Kitchen — čistý obdélník
@@ -3418,7 +3483,7 @@
         hits.push({ x: d, label: "postel J" });
       }
     } else if (wall === "west") {
-      if (state.showSofa) hits.push({ x: 240, label: "gauč J" });
+      if (state.showSofa) hits.push({ x: state.sofaWestD || 240, label: "gauč J" });
     }
     return hits.filter((h) => h.x > 0.5 && h.x < elevWallMeta(wall).len - 0.5);
   }
@@ -5909,6 +5974,13 @@
       render();
       return;
     }
+    if (d.type === "sofa-se") {
+      state.sofaNorthW = d.sofaNorthW + dx;
+      state.sofaWestD = d.sofaWestD + dy;
+      clampSofaSize();
+      render();
+      return;
+    }
     if (d.type === "furn-draw") {
       state.furnDraw = {
         x0: d.start.x, y0: d.start.y,
@@ -6204,6 +6276,17 @@
       evt.preventDefault();
       return;
     }
+    if (target && state.tab === "furniture" && !state.measureMode &&
+        target.getAttribute("data-drag") === "sofa-se") {
+      state.drag = {
+        type: "sofa-se",
+        start: p,
+        sofaNorthW: state.sofaNorthW,
+        sofaWestD: state.sofaWestD,
+      };
+      evt.preventDefault();
+      return;
+    }
     if (target && state.tab === "cabin" && !state.measureMode) {
       state.drag = {
         type: target.getAttribute("data-drag"),
@@ -6380,6 +6463,7 @@
     clampRoofControls();
     syncRoofHint();
     clampBedOuter();
+    clampSofaSize();
   }
 
   function bindSeg(id, key, mapFn = (v) => v, after) {
@@ -6516,6 +6600,21 @@
   bedOuterDEl?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); onBedOuterInput(); }
   });
+  const onSofaInput = () => {
+    state.sofaNorthW = Number(document.getElementById("sofa-north-w")?.value);
+    state.sofaWestD = Number(document.getElementById("sofa-west-d")?.value);
+    state.sofaArmW = Number(document.getElementById("sofa-arm-w")?.value);
+    state.sofaArmD = Number(document.getElementById("sofa-arm-d")?.value);
+    clampSofaSize();
+    render();
+  };
+  for (const id of ["sofa-north-w", "sofa-west-d", "sofa-arm-w", "sofa-arm-d"]) {
+    const eln = document.getElementById(id);
+    eln?.addEventListener("change", onSofaInput);
+    eln?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); onSofaInput(); }
+    });
+  }
   bindSeg("tv-variant", "tvVariant", Number);
 
   bindSeg("door-width", "doorWidth", Number, () => clampDoorOffset());
@@ -7063,6 +7162,11 @@
       state.bedOuterD = BED_LEN + 2 * Number(state.bedFrameOffset || 2.5);
     }
     clampBedOuter();
+    if (state.sofaNorthW == null || !Number.isFinite(Number(state.sofaNorthW))) state.sofaNorthW = 160;
+    if (state.sofaWestD == null || !Number.isFinite(Number(state.sofaWestD))) state.sofaWestD = 240;
+    if (state.sofaArmW == null || !Number.isFinite(Number(state.sofaArmW))) state.sofaArmW = 95;
+    if (state.sofaArmD == null || !Number.isFinite(Number(state.sofaArmD))) state.sofaArmD = 90;
+    clampSofaSize();
     // sprcha: migrace z presetu / výchozí pozice
     if (state.showerW == null || !Number.isFinite(Number(state.showerW))) {
       if (state.showerPreset === "full") {
