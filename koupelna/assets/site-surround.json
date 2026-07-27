@@ -1,11 +1,13 @@
 {
   "lat": 50.558394,
   "lon": 14.080436,
-  "zoom": 19,
-  "halfExtentM": 100,
-  "metersPerPixel": 0.18968668931962993,
+  "zoom": 16,
+  "source": "Esri World Imagery",
+  "halfExtentM": 799.7,
+  "nearClearM": 25,
+  "metersPerPixel": 1.5174935145570394,
   "imageSizePx": 1054,
   "northWallBearingDeg": 343,
-  "source": "Esri World Imagery tiles",
+  "mode": "distant-surround",
   "attribution": "Esri, Maxar, Earthstar Geographics, and the GIS User Community"
 }

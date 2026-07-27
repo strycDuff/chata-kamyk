@@ -1260,8 +1260,8 @@
             <div class="side-block-body">
               <label class="chk"><input type="checkbox" id="view3d-door-open-side"> Dveře koupelny otevřené</label>
               <label class="chk"><input type="checkbox" id="view3d-lamps" checked> Interiérové lampy</label>
-              <label class="chk"><input type="checkbox" id="view3d-ortho"> Podklad mapa (satelit)</label>
-              <p class="hint">Esri World Imagery · střed chaty · severní stěna ≈ 343°. Attribution: Esri/Maxar.</p>
+              <label class="chk"><input type="checkbox" id="view3d-ortho"> Pozadí okolí (satelit v dálce)</label>
+              <p class="hint">Esri z16 · prstenec ~25–800 m od chaty (ne pod budovou). Severní stěna ≈ 343°. Attribution: Esri/Maxar.</p>
             </div>
           </details>
 
@@ -1337,7 +1337,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.21.0";
+  const APP_VERSION = "3.21.1";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -5567,20 +5567,18 @@
 
     if (state.showRoof) pushRoofStructure3d(boxes);
 
-    // Terén — šedý pad jen bez satelitního podkladu
-    const yardPad = state.showSiteOrtho ? 10000 : 320; // ortho half 100 m
-    if (!state.showSiteOrtho) {
-      boxes.push({
-        x: -yardPad,
-        y: -yardPad,
-        w: CLEAR.w + yardPad * 2,
-        d: CLEAR.h + yardPad * 2,
-        h: 1.5,
-        color: "#cfd8dc",
-        opacity: 0.95,
-        matKind: "yard",
-      });
-    }
+    // Blízký dvorek vždy; satelit jen jako vzdálený prstenec (planner3d)
+    const yardPad = 320;
+    boxes.push({
+      x: -yardPad,
+      y: -yardPad,
+      w: CLEAR.w + yardPad * 2,
+      d: CLEAR.h + yardPad * 2,
+      h: 1.5,
+      color: "#cfd8dc",
+      opacity: 0.95,
+      matKind: "yard",
+    });
 
     return {
       roomH, clearW: CLEAR.w, clearH: CLEAR.h, boxes,
@@ -5593,10 +5591,11 @@
         covering: !!state.texCovering,
       },
       interiorLights: !!state.showInteriorLights,
-      siteOrtho: state.showSiteOrtho
+      siteSurround: state.showSiteOrtho
         ? {
             enabled: true,
-            halfExtentM: 100,
+            halfExtentM: 800,
+            nearClearM: 25,
             northWallBearingDeg: 343,
             lat: 50.558394,
             lon: 14.080436,
@@ -5604,10 +5603,9 @@
         : { enabled: false },
       walk: {
         door: { x0: southDoorClear().x0, x1: southDoorClear().x1 },
-        outsidePad: yardPad,
-        // legacy fields kept for older viewer builds
-        outsideDepth: yardPad,
-        outsidePadX: yardPad,
+        outsidePad: state.showSiteOrtho ? 4000 : yardPad,
+        outsideDepth: state.showSiteOrtho ? 4000 : yardPad,
+        outsidePadX: state.showSiteOrtho ? 4000 : yardPad,
       },
     };
   }
@@ -5632,9 +5630,9 @@
     }
     view3dViewer.preset = view3dPreset;
     const spec = buildView3dSpec();
-    if (spec.siteOrtho?.enabled) {
+    if (spec.siteSurround?.enabled) {
       const map = await mod.ensureSiteOrtho(spec);
-      if (map) spec.siteOrtho.map = map;
+      if (map) spec.siteSurround.map = map;
     }
     mod.rebuild(view3dViewer, spec, { applyCamera: first || !view3dMountedOnce });
     view3dMountedOnce = true;

@@ -197,15 +197,15 @@ function applyUvRepeat(map, kind, sx, sy) {
   return mx;
 }
 
-const ORTHO_URL = new URL("./assets/site-ortho.jpg", import.meta.url).href;
-let orthoTexPromise = null;
+const SURROUND_URL = new URL("./assets/site-surround.jpg", import.meta.url).href;
+let surroundTexPromise = null;
 
-function loadOrthoTexture() {
-  if (!orthoTexPromise) {
-    orthoTexPromise = new Promise((resolve, reject) => {
+function loadSurroundTexture() {
+  if (!surroundTexPromise) {
+    surroundTexPromise = new Promise((resolve, reject) => {
       const loader = new THREE.TextureLoader();
       loader.load(
-        ORTHO_URL,
+        SURROUND_URL,
         (tex) => {
           tex.colorSpace = THREE.SRGBColorSpace;
           tex.anisotropy = 4;
@@ -219,30 +219,48 @@ function loadOrthoTexture() {
       );
     });
   }
-  return orthoTexPromise;
+  return surroundTexPromise;
 }
 
 /**
- * Ortofoto pod chatou. Textura je north-up; local −Z = „severní“ stěna plánu.
- * northWallBearingDeg = zeměpisný azimut vnější normály severní stěny.
+ * Vzdálené satelitní okolí — prstenec kolem chaty (ne pod budovou).
+ * Textura north-up; local −Z = „severní“ stěna plánu @ northWallBearingDeg.
  */
-function addSiteOrtho(group, { clearW, clearD, halfExtentM = 100, northWallBearingDeg = 343, map }) {
-  const halfCm = halfExtentM * 100;
-  const size = halfCm * 2;
+function addSiteSurround(group, {
+  clearW, clearD,
+  halfExtentM = 800,
+  nearClearM = 25,
+  northWallBearingDeg = 343,
+  map,
+}) {
+  const outer = Math.max(5000, halfExtentM * 100);
+  const inner = Math.min(outer * 0.85, Math.max(1500, nearClearM * 100));
+  const geo = new THREE.RingGeometry(inner, outer, 128, 1);
+  // UV: střed textury = chata, ortofoto north-up v rovině XY před rotací
+  const pos = geo.attributes.position;
+  const uv = geo.attributes.uv;
+  const span = outer * 2;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    // Ring XY → po rotaci X−90°: +Y = world −Z (sever). Textura north-up: V = y/span+0.5.
+    uv.setXY(i, x / span + 0.5, y / span + 0.5);
+  }
+  uv.needsUpdate = true;
+
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(size, size),
+    geo,
     new THREE.MeshStandardMaterial({
       map,
       roughness: 1,
       metalness: 0,
       color: "#ffffff",
+      side: THREE.DoubleSide,
     })
   );
   mesh.rotation.x = -Math.PI / 2;
-  // North-up textura: +V → −Z po rotaci. Local −Z má mířit na bearing; true N = 0°.
-  // Otočení scény podkladu: +(360 - bearing) ° → true N není v −Z, ale −Z = bearing.
   mesh.rotation.y = THREE.MathUtils.degToRad(360 - northWallBearingDeg);
-  mesh.position.set(clearW / 2, -1.5, clearD / 2);
+  mesh.position.set(clearW / 2, -2, clearD / 2);
   mesh.receiveShadow = true;
   group.add(mesh);
 }
@@ -664,14 +682,15 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
     lamps[1].visible = true;
   }
 
-  const ortho = spec.siteOrtho;
-  if (ortho?.enabled && ortho.map) {
-    addSiteOrtho(viewer.root, {
+  const surround = spec.siteSurround;
+  if (surround?.enabled && surround.map) {
+    addSiteSurround(viewer.root, {
       clearW,
       clearD,
-      halfExtentM: ortho.halfExtentM,
-      northWallBearingDeg: ortho.northWallBearingDeg,
-      map: ortho.map,
+      halfExtentM: surround.halfExtentM,
+      nearClearM: surround.nearClearM,
+      northWallBearingDeg: surround.northWallBearingDeg,
+      map: surround.map,
     });
   }
 
@@ -693,16 +712,16 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
 }
 
 export function loadSiteOrthoTexture() {
-  return loadOrthoTexture();
+  return loadSurroundTexture();
 }
 
-/** Ensure ortho texture is loaded when enabled; returns texture or null. */
+/** Load distant surround texture when enabled. */
 export async function ensureSiteOrtho(spec) {
-  if (!spec?.siteOrtho?.enabled) return null;
+  if (!spec?.siteSurround?.enabled) return null;
   try {
-    return await loadOrthoTexture();
+    return await loadSurroundTexture();
   } catch (err) {
-    console.warn("site ortho load failed", err);
+    console.warn("site surround load failed", err);
     return null;
   }
 }
