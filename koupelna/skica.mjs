@@ -90,9 +90,17 @@ function saveState(state) {
   }));
 }
 
+function furnMinSize(layer) {
+  // TV is a thin panel (~8 cm); WC/sink can also be under 40 cm.
+  if (layer.kind === "tv") return { w: 4, d: 4 };
+  if (layer.kind === "wc" || layer.kind === "sink") return { w: 15, d: 15 };
+  return { w: 20, d: 20 };
+}
+
 function clampFurn(layer) {
-  layer.w = Math.min(CLEAR.w, Math.max(20, layer.w));
-  layer.d = Math.min(CLEAR.h, Math.max(20, layer.d));
+  const min = furnMinSize(layer);
+  layer.w = Math.min(CLEAR.w, Math.max(min.w, layer.w));
+  layer.d = Math.min(CLEAR.h, Math.max(min.d, layer.d));
   layer.x = Math.min(CLEAR.w - layer.w, Math.max(0, layer.x));
   layer.y = Math.min(CLEAR.h - layer.d, Math.max(0, layer.y));
   layer.h = Math.min(280, Math.max(10, Number(layer.h) || 75));
@@ -617,10 +625,10 @@ export function createSkica(opts) {
               <button type="button" class="btn" id="skica-furn-del" style="flex:1">Smazat kus</button>
             </div>
             <div id="skica-size-wrap" hidden style="margin-bottom:8px">
-              <label>Šířka (V–Z) / Délka (S–J)</label>
+              <label id="skica-furn-wd-lab">Šířka (V–Z) / Délka (S–J)</label>
               <div class="row" style="gap:6px;margin-top:4px">
-                <input type="number" id="skica-furn-w" min="40" max="400" step="1" style="flex:1">
-                <input type="number" id="skica-furn-d" min="40" max="400" step="1" style="flex:1">
+                <input type="number" id="skica-furn-w" min="4" max="400" step="1" style="flex:1">
+                <input type="number" id="skica-furn-d" min="4" max="400" step="1" style="flex:1">
               </div>
               <div id="skica-furn-h-wrap" hidden style="margin-top:6px">
                 <label>Výška H (do 3D)</label>
@@ -806,15 +814,23 @@ export function createSkica(opts) {
     const onFurnSize = () => {
       const layer = state.furnitureLayers.find((l) => l.id === state.furnSelectedId);
       if (!layer) return;
+      const min = furnMinSize(layer);
       const wEl = panel.querySelector("#skica-furn-w");
       const dEl = panel.querySelector("#skica-furn-d");
       const hEl = panel.querySelector("#skica-furn-h");
       const awEl = panel.querySelector("#skica-sofa-armw");
       const adEl = panel.querySelector("#skica-sofa-armd");
-      if (wEl) layer.w = Math.min(400, Math.max(40, Number(wEl.value) || layer.w));
-      if (dEl) layer.d = Math.min(400, Math.max(40, Number(dEl.value) || layer.d));
+      if (wEl) {
+        const raw = Number(wEl.value);
+        if (Number.isFinite(raw)) layer.w = Math.min(400, Math.max(min.w, raw));
+      }
+      if (dEl) {
+        const raw = Number(dEl.value);
+        if (Number.isFinite(raw)) layer.d = Math.min(400, Math.max(min.d, raw));
+      }
       if (hEl && !hEl.closest("#skica-furn-h-wrap")?.hidden) {
-        layer.h = Math.min(280, Math.max(10, Number(hEl.value) || layer.h || 75));
+        const raw = Number(hEl.value);
+        if (Number.isFinite(raw)) layer.h = Math.min(280, Math.max(10, raw));
       }
       if (layer.kind === "sofa") {
         if (awEl) layer.armW = Math.min(layer.w, Math.max(40, Number(awEl.value) || layer.armW || 95));
@@ -994,8 +1010,21 @@ export function createSkica(opts) {
         sizeWrap.hidden = false;
         const wEl = panel.querySelector("#skica-furn-w");
         const dEl = panel.querySelector("#skica-furn-d");
-        if (wEl && document.activeElement !== wEl) wEl.value = String(Math.round(layer.w));
-        if (dEl && document.activeElement !== dEl) dEl.value = String(Math.round(layer.d));
+        const min = furnMinSize(layer);
+        if (wEl) {
+          wEl.min = String(min.w);
+          if (document.activeElement !== wEl) wEl.value = String(Math.round(layer.w));
+        }
+        if (dEl) {
+          dEl.min = String(min.d);
+          if (document.activeElement !== dEl) dEl.value = String(Math.round(layer.d));
+        }
+        const wdLab = panel.querySelector("#skica-furn-wd-lab");
+        if (wdLab) {
+          wdLab.textContent = layer.kind === "tv"
+            ? "Tloušťka (V–Z) / šířka panelu (S–J)"
+            : "Šířka (V–Z) / Délka (S–J)";
+        }
         const showH = layer.kind === "generic" || layer.kind === "kitchen" || layer.kind === "tv";
         if (hWrap) {
           hWrap.hidden = !showH;
@@ -1161,8 +1190,9 @@ export function createSkica(opts) {
     if (state.drag.type === "furn-se") {
       const layer = state.furnitureLayers.find((l) => l.id === state.drag.id);
       if (layer) {
-        layer.w = Math.max(40, state.drag.ow + dx);
-        layer.d = Math.max(40, state.drag.od + dy);
+        const min = furnMinSize(layer);
+        layer.w = Math.max(min.w, state.drag.ow + dx);
+        layer.d = Math.max(min.d, state.drag.od + dy);
         if (layer.kind === "sofa") {
           layer.armW = Math.min(layer.w, layer.armW || 95);
           layer.armD = Math.min(layer.d, layer.armD || 90);
