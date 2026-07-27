@@ -942,6 +942,7 @@
         <button type="button" data-tab="furniture">2 · Nábytek</button>
         <button type="button" data-tab="electro">3 · Elektro</button>
         <button type="button" data-tab="view3d">4 · 3D</button>
+        <button type="button" data-tab="skica">5 · Skica</button>
       </div>
       <button type="button" class="icon-btn" id="btn-measure" title="Měřit vzdálenost" aria-label="Měřit vzdálenost">📏</button>
       <button type="button" class="icon-btn" id="btn-measure-reset" title="Reset měření" aria-label="Reset měření">↺</button>
@@ -1300,6 +1301,10 @@
           </details>
           <p class="hint">Výšky vestavěných kusů jsou defaulty. U „Ostatní nábytek“ nastav <strong>V</strong> ve tabu Nábytek.</p>
         </div>
+
+        <div id="panel-skica" hidden>
+          <!-- filled by skica.mjs -->
+        </div>
       </aside>
     </div>
   </div>
@@ -1336,7 +1341,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.21.3";
+  const APP_VERSION = "3.24.0";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -4624,6 +4629,8 @@
   let view3dViewer = null;
   let view3dPreset = "sofa";
   let view3dMountedOnce = false;
+  let skicaCtrl = null;
+  let skicaReady = null;
 
   let autorouteMod = null;
   async function ensureAutoroute() {
@@ -5605,6 +5612,21 @@
     return view3dMod;
   }
 
+  async function ensureSkica() {
+    if (skicaCtrl) return skicaCtrl;
+    if (!skicaReady) {
+      skicaReady = import("./skica.mjs").then((mod) => {
+        skicaCtrl = mod.createSkica({
+          panel: document.getElementById("panel-skica"),
+          wrap: document.getElementById("canvas-wrap"),
+          importPlanner3d: ensureView3d,
+        });
+        return skicaCtrl;
+      });
+    }
+    return skicaReady;
+  }
+
   async function mountView3d(wrap) {
     const mod = await ensureView3d();
     wrap.classList.add("view3d-host");
@@ -5681,27 +5703,44 @@
     const wrap = document.getElementById("canvas-wrap");
     const showElev = state.tab === "electro" && state.elecStep === "elev";
     const show3d = state.tab === "view3d";
+    const showSkica = state.tab === "skica";
     const elevBar = document.getElementById("elev-wall-bar");
     const view3dBar = document.getElementById("view3d-bar");
     if (elevBar) elevBar.hidden = !showElev;
     if (view3dBar) view3dBar.hidden = !show3d;
 
-    if (show3d) {
-      // keep viewer; async mount
-      mountView3d(wrap).catch((err) => {
+    if (showSkica) {
+      if (view3dViewer) disposeView3d();
+      ensureSkica().then((ctrl) => {
+        if (state.tab !== "skica") return;
+        ctrl.activate();
+      }).catch((err) => {
         wrap.classList.remove("view3d-host");
         wrap.innerHTML = "";
         const p = document.createElement("p");
         p.className = "hint";
         p.style.padding = "24px";
-        p.textContent = `3D se nepodařilo načíst: ${err.message || err}`;
+        p.textContent = `Skica se nepodařilo načíst: ${err.message || err}`;
         wrap.appendChild(p);
       });
     } else {
-      if (view3dViewer) disposeView3d();
-      wrap.classList.remove("view3d-host");
-      wrap.innerHTML = "";
-      wrap.appendChild(showElev ? renderElevationView() : renderCabinView());
+      if (skicaCtrl?.isActive()) skicaCtrl.deactivate();
+      if (show3d) {
+        mountView3d(wrap).catch((err) => {
+          wrap.classList.remove("view3d-host");
+          wrap.innerHTML = "";
+          const p = document.createElement("p");
+          p.className = "hint";
+          p.style.padding = "24px";
+          p.textContent = `3D se nepodařilo načíst: ${err.message || err}`;
+          wrap.appendChild(p);
+        });
+      } else {
+        if (view3dViewer) disposeView3d();
+        wrap.classList.remove("view3d-host");
+        wrap.innerHTML = "";
+        wrap.appendChild(showElev ? renderElevationView() : renderCabinView());
+      }
     }
 
     const showCabinMeta = state.tab === "cabin";
@@ -5729,6 +5768,8 @@
     document.getElementById("panel-electro").hidden = state.tab !== "electro";
     const panel3d = document.getElementById("panel-view3d");
     if (panel3d) panel3d.hidden = state.tab !== "view3d";
+    const panelSkica = document.getElementById("panel-skica");
+    if (panelSkica) panelSkica.hidden = state.tab !== "skica";
     const planTools = document.getElementById("elec-plan-tools");
     const elevTools = document.getElementById("elec-elev-tools");
     if (planTools) planTools.hidden = state.elecStep !== "plan";
@@ -5740,6 +5781,7 @@
         ? ["Elektro · pohledy", "Trasy do aktivního okruhu · strom výše"]
         : ["Elektro · půdorys", "Místnost → typ okruhu → body"],
       view3d: ["3D", "Krov · kleštiny · loft · bez editace ve 3D"],
+      skica: ["Skica", "Explorace layoutu · půdorys + 3D · bez elektro"],
     };
     const [t, sub] = titles[state.tab] || titles.cabin;
     document.getElementById("side-title").textContent = t;
@@ -5985,6 +6027,7 @@
   });
 
   wrapEl.addEventListener("mousedown", (evt) => {
+    if (state.tab === "skica") return;
     const svg = currentSvg();
     if (!svg) return;
 
@@ -6189,6 +6232,7 @@
   });
 
   wrapEl.addEventListener("mousemove", (evt) => {
+    if (state.tab === "skica") return;
     const svg = currentSvg();
     if (!svg) return;
     if (state.drag && state.drag.type === "elev-pan") {
