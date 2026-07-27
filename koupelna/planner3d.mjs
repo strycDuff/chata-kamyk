@@ -594,8 +594,15 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
   // Interiérové lampy podle světlosti místnosti (Z / V zóna)
   const lamps = viewer.interiorLights || [];
   const lampY = Math.max(140, Math.min(roomH - 12, roomH * 0.92));
-  if (lamps[0]) lamps[0].position.set(clearW * 0.32, lampY, clearD * 0.48);
-  if (lamps[1]) lamps[1].position.set(clearW * 0.72, lampY, clearD * 0.52);
+  const lampsOn = spec.interiorLights !== false;
+  if (lamps[0]) {
+    lamps[0].position.set(clearW * 0.32, lampY, clearD * 0.48);
+    lamps[0].visible = lampsOn;
+  }
+  if (lamps[1]) {
+    lamps[1].position.set(clearW * 0.72, lampY, clearD * 0.52);
+    lamps[1].visible = lampsOn;
+  }
 
   addBox(viewer.root, {
     x: 0, y: 0, w: clearW, d: clearD, h: 2,
