@@ -1330,7 +1330,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.19.0";
+  const APP_VERSION = "3.19.1";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -5192,6 +5192,20 @@
       color: woodDark, matKind: "wood",
     });
 
+    // Hřebenová lať — tenká (ne vaznice); vizuální osa styku krokví
+    const ridgeLatW = 5;
+    const ridgeLatH = 4;
+    boxes.push({
+      x: -2,
+      y: r.halfSpan - ridgeLatW / 2,
+      w: CLEAR.w + 4,
+      d: ridgeLatW,
+      h: ridgeLatH,
+      elev: r.ridgeH - ridgeLatH * 0.35,
+      color: woodDark,
+      matKind: "wood",
+    });
+
     const xs = roofRafterXs(r);
     const livingXs = livingCollarCandidates(r, xs);
     const movableXs = livingXs.slice(0, state.livingCollarCount);
@@ -5240,14 +5254,16 @@
       const sheet = "#f4f6f8";
       const sheetH = ROOF_SHEATH_H;
       const drop = r.rafterTh * 0.55 + sheetH * 0.5;
+      // mírně zkrátit k hřebeni — zůstane viditelný zlom / lať
+      const sheathLen = Math.max(40, r.rafterLen - 4);
       boxes.push({
         oriented: true,
         cx: CLEAR.w / 2,
-        cy: r.plateH + r.rise / 2 - drop,
+        cy: r.plateH + r.rise / 2 - drop - 1.2,
         cz: r.halfSpan / 2,
         w: CLEAR.w + 12,
         h: sheetH,
-        d: r.rafterLen + 6,
+        d: sheathLen,
         rotX: -r.pitch,
         color: sheet,
         doubleSide: true,
@@ -5256,15 +5272,30 @@
       boxes.push({
         oriented: true,
         cx: CLEAR.w / 2,
-        cy: r.plateH + r.rise / 2 - drop,
+        cy: r.plateH + r.rise / 2 - drop - 1.2,
         cz: r.halfSpan + r.halfSpan / 2,
         w: CLEAR.w + 12,
         h: sheetH,
-        d: r.rafterLen + 6,
+        d: sheathLen,
         rotX: r.pitch,
         color: sheet,
         doubleSide: true,
         matKind: "wall",
+      });
+    }
+
+    // Spodní hrana hřebene — vždy tenká osa styku podhledů (čitelnost z interiéru)
+    {
+      const ceil = roofCeilingAtZ(r.halfSpan, r);
+      boxes.push({
+        x: -2,
+        y: r.halfSpan - 1.6,
+        w: CLEAR.w + 4,
+        d: 3.2,
+        h: 2.4,
+        elev: ceil - 2.0,
+        color: state.showRoofSheathing ? "#c8ced4" : woodDark,
+        matKind: state.showRoofSheathing ? "wall" : "wood",
       });
     }
 

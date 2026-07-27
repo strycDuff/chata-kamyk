@@ -335,13 +335,23 @@ export function createViewer(container) {
   const root = new THREE.Group();
   scene.add(root);
 
-  const hemi = new THREE.HemisphereLight(0xf0f4f8, 0x8a9aaa, 0.95);
+  const hemi = new THREE.HemisphereLight(0xf0f4f8, 0x7a8a98, 0.48);
   scene.add(hemi);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.75);
-  dir.position.set(400, 800, 200);
+  // Hlavní světlo z SZ — severní a jižní sklon střechy se liší jasem (hřeben = zlom)
+  const dir = new THREE.DirectionalLight(0xfff8f0, 1.05);
+  dir.position.set(-280, 920, -420);
   dir.castShadow = true;
   dir.shadow.mapSize.set(1024, 1024);
+  dir.shadow.camera.near = 50;
+  dir.shadow.camera.far = 2500;
+  dir.shadow.camera.left = -800;
+  dir.shadow.camera.right = 800;
+  dir.shadow.camera.top = 800;
+  dir.shadow.camera.bottom = -800;
   scene.add(dir);
+  const fill = new THREE.DirectionalLight(0xdde8f5, 0.28);
+  fill.position.set(420, 380, 520);
+  scene.add(fill);
 
   const viewer = {
     scene,
