@@ -933,13 +933,14 @@
           </div>
         </div>
         <div class="view3d-bar" id="view3d-bar" hidden>
-          <span class="elev-wall-bar-label">3D pohled</span>
+          <span class="elev-wall-bar-label">Pohled zevnitř</span>
           <div class="row seg" id="view3d-preset">
-            <button type="button" data-v="iso" class="active">Izometrie</button>
-            <button type="button" data-v="sv">SV</button>
-            <button type="button" data-v="jv">JV</button>
+            <button type="button" data-v="sofa" class="active">Z gauče</button>
+            <button type="button" data-v="door">Ze dveří</button>
+            <button type="button" data-v="fridge">Od lednice</button>
           </div>
-          <span class="hint" style="margin:0">Orbit myší · scroll zoom · bez editace</span>
+          <label class="chk" style="margin:0"><input type="checkbox" id="view3d-door-open"> Dveře koupelny otevřené</label>
+          <span class="hint" style="margin:0">Orbit myší · scroll zoom</span>
         </div>
         <div class="canvas-wrap" id="canvas-wrap"></div>
       </div>
@@ -1192,13 +1193,14 @@
 
         <div id="panel-view3d" hidden>
           <p class="hint">Jen prohlížení. Upravuj půdorys / nábytek v jiných tabech — 3D se přestaví samo.</p>
-          <p class="hint">Výšky vestavěných kusů jsou defaulty (postel 45, linka 86…). U „Ostatní nábytek“ nastav <strong>V</strong> ve tabu Nábytek.</p>
-          <label>Kamera</label>
+          <label>Pohled zevnitř</label>
           <div class="row seg" id="view3d-preset-side">
-            <button type="button" data-v="iso" class="active">Izometrie</button>
-            <button type="button" data-v="sv">SV</button>
-            <button type="button" data-v="jv">JV</button>
+            <button type="button" data-v="sofa" class="active">Z gauče</button>
+            <button type="button" data-v="door">Ze dveří</button>
+            <button type="button" data-v="fridge">Od lednice</button>
           </div>
+          <label class="chk" style="margin-top:10px"><input type="checkbox" id="view3d-door-open-side"> Dveře koupelny otevřené</label>
+          <p class="hint">Výšky vestavěných kusů jsou defaulty. U „Ostatní nábytek“ nastav <strong>V</strong> ve tabu Nábytek.</p>
         </div>
       </aside>
     </div>
@@ -1236,7 +1238,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.13.3";
+  const APP_VERSION = "3.14.0";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1402,6 +1404,7 @@
     showFurniture: true,
     showElectro: true,
     showDims: true,
+    view3dDoorOpen: false,
     doorWidth: 70,
     doorOffset: 90,
     doorType: "A",
@@ -4069,7 +4072,8 @@
 
   let view3dMod = null;
   let view3dViewer = null;
-  let view3dPreset = "iso";
+  let view3dPreset = "sofa";
+  let view3dMountedOnce = false;
 
   function absToClearBox(box) {
     return {
@@ -4175,21 +4179,92 @@
       });
     }
 
-    // Křídlo ve otvoru (zavřeno) — tenký panel
+    // Křídlo — zavřeno v otvoru / otevřeno v dráze (posuv)
     const leafW = Math.max(3, PART - 4);
-    boxes.push({
-      ...absToClearBox({ x: op.x + (PART - leafW) / 2, y: op.y, w: leafW, d: op.d }),
-      h: leafH, color: "#e1b12c",
-    });
+    if (state.view3dDoorOpen) {
+      const travel = doorTravelBox();
+      boxes.push({
+        ...absToClearBox(travel),
+        h: leafH, color: "#e1b12c",
+      });
+    } else {
+      boxes.push({
+        ...absToClearBox({ x: op.x + (PART - leafW) / 2, y: op.y, w: leafW, d: op.d }),
+        h: leafH, color: "#e1b12c",
+      });
+    }
     // Dráha / pouzdro (náznak)
     const travel = doorTravelBox();
     boxes.push({
       ...absToClearBox(travel),
-      h: Math.min(8, leafH * 0.05 + 4),
+      h: Math.min(6, leafH * 0.04 + 3),
       color: "#d35400",
-      opacity: 0.45,
-      elev: Math.max(0, leafH * 0.45),
+      opacity: 0.35,
+      elev: Math.max(0, leafH * 0.4),
     });
+  }
+
+  function pushSofa3d(boxes) {
+    const s = sofaPolylines();
+    const west = absToClearBox(s.west);
+    const north = absToClearBox(s.north);
+    const seatH = 42;
+    const backH = 78;
+    const backT = 18;
+    const seat = "#8e9eab";
+    const back = "#5d6d7e";
+    // sedák L — bez překryvu rohů (z-fighting)
+    boxes.push({ ...west, h: seatH, color: seat });
+    const northSeatW = Math.max(0, north.w - west.w);
+    if (northSeatW > 1) {
+      boxes.push({
+        x: west.x + west.w, y: north.y,
+        w: northSeatW, d: north.d,
+        h: seatH, color: seat,
+      });
+    }
+    // opěradla u stěn
+    boxes.push({
+      x: west.x, y: west.y, w: backT, d: west.d,
+      h: backH, color: back,
+    });
+    boxes.push({
+      x: north.x, y: north.y, w: north.w, d: backT,
+      h: backH, color: back,
+    });
+    // krátká područka na konci severního ramene
+    const armW = 16;
+    boxes.push({
+      x: north.x + north.w - armW, y: north.y + backT,
+      w: armW, d: Math.max(8, north.d - backT),
+      h: 58, color: back,
+    });
+  }
+
+  function buildView3dCameras() {
+    const s = sofaPolylines();
+    const west = absToClearBox(s.west);
+    const k = absToClearBox(kitchenBox());
+    const op = absToClearBox(doorOpeningBox());
+    // z gauče (sedící) — výhled do místnosti / k lince
+    const sofa = {
+      eye: { x: west.x + Math.min(70, west.w * 0.55), y: 118, z: west.y + west.d * 0.42 },
+      target: { x: CLEAR.w * 0.42, y: 95, z: CLEAR.h * 0.72 },
+      fov: 58,
+    };
+    // ze dveří koupelny — ven do obýváku (mimo koupelnu, před otvorem)
+    const door = {
+      eye: { x: op.x - 55, y: 155, z: op.y + op.d * 0.5 },
+      target: { x: CLEAR.w * 0.28, y: 110, z: CLEAR.h * 0.45 },
+      fov: 60,
+    };
+    // od lednice (u linky) — do místnosti
+    const fridge = {
+      eye: { x: k.x + k.w * 0.82, y: 155, z: Math.max(20, k.y - 35) },
+      target: { x: CLEAR.w * 0.28, y: 100, z: CLEAR.h * 0.32 },
+      fov: 58,
+    };
+    return { sofa, door, fridge };
   }
 
   function buildView3dSpec() {
@@ -4223,13 +4298,7 @@
       boxes.push({ ...bed, h: baseH, color: "#d35400" });
       boxes.push({ ...mat, h: matH, color: "#f5cd79", elev: baseH });
     }
-    if (state.showSofa) {
-      const s = sofaPolylines();
-      for (const part of [s.west, s.north]) {
-        const c = absToClearBox(part);
-        boxes.push({ ...c, h: VIEW3D_H.sofa, color: "#95a5a6" });
-      }
-    }
+    if (state.showSofa) pushSofa3d(boxes);
     {
       const c = absToClearBox(showerBox());
       boxes.push({ ...c, h: VIEW3D_H.shower, color: "#3498db" });
@@ -4252,7 +4321,10 @@
       }
     }
 
-    return { roomH, clearW: CLEAR.w, clearH: CLEAR.h, boxes };
+    return {
+      roomH, clearW: CLEAR.w, clearH: CLEAR.h, boxes,
+      cameras: buildView3dCameras(),
+    };
   }
 
   async function ensureView3d() {
@@ -4265,6 +4337,7 @@
   async function mountView3d(wrap) {
     const mod = await ensureView3d();
     wrap.classList.add("view3d-host");
+    const first = !view3dViewer;
     if (!view3dViewer) {
       wrap.innerHTML = "";
       view3dViewer = mod.createViewer(wrap);
@@ -4273,21 +4346,25 @@
       wrap.appendChild(view3dViewer.renderer.domElement);
     }
     view3dViewer.preset = view3dPreset;
-    mod.rebuild(view3dViewer, buildView3dSpec());
+    mod.rebuild(view3dViewer, buildView3dSpec(), { applyCamera: first || !view3dMountedOnce });
+    view3dMountedOnce = true;
     syncView3dPresetButtons();
+    syncView3dDoorToggle();
   }
 
   function disposeView3d() {
     if (!view3dViewer || !view3dMod) return;
     view3dMod.dispose(view3dViewer);
     view3dViewer = null;
+    view3dMountedOnce = false;
   }
 
   function applyView3dPreset(name) {
-    view3dPreset = name === "sv" || name === "jv" ? name : "iso";
+    view3dPreset = ["sofa", "door", "fridge"].includes(name) ? name : "sofa";
     syncView3dPresetButtons();
     if (view3dViewer && view3dMod) {
-      view3dMod.setPreset(view3dViewer, view3dPreset);
+      view3dViewer.cameras = buildView3dCameras();
+      view3dMod.setCameraView(view3dViewer, view3dPreset);
     }
   }
 
@@ -4299,6 +4376,19 @@
         b.classList.toggle("active", b.dataset.v === view3dPreset);
       });
     }
+  }
+
+  function syncView3dDoorToggle() {
+    for (const id of ["view3d-door-open", "view3d-door-open-side"]) {
+      const el = document.getElementById(id);
+      if (el) el.checked = !!state.view3dDoorOpen;
+    }
+  }
+
+  function setView3dDoorOpen(open) {
+    state.view3dDoorOpen = !!open;
+    syncView3dDoorToggle();
+    if (state.tab === "view3d") render();
   }
 
   let hoverRaf = 0;
@@ -5221,6 +5311,11 @@
   }
   bindView3dPresetRoot("view3d-preset");
   bindView3dPresetRoot("view3d-preset-side");
+  for (const id of ["view3d-door-open", "view3d-door-open-side"]) {
+    document.getElementById(id)?.addEventListener("change", (e) => {
+      setView3dDoorOpen(e.target.checked);
+    });
+  }
 
   // Variants
   function loadVariants() {

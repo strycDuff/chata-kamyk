@@ -45,7 +45,7 @@ export function createViewer(container) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#e8eef3");
 
-  const camera = new THREE.PerspectiveCamera(42, 1, 1, 5000);
+  const camera = new THREE.PerspectiveCamera(50, 1, 1, 5000);
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = true;
@@ -55,9 +55,9 @@ export function createViewer(container) {
   const root = new THREE.Group();
   scene.add(root);
 
-  const hemi = new THREE.HemisphereLight(0xf0f4f8, 0x8a9aaa, 0.85);
+  const hemi = new THREE.HemisphereLight(0xf0f4f8, 0x8a9aaa, 0.9);
   scene.add(hemi);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.75);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.7);
   dir.position.set(400, 600, 200);
   dir.castShadow = true;
   dir.shadow.mapSize.set(1024, 1024);
@@ -72,8 +72,8 @@ export function createViewer(container) {
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.maxPolarAngle = Math.PI * 0.49;
-  controls.minDistance = 80;
+  controls.maxPolarAngle = Math.PI * 0.495;
+  controls.minDistance = 40;
   controls.maxDistance = 2200;
 
   const viewer = {
@@ -83,7 +83,8 @@ export function createViewer(container) {
     controls,
     root,
     container,
-    preset: "iso",
+    preset: "sofa",
+    cameras: {},
     room: { w: 906, d: 333, h: 210 },
     raf: 0,
     _ro: null,
@@ -110,34 +111,29 @@ export function createViewer(container) {
   return viewer;
 }
 
-export function setPreset(viewer, name) {
-  const { w, d, h } = viewer.room;
-  const cx = w / 2;
-  const cz = d / 2;
-  const cy = h * 0.35;
+/** eye/target: {x, y, z} in Three space (Y up). */
+export function setCameraView(viewer, name) {
+  const cam = viewer.cameras?.[name] || viewer.cameras?.sofa;
+  if (!cam?.eye || !cam?.target) return;
   viewer.preset = name;
-  viewer.controls.target.set(cx, cy, cz);
-  const dist = Math.max(w, d) * 0.95;
-  if (name === "sv") {
-    // severovýchod — high X, low Z (mimo SV roh)
-    viewer.camera.position.set(cx + dist * 0.75, h * 1.15, cz - dist * 0.55);
-  } else if (name === "jv") {
-    viewer.camera.position.set(cx + dist * 0.75, h * 1.15, cz + dist * 0.55);
-  } else {
-    // izometrie
-    viewer.camera.position.set(cx + dist * 0.7, h * 1.35, cz + dist * 0.7);
+  const { eye, target } = cam;
+  viewer.camera.position.set(eye.x, eye.y, eye.z);
+  viewer.controls.target.set(target.x, target.y, target.z);
+  if (cam.fov) {
+    viewer.camera.fov = cam.fov;
+    viewer.camera.updateProjectionMatrix();
   }
   viewer.controls.update();
 }
 
-export function rebuild(viewer, spec) {
+export function rebuild(viewer, spec, { applyCamera = false } = {}) {
   clearGroup(viewer.root);
   const roomH = spec.roomH || 210;
   const clearW = spec.clearW || 906;
   const clearD = spec.clearH || 333;
   viewer.room = { w: clearW, d: clearD, h: roomH };
+  viewer.cameras = spec.cameras || {};
 
-  // floor
   addBox(viewer.root, {
     x: 0, y: 0, w: clearW, d: clearD, h: 2,
     color: "#dfe6e9",
@@ -147,8 +143,7 @@ export function rebuild(viewer, spec) {
     addBox(viewer.root, b);
   }
 
-  // keep current preset framing
-  setPreset(viewer, viewer.preset || "iso");
+  if (applyCamera) setCameraView(viewer, viewer.preset || "sofa");
 }
 
 export function dispose(viewer) {
