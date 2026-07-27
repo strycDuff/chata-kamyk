@@ -142,6 +142,8 @@
     background: #fff;
   }
   .elec-list li.selected { border-color: var(--accent); background: #eef5f9; }
+  .elec-list li.draft { border-color: #e67e22; background: #fef6ec; border-style: dashed; }
+  .elec-list li.draft.selected { background: #fbe9d4; }
   .elec-list .elec-row {
     display: flex;
     flex-wrap: wrap;
@@ -376,6 +378,34 @@
     border-radius: 3px;
     background: #fff;
   }
+  .elec-points-panel .elec-points-tree li.route-selected {
+    border-color: #e67e22;
+    background: #fef6ec;
+  }
+  .elec-points-panel .pt-route-chk {
+    flex: 0 0 auto;
+    width: 15px;
+    height: 15px;
+    accent-color: #e67e22;
+    cursor: pointer;
+  }
+  .elec-route-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+    flex: 0 0 auto;
+  }
+  .elec-route-actions .btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.78rem;
+    padding: 6px 8px;
+  }
+  .elec-route-actions .btn-accept { border-color: var(--ok); color: var(--ok); }
+  .elec-route-actions .btn-accept:hover { background: #eafaf1; }
+  .elec-route-actions .btn-discard { border-color: var(--bad); color: var(--bad); }
+  .elec-route-actions .btn-discard:hover { background: #fdecea; }
   .elec-run-detail {
     margin-top: 8px;
     padding: 8px;
@@ -1113,6 +1143,11 @@
             <div id="elec-list" class="elec-tree"></div>
             <div id="elec-points-panel" class="elec-points-panel" hidden>
               <div id="elec-points-panel-body"></div>
+              <div class="elec-route-actions" id="elec-route-actions">
+                <button type="button" class="btn" id="btn-elec-propose-route">🧭 Navrhnout trasu</button>
+                <button type="button" class="btn btn-accept" id="btn-elec-accept-route" hidden>✓ Přijmout</button>
+                <button type="button" class="btn btn-discard" id="btn-elec-discard-route" hidden>✗ Zahodit</button>
+              </div>
               <button type="button" class="btn" id="btn-elec-point">＋ Bod do aktivního okruhu</button>
               <p class="hint" id="elec-mode-hint"></p>
             </div>
@@ -1376,6 +1411,10 @@
   const ELEC_WALL_PROX = 45;
   const ELEV_WALL_ORDER = ["north", "east", "south", "west"];
   const ELEV_WALL_LABELS = { north: "Sever", east: "Východ", south: "Jih", west: "Západ" };
+  /** Partition wall ids from buildElecWallSegs() beyond the 4 outer walls — routable but not drawn on the elev strip. */
+  const PARTITION_WALL_IDS = ["bath-west", "bath-east", "bath-south", "tv-west"];
+  /** All wall ids a route point may legitimately sit on (outer + partitions). */
+  const ALL_ELEC_WALL_IDS = [...ELEV_WALL_ORDER, ...PARTITION_WALL_IDS];
   /** Rozvinutý pás po obvodu (uvnitř): flip u J/Z, aby sousední stěny sdílely roh. */
   const ELEV_UNFOLD = [
     { wall: "north", flip: false, cornerAfter: "NE" },
@@ -1452,6 +1491,8 @@
     elecType: "socket",
     elecH: 30,
     elecRunDraft: null, // elev: [{along,h}]
+    elecRoutePointIds: [], // selection for next propose
+    elecDraftRunId: null,
   };
 
   let furnIdSeq = 1;
@@ -1824,7 +1865,7 @@
   function runPointsNorm(run) {
     if (!run || !Array.isArray(run.points)) return [];
     return run.points.map((p) => ({
-      wall: ELEV_WALL_ORDER.includes(p.wall) ? p.wall : (run.wall || "north"),
+      wall: ALL_ELEC_WALL_IDS.includes(p.wall) ? p.wall : (run.wall || "north"),
       along: Number(p.along) || 0,
       h: Number(p.h) || 0,
     }));
@@ -1958,14 +1999,38 @@
   }
 
   function elevRunStubsLengthCm(run) {
-    if (!runIsSocketTrunk(run)) return 0;
-    const th = runTrunkH(run);
-    return attachedSockets(run).reduce((n, pt) => n + Math.abs((Number(pt.h) || 0) - th), 0);
+    return elevRunStubSegs(run).reduce((n, s) => n + Math.abs(s.h1 - s.h0), 0);
   }
 
+  /**
+   * Stub segments (trunk height → point height) for a run.
+   * - Draft/proposed runs carry an explicit `pointIds` list — project each
+   *   point onto the current wall set (outer + partitions) and stub from there.
+   * - Legacy manually-drawn socket trunks keep the old proximity-based
+   *   auto-attach behavior (attachedSockets).
+   */
   function elevRunStubSegs(run) {
-    if (!runIsSocketTrunk(run)) return [];
     const th = runTrunkH(run);
+    const ids = idList(run.pointIds);
+    if (ids.length) {
+      const walls = buildElecWallSegs();
+      const segs = [];
+      for (const id of ids) {
+        const pt = findElecPoint(id);
+        if (!pt) continue;
+        const place = projectElecPointToWall({ x: pt.x, y: pt.y }, walls);
+        if (!place) continue;
+        segs.push({
+          pointId: pt.id,
+          wall: place.wall,
+          along: place.along,
+          h0: th,
+          h1: Number(pt.h) || th,
+        });
+      }
+      return segs;
+    }
+    if (!runIsSocketTrunk(run)) return [];
     const segs = [];
     for (const pt of attachedSockets(run)) {
       const place = socketWallPlacement(pt);
@@ -3385,6 +3450,25 @@
     return rooms.concat(rest);
   }
 
+  /** Draft route for the given circuit, if any (missing status is treated as accepted). */
+  function activeDraftRun(circ) {
+    if (!circ) return null;
+    return state.elecElevRuns.find((r) => r.status === "draft" && r.circuitId === circ.id) || null;
+  }
+
+  function updateElecRouteActions(circ) {
+    const proposeBtn = document.getElementById("btn-elec-propose-route");
+    const acceptBtn = document.getElementById("btn-elec-accept-route");
+    const discardBtn = document.getElementById("btn-elec-discard-route");
+    const draft = activeDraftRun(circ);
+    if (proposeBtn) {
+      proposeBtn.hidden = !circ;
+      proposeBtn.textContent = draft ? "🧭 Navrhnout znovu" : "🧭 Navrhnout trasu";
+    }
+    if (acceptBtn) acceptBtn.hidden = !draft;
+    if (discardBtn) discardBtn.hidden = !draft;
+  }
+
   function renderElecActivePoints() {
     const panel = document.getElementById("elec-points-panel");
     const body = document.getElementById("elec-points-panel-body");
@@ -3393,9 +3477,11 @@
     const circ = activeCircuit();
     if (!circ) {
       panel.hidden = true;
+      updateElecRouteActions(null);
       return;
     }
     panel.hidden = false;
+    updateElecRouteActions(circ);
     const pts = state.elecPoints.filter((p) => p.circuitId === circ.id);
     const runLen = circuitRunsLengthCm(circ.id);
     const head = document.createElement("div");
@@ -3419,6 +3505,26 @@
     pts.forEach((pt) => {
       const li = document.createElement("li");
       if (state.elecSelectedKind === "point" && pt.id === state.elecSelectedId) li.classList.add("selected");
+      if (state.elecRoutePointIds.includes(pt.id)) li.classList.add("route-selected");
+
+      let routeChk = null;
+      if (pt.type !== "panel") {
+        routeChk = document.createElement("input");
+        routeChk.type = "checkbox";
+        routeChk.className = "pt-route-chk";
+        routeChk.title = "Zahrnout do návrhu trasy";
+        routeChk.checked = state.elecRoutePointIds.includes(pt.id);
+        routeChk.addEventListener("click", (e) => e.stopPropagation());
+        routeChk.addEventListener("change", () => {
+          if (routeChk.checked) {
+            if (!state.elecRoutePointIds.includes(pt.id)) state.elecRoutePointIds.push(pt.id);
+          } else {
+            state.elecRoutePointIds = state.elecRoutePointIds.filter((id) => id !== pt.id);
+          }
+          render();
+        });
+      }
+
       const ico = document.createElement("span");
       ico.className = "elec-ico";
       ico.textContent = ELEC_TYPE_ICONS[pt.type] || "•";
@@ -3505,9 +3611,11 @@
       del.addEventListener("click", (e) => {
         e.stopPropagation();
         state.elecPoints = state.elecPoints.filter((p) => p.id !== pt.id);
+        state.elecRoutePointIds = state.elecRoutePointIds.filter((id) => id !== pt.id);
         render();
       });
 
+      if (routeChk) li.appendChild(routeChk);
       li.append(ico, labWrap);
       if (waysSel) li.appendChild(waysSel);
       li.append(h, btnEdit, del);
@@ -3656,17 +3764,19 @@
         const wallSet = [...new Set(pts.map((p) => ELEV_WALL_LABELS[p.wall] || p.wall))];
         const li = document.createElement("li");
         if (state.elecSelectedKind === "elev-run" && run.id === state.elecSelectedId) li.classList.add("selected");
+        if (run.status === "draft") li.classList.add("draft");
         const row = document.createElement("div");
         row.className = "elec-row";
         const lab = document.createElement("span");
         const kindIco = circ ? (ELEC_KIND_ICONS[circ.kind] || CABLE_ICONS[run.cableType] || "") : (CABLE_ICONS[run.cableType] || "");
         const meters = formatRunMeters(elevRunLengthCm(run));
         const runName = elevRunDisplayName(run);
-        const stubsN = runIsSocketTrunk(run) ? attachedSockets(run).length : 0;
+        const stubsN = elevRunStubSegs(run).length;
         const stubBit = stubsN ? ` · ${stubsN} odboč.` : "";
+        const draftBit = run.status === "draft" ? " · 🔶 návrh" : "";
         lab.textContent = runName
-          ? `${kindIco} ${runName} · ${meters}${stubBit}`.trim()
-          : `${kindIco} ${CABLE_LABELS[run.cableType] || run.cableType} · ${circ ? circ.name : "?"} · ${wallSet.join("+")} · ${meters}${stubBit}`.trim();
+          ? `${kindIco} ${runName} · ${meters}${stubBit}${draftBit}`.trim()
+          : `${kindIco} ${CABLE_LABELS[run.cableType] || run.cableType} · ${circ ? circ.name : "?"} · ${wallSet.join("+")} · ${meters}${stubBit}${draftBit}`.trim();
         const del = document.createElement("button");
         del.type = "button";
         del.className = "btn";
@@ -3760,7 +3870,7 @@
     const meta = document.createElement("div");
     meta.className = "muted";
     meta.style.marginBottom = "6px";
-    const stubN = runIsSocketTrunk(run) ? attachedSockets(run).length : 0;
+    const stubN = elevRunStubSegs(run).length;
     meta.textContent =
       `${CABLE_LABELS[run.cableType] || run.cableType}` +
       (circ ? ` · ${circ.name}` : "") +
@@ -3791,60 +3901,69 @@
       hRow.append(hLab, hInp, hUnit);
       box.appendChild(hRow);
 
-      const sockTitle = document.createElement("div");
-      sockTitle.style.marginTop = "6px";
-      sockTitle.style.fontWeight = "600";
-      sockTitle.textContent = "Napojené zásuvky";
-      box.appendChild(sockTitle);
+      // Propose-based runs carry an explicit pointIds list — no manual
+      // auto-attach UI needed (points were chosen at propose time).
+      if (!idList(run.pointIds).length) {
+        const sockTitle = document.createElement("div");
+        sockTitle.style.marginTop = "6px";
+        sockTitle.style.fontWeight = "600";
+        sockTitle.textContent = "Napojené zásuvky";
+        box.appendChild(sockTitle);
 
-      const auto = autoSocketCandidates(run);
-      const autoIds = new Set(auto.map((p) => p.id));
-      const attachedIds = new Set(attachedSockets(run).map((p) => p.id));
-      const circuitSockets = state.elecPoints.filter(
-        (p) => p.type === "socket" && p.circuitId === run.circuitId
-      );
-      const ul = document.createElement("ul");
-      ul.className = "rd-sockets";
-      if (!circuitSockets.length) {
-        const empty = document.createElement("li");
-        empty.innerHTML = `<span class="muted">Žádné zásuvky v okruhu</span>`;
-        ul.appendChild(empty);
-      } else {
-        circuitSockets.forEach((pt) => {
-          const place = socketWallPlacement(pt);
-          const li = document.createElement("li");
-          const cb = document.createElement("input");
-          cb.type = "checkbox";
-          cb.checked = attachedIds.has(pt.id);
-          cb.addEventListener("change", () => {
-            setRunSocketAttached(run, pt.id, cb.checked);
-            render();
+        const auto = autoSocketCandidates(run);
+        const autoIds = new Set(auto.map((p) => p.id));
+        const attachedIds = new Set(attachedSockets(run).map((p) => p.id));
+        const circuitSockets = state.elecPoints.filter(
+          (p) => p.type === "socket" && p.circuitId === run.circuitId
+        );
+        const ul = document.createElement("ul");
+        ul.className = "rd-sockets";
+        if (!circuitSockets.length) {
+          const empty = document.createElement("li");
+          empty.innerHTML = `<span class="muted">Žádné zásuvky v okruhu</span>`;
+          ul.appendChild(empty);
+        } else {
+          circuitSockets.forEach((pt) => {
+            const place = socketWallPlacement(pt);
+            const li = document.createElement("li");
+            const cb = document.createElement("input");
+            cb.type = "checkbox";
+            cb.checked = attachedIds.has(pt.id);
+            cb.addEventListener("change", () => {
+              setRunSocketAttached(run, pt.id, cb.checked);
+              render();
+            });
+            const name = document.createElement("span");
+            name.style.flex = "1";
+            name.textContent = pt.name
+              ? `${pt.name} · ${Math.round(pt.h)} cm`
+              : `${ELEC_LABELS.socket} · ${Math.round(pt.h)} cm`;
+            const tag = document.createElement("span");
+            tag.className = "muted";
+            if (!place) tag.textContent = "mimo stěnu";
+            else if (autoIds.has(pt.id)) tag.textContent = "auto";
+            else if (attachedIds.has(pt.id)) tag.textContent = "ručně";
+            else tag.textContent = place ? (ELEV_WALL_LABELS[place.wall] || place.wall) : "";
+            li.append(cb, name, tag);
+            ul.appendChild(li);
           });
-          const name = document.createElement("span");
-          name.style.flex = "1";
-          name.textContent = pt.name
-            ? `${pt.name} · ${Math.round(pt.h)} cm`
-            : `${ELEC_LABELS.socket} · ${Math.round(pt.h)} cm`;
-          const tag = document.createElement("span");
-          tag.className = "muted";
-          if (!place) tag.textContent = "mimo stěnu";
-          else if (autoIds.has(pt.id)) tag.textContent = "auto";
-          else if (attachedIds.has(pt.id)) tag.textContent = "ručně";
-          else tag.textContent = place ? (ELEV_WALL_LABELS[place.wall] || place.wall) : "";
-          li.append(cb, name, tag);
-          ul.appendChild(li);
-        });
+        }
+        box.appendChild(ul);
       }
-      box.appendChild(ul);
     }
   }
 
-  function elevRunStroke(cableType, selected) {
-    const color = selected
-      ? (CABLE_COLORS_SEL[cableType] || CABLE_COLORS[cableType] || "#e67e22")
-      : (CABLE_COLORS[cableType] || "#e67e22");
-    // CYKY = plná úzká; slaboproud = tečky (ne dlouhé čárky jako příčky)
-    const dash = cableType === "slaboproud" ? "1.2,2.2" : null;
+  /** Draft (proposed, not-yet-accepted) color — orange, distinct from cable-type colors. */
+  const ELEC_DRAFT_COLOR = "#e67e22";
+
+  function elevRunStroke(cableType, selected, draft) {
+    const color = draft
+      ? ELEC_DRAFT_COLOR
+      : selected
+        ? (CABLE_COLORS_SEL[cableType] || CABLE_COLORS[cableType] || "#e67e22")
+        : (CABLE_COLORS[cableType] || "#e67e22");
+    // Draft = dashed (proposal, not committed). Otherwise CYKY = plná úzká; slaboproud = tečky.
+    const dash = draft ? "3,2.5" : (cableType === "slaboproud" ? "1.2,2.2" : null);
     return {
       stroke: color,
       "stroke-width": selected ? 1.15 : 0.7,
@@ -3873,7 +3992,8 @@
       const mapped = pts.map(toStrip).filter(Boolean);
       if (mapped.length < 2) continue;
       const sel = state.elecSelectedKind === "elev-run" && run.id === state.elecSelectedId;
-      const color = CABLE_COLORS[run.cableType] || "#e67e22";
+      const isDraft = run.status === "draft";
+      const color = isDraft ? ELEC_DRAFT_COLOR : (CABLE_COLORS[run.cableType] || "#e67e22");
       const d = mapped.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" ");
       const inActive = !state.elecActiveCircuitId || run.circuitId === state.elecActiveCircuitId;
       const rg = el("g", { opacity: inActive ? 1 : 0.22 });
@@ -3888,11 +4008,11 @@
         opacity: 0.85,
       }));
       rg.appendChild(el("path", {
-        class: "elec-run",
+        class: "elec-run" + (isDraft ? " elec-run-draft" : ""),
         "data-elec": run.id,
         "data-elec-kind": "elev-run",
         d, fill: "none",
-        ...elevRunStroke(run.cableType, sel),
+        ...elevRunStroke(run.cableType, sel, isDraft),
         "pointer-events": editable ? "stroke" : "none",
       }));
       // odvozené odbočky k zásuvkám (páteř + stub)
@@ -3919,6 +4039,7 @@
           stroke: color,
           "stroke-width": sel ? 0.95 : 0.55,
           "stroke-linecap": "round",
+          "stroke-dasharray": isDraft ? "2,2" : null,
           "pointer-events": "none",
           opacity: inActive ? 0.95 : 0.35,
         }));
@@ -3932,8 +4053,8 @@
       });
       const circName = circ ? circ.name : "";
       const runName = elevRunDisplayName(run);
-      t.textContent = runName
-        || `${CABLE_LABELS[run.cableType]}${circName ? ` · ${circName}` : ""}`;
+      t.textContent = (isDraft ? "🔶 " : "") + (runName
+        || `${CABLE_LABELS[run.cableType]}${circName ? ` · ${circName}` : ""}`);
       rg.appendChild(t);
       g.appendChild(rg);
     }
@@ -4142,6 +4263,87 @@
     });
 
     return segs;
+  }
+
+  /** Local copy of autoroute.mjs's projectPointToWalls — used synchronously by draw code
+   * (autorouteMod may not be loaded yet if propose was never run this session). */
+  function projectElecPointToWall(pt, walls) {
+    let best = null;
+    for (const w of walls) {
+      const len = Math.hypot(w.x1 - w.x0, w.y1 - w.y0) || 1;
+      const ux = (w.x1 - w.x0) / len;
+      const uy = (w.y1 - w.y0) / len;
+      let t = (pt.x - w.x0) * ux + (pt.y - w.y0) * uy;
+      t = Math.max(0, Math.min(len, t));
+      const qx = w.x0 + ux * t;
+      const qy = w.y0 + uy * t;
+      const d = Math.hypot(pt.x - qx, pt.y - qy);
+      if (!best || d < best.d) best = { wall: w.id, along: t, d };
+    }
+    return best;
+  }
+
+  async function proposeElecRoute() {
+    const circ = activeCircuit();
+    const panel = state.elecPoints.find((p) => p.type === "panel");
+    if (!circ || !panel) { alert("Chybí aktivní okruh nebo rozvaděč (panel)."); return; }
+    const ids = state.elecRoutePointIds.filter((id) => {
+      const p = findElecPoint(id);
+      return p && p.circuitId === circ.id && p.type !== "panel";
+    });
+    if (!ids.length) { alert("Vyber aspoň jeden bod."); return; }
+    // remove previous draft for this circuit
+    state.elecElevRuns = state.elecElevRuns.filter(
+      (r) => !(r.status === "draft" && r.circuitId === circ.id)
+    );
+    const mod = await ensureAutoroute();
+    const walls = buildElecWallSegs();
+    const pts = ids.map((id) => findElecPoint(id)).filter(Boolean);
+    const draft = mod.proposeRoute({
+      kind: circ.kind,
+      walls,
+      panel: { x: panel.x, y: panel.y },
+      points: pts.map((p) => ({ id: p.id, x: p.x, y: p.y, h: p.h })),
+      occupiedSlots: occupiedPowerSlots(circuitRoomKey(circ)),
+    });
+    const run = {
+      id: newElecId("er"),
+      circuitId: circ.id,
+      cableType: draft.cableType,
+      name: circ.name || "",
+      pointIds: draft.pointIds,
+      trunkH: draft.trunkH,
+      points: draft.points, // may include wall ids beyond ELEV_WALL_ORDER — keep them
+      status: "draft",
+      excludePointIds: [],
+      includePointIds: [],
+    };
+    state.elecElevRuns.push(run);
+    state.elecDraftRunId = run.id;
+    state.elecSelectedId = run.id;
+    state.elecSelectedKind = "elev-run";
+    render();
+  }
+
+  function acceptElecRoute() {
+    const run = findElecElevRun(state.elecDraftRunId) || state.elecElevRuns.find((r) => r.status === "draft" && r.circuitId === activeCircuit()?.id);
+    if (!run) return;
+    run.status = "accepted";
+    state.elecDraftRunId = null;
+    state.elecRoutePointIds = [];
+    render();
+  }
+
+  function discardElecRoute() {
+    const id = state.elecDraftRunId;
+    const circ = activeCircuit();
+    state.elecElevRuns = state.elecElevRuns.filter((r) => {
+      if (id && r.id === id) return false;
+      if (!id && circ && r.status === "draft" && r.circuitId === circ.id) return false;
+      return true;
+    });
+    state.elecDraftRunId = null;
+    render();
   }
 
   function pushWallSegments(boxes, segs, wall, roomH) {
@@ -5351,6 +5553,15 @@
     state.elecRunDraft = null;
     render();
   });
+  document.getElementById("btn-elec-propose-route")?.addEventListener("click", () => {
+    proposeElecRoute();
+  });
+  document.getElementById("btn-elec-accept-route")?.addEventListener("click", () => {
+    acceptElecRoute();
+  });
+  document.getElementById("btn-elec-discard-route")?.addEventListener("click", () => {
+    discardElecRoute();
+  });
   document.getElementById("btn-elec-run").addEventListener("click", () => {
     state.elecStep = "elev";
     if (!activeCircuit()) {
@@ -5614,10 +5825,10 @@
         const legacyKind = ELEC_KINDS.includes(r.circuit) ? r.circuit : (cableToKind[cable] || "sockets");
         circuitId = ensureKindCircuit(circuits, kindMap, legacyKind);
       }
-      const fallbackWall = ELEV_WALL_ORDER.includes(r.wall) ? r.wall : "north";
+      const fallbackWall = ALL_ELEC_WALL_IDS.includes(r.wall) ? r.wall : "north";
       const points = Array.isArray(r.points)
         ? r.points.map((p) => ({
-          wall: ELEV_WALL_ORDER.includes(p.wall) ? p.wall : fallbackWall,
+          wall: ALL_ELEC_WALL_IDS.includes(p.wall) ? p.wall : fallbackWall,
           along: Number(p.along) || 0,
           h: Number(p.h) || 0,
         }))
@@ -5647,6 +5858,7 @@
       tab, measureMode, measureA, measureB, measureCursor, hoverCm, drag,
       furnMode, furnDraw, furnitureLayers,
       elecMode, elecRunDraft, elecCursor, elecSelectedId, elecSelectedKind,
+      elecRoutePointIds, elecDraftRunId,
       elecCircuits, elecPoints, elecRuns, elecElevRuns,
       elecCircuit, // legacy global filter kind — ignore
       savedAt, appVersion, appBuild, appCommit, ...rest
@@ -5699,6 +5911,8 @@
     state.elecMode = null;
     state.elecRunDraft = null;
     state.elecCursor = null;
+    state.elecRoutePointIds = [];
+    state.elecDraftRunId = null;
     delete state.elecCircuit;
     if (!state.elecType) state.elecType = "socket";
     if (!state.elecNewKind) state.elecNewKind = "sockets";
