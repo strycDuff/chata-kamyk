@@ -1236,7 +1236,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.13.1";
+  const APP_VERSION = "3.13.2";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -4158,9 +4158,12 @@
     }
     if (state.showBed) {
       const bed = absToClearBox(bedBox());
-      boxes.push({ ...bed, h: VIEW3D_H.bed, color: "#e67e22" });
       const mat = absToClearBox(bedMattressBox());
-      boxes.push({ ...mat, h: VIEW3D_H.mattress, color: "#f5cd79", elev: VIEW3D_H.bed - VIEW3D_H.mattress });
+      const matH = VIEW3D_H.mattress;
+      const baseH = Math.max(8, VIEW3D_H.bed - matH);
+      // rám nižší než matrace — bez společné horní plochy (z-fighting)
+      boxes.push({ ...bed, h: baseH, color: "#d35400" });
+      boxes.push({ ...mat, h: matH, color: "#f5cd79", elev: baseH });
     }
     if (state.showSofa) {
       const s = sofaPolylines();
