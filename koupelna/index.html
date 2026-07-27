@@ -1004,7 +1004,8 @@
             <label>Šířka V–Z: <strong id="bath-w-val">125</strong> cm</label>
             <input type="range" id="bath-w" min="110" max="400" value="125" step="1">
             <label>Hloubka S–J: <strong id="bath-d-val">230</strong> cm</label>
-            <input type="range" id="bath-d" min="180" max="260" value="230" step="1">
+            <input type="range" id="bath-d" min="150" max="260" value="230" step="1"
+              title="Min 150 cm: dveře v západní příčce (typ B) potřebují offset ≥65 + šířku 70. Pro hloubku ≤124 (nad východním oknem) jsou potřeba dveře v jižní příčce — zatím jen v exploraci SVG.">
             <p class="hint" id="bath-clear-hint">Světlá šířka: 100 cm</p>
             <button type="button" class="btn" id="btn-bath-reset" style="margin-top:8px;width:100%">Reset koupelny na výchozí</button>
           </div>
@@ -1335,7 +1336,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.21.2";
+  const APP_VERSION = "3.21.3";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -5911,7 +5912,9 @@
       const east = clampOffNorthWindows(state.bathLeft + state.bathW - PART, state.bathLeft + state.bathW - PART);
       state.bathW = clampBathW(east + PART - state.bathLeft, state.bathLeft);
     } else if (d.type === "bath-south") {
-      state.bathD = Math.min(260, Math.max(180, d.bathD + dy));
+      // Min ~150: west pocket door (type B) needs doorOffset≥65 + doorWidth 70 inside bath.
+      // True clearance north of east window (bathD≤124) needs a south-wall door — see layout explorace.
+      state.bathD = Math.min(260, Math.max(150, d.bathD + dy));
     } else if (d.type === "tv-x") {
       let nx = Math.min(420, Math.max(280, d.tvX + dx));
       state.tvX = clampOffNorthWindows(nx, d.tvX);
