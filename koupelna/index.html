@@ -664,8 +664,51 @@
     min-height: 0;
   }
   .main > .side { order: -1; }
+  .stage {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #f8f9fa;
+  }
+  .elev-wall-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 8px 12px;
+    background: #fff;
+    border-bottom: 1px solid var(--line);
+    flex: 0 0 auto;
+    z-index: 2;
+  }
+  .elev-wall-bar[hidden] { display: none !important; }
+  .elev-wall-bar-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+  }
+  .elev-wall-bar .elev-wall-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin: 0;
+    grid-template-columns: unset;
+  }
+  .elev-wall-bar .elev-wall-toggles label {
+    padding: 4px 8px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: #f7fafc;
+  }
+  .elev-wall-bar .elev-wall-toggles label:has(input:checked) {
+    border-color: var(--accent);
+    background: #e8eef3;
+  }
   .canvas-wrap {
     min-height: 0;
+    flex: 1;
     overflow: auto;
     padding: 12px;
     background: #f8f9fa;
@@ -851,7 +894,18 @@
     </div>
 
     <div class="main">
-      <div class="canvas-wrap" id="canvas-wrap"></div>
+      <div class="stage" id="stage">
+        <div class="elev-wall-bar" id="elev-wall-bar" hidden>
+          <span class="elev-wall-bar-label">Stěny v pásu</span>
+          <div class="elev-wall-toggles" id="elev-wall">
+            <label class="chk"><input type="checkbox" data-wall="north" checked> <span class="elec-ico">↑</span> Sever</label>
+            <label class="chk"><input type="checkbox" data-wall="east"> <span class="elec-ico">→</span> Východ</label>
+            <label class="chk"><input type="checkbox" data-wall="south"> <span class="elec-ico">↓</span> Jih</label>
+            <label class="chk"><input type="checkbox" data-wall="west"> <span class="elec-ico">←</span> Západ</label>
+          </div>
+        </div>
+        <div class="canvas-wrap" id="canvas-wrap"></div>
+      </div>
       <aside class="side" id="side">
         <h1 id="side-title">Půdorys</h1>
         <p class="sub" id="side-sub">Táhni příčky · sekce v menu rozbal dle potřeby</p>
@@ -1030,14 +1084,7 @@
           </div>
 
           <div id="elec-elev-tools" hidden>
-            <p class="hint" id="elec-elev-circuit-hint">Nové trasy → do <strong>aktivního okruhu</strong>. U zásuvek kreslíš páteř; odbočky k napojeným zásuvkám se dopočítají. Trasu pojmenuj v panelu pod seznamem.</p>
-            <label>Stěny v pásu</label>
-            <div class="elev-wall-toggles" id="elev-wall">
-              <label class="chk"><input type="checkbox" data-wall="north" checked> <span class="elec-ico">↑</span> Sever</label>
-              <label class="chk"><input type="checkbox" data-wall="east"> <span class="elec-ico">→</span> Východ</label>
-              <label class="chk"><input type="checkbox" data-wall="south"> <span class="elec-ico">↓</span> Jih</label>
-              <label class="chk"><input type="checkbox" data-wall="west"> <span class="elec-ico">←</span> Západ</label>
-            </div>
+            <p class="hint" id="elec-elev-circuit-hint">Nové trasy → do <strong>aktivního okruhu</strong>. U zásuvek kreslíš páteř; odbočky se dopočítají. Stěny pásu přepínej <strong>nad výkresem</strong>.</p>
             <label>Filtr typů</label>
             <div class="elec-filters">
               <label class="chk"><input type="checkbox" id="filt-data" checked> <span class="elec-ico">🖧</span> Datové</label>
@@ -1121,7 +1168,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.11.0";
+  const APP_VERSION = "3.11.1";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1424,6 +1471,45 @@
     pt.x = Math.min(CLEAR.w + ELEC_OUT_PAD, Math.max(-ELEC_OUT_PAD, pt.x));
     pt.y = Math.min(CLEAR.h + ELEC_OUT_PAD, Math.max(-ELEC_OUT_PAD, pt.y));
     return pt;
+  }
+
+  const ELEC_SNAP_PX = 8; // cm v clear souřadnicích
+
+  /** Vnitřní + vnější líce obvodu a koupelnových příček (clear cm). */
+  function elecSnapAxes() {
+    const xs = [0, CLEAR.w, -WALL, CLEAR.w + WALL];
+    const ys = [0, CLEAR.h, -WALL, CLEAR.h + WALL];
+    const o = bathOuter();
+    const bi = bathInner();
+    // abs → clear
+    const ox0 = o.x - INNER.x;
+    const ox1 = o.x + o.w - INNER.x;
+    const oy0 = o.y - INNER.y;
+    const oy1 = o.y + o.d - INNER.y;
+    const ix0 = bi.x - INNER.x;
+    const ix1 = bi.x + bi.w - INNER.x;
+    const iy0 = bi.y - INNER.y;
+    const iy1 = bi.y + bi.d - INNER.y;
+    xs.push(ox0, ox1, ix0, ix1);
+    ys.push(oy0, oy1, iy0, iy1);
+    return { xs, ys };
+  }
+
+  function snapElecXY(x, y) {
+    const { xs, ys } = elecSnapAxes();
+    let sx = x;
+    let sy = y;
+    let bestX = ELEC_SNAP_PX;
+    let bestY = ELEC_SNAP_PX;
+    for (const v of xs) {
+      const d = Math.abs(x - v);
+      if (d <= bestX) { bestX = d; sx = v; }
+    }
+    for (const v of ys) {
+      const d = Math.abs(y - v);
+      if (d <= bestY) { bestY = d; sy = v; }
+    }
+    return clampElecXY({ x: sx, y: sy });
   }
 
   function planToElecClear(p) {
@@ -2342,12 +2428,6 @@
     }
   }
 
-  function passageStroke(len) {
-    if (len > PASS_COMFORT) return "#27ae60";
-    if (len >= PASS_TIGHT) return "#e67e22";
-    return "#c0392b";
-  }
-
   function drawFurnitureCabin(g) {
     if (state.showSofa) {
       const s = sofaPolylines();
@@ -2394,31 +2474,6 @@
     });
     kt.textContent = `Kuchyňská linka ${Math.round(state.kitchenLen)}`;
     g.appendChild(kt);
-
-    // Passage — čerchovaná čára + malý zalomený popisek u středu
-    const pass = kitchenBathPassage();
-    const passColor = passageStroke(pass.len);
-    g.appendChild(el("line", {
-      x1: pass.a.x, y1: pass.a.y, x2: pass.b.x, y2: pass.b.y,
-      stroke: passColor,
-      "stroke-width": 1.5, "stroke-dasharray": "4,4",
-    }));
-    const mx = (pass.a.x + pass.b.x) / 2 + 6;
-    const my = (pass.a.y + pass.b.y) / 2 - 2;
-    const band = pass.len > PASS_COMFORT ? "komfort" : pass.len >= PASS_TIGHT ? "těsně" : "nekomfort";
-    const pt = el("text", {
-      x: mx, y: my, fill: passColor, "font-size": 8, "font-family": PLAN_FONT,
-    });
-    const l1 = el("tspan", { x: mx, dy: "0" });
-    l1.textContent = "Průchod";
-    const l2 = el("tspan", { x: mx, dy: "9" });
-    l2.textContent = `${round1(pass.len)} cm`;
-    const l3 = el("tspan", { x: mx, dy: "9" });
-    l3.textContent = `(${band})`;
-    pt.appendChild(l1);
-    pt.appendChild(l2);
-    pt.appendChild(l3);
-    g.appendChild(pt);
 
     // TV partition
     const tv = tvBox();
@@ -2488,13 +2543,8 @@
         fill: "#e67e22", "font-size": 10, "font-family": PLAN_FONT,
         "text-anchor": "middle", "dominant-baseline": "middle",
       });
-      bt.textContent = f > 0.05
-        ? `${state.bedVariant}×${BED_LEN} → ${round1(bed.w)}×${round1(bed.d)}`
-        : `Postel ${state.bedVariant}×${BED_LEN}`;
+      bt.textContent = "Postel";
       g.appendChild(bt);
-      if (state.showDims && gap > 1) {
-        dimH(g, o.x + o.w, bed.x, bed.y + 14, `${round1(gap)}`, safe ? "#27ae60" : "#c0392b");
-      }
     }
   }
 
@@ -3758,6 +3808,8 @@
     const wrap = document.getElementById("canvas-wrap");
     wrap.innerHTML = "";
     const showElev = state.tab === "electro" && state.elecStep === "elev";
+    const elevBar = document.getElementById("elev-wall-bar");
+    if (elevBar) elevBar.hidden = !showElev;
     wrap.appendChild(showElev ? renderElevationView() : renderCabinView());
     const showCabinMeta = state.tab === "cabin";
     const legend = document.getElementById("legend");
@@ -3821,7 +3873,7 @@
     if (elecHint) {
       if (!act) elecHint.textContent = "Bez aktivního okruhu nejde přidávat body.";
       else if (state.elecMode === "point") {
-        elecHint.textContent = "Klikni do půdorysu (i mimo světlost = venek) — bod do aktivního okruhu, pak dorovnej.";
+        elecHint.textContent = "Klikni do půdorysu — snap na vnitřní/vnější líc stěny (±8 cm). Venek = mimo světlost.";
       } else {
         elecHint.textContent = `${state.elecCircuits.length} okruhů · ${state.elecPoints.length} bodů · venek ±${ELEC_OUT_PAD} cm.`;
       }
@@ -3927,9 +3979,9 @@
     if (d.type === "elec-move") {
       const pt = findElecPoint(d.elecId);
       if (pt) {
-        pt.x = d.origX + dx;
-        pt.y = d.origY + dy;
-        clampElecXY(pt);
+        const snapped = snapElecXY(d.origX + dx, d.origY + dy);
+        pt.x = snapped.x;
+        pt.y = snapped.y;
       }
       render();
       return;
@@ -4040,7 +4092,8 @@
             render();
             return;
           }
-          const { x: cx, y: cy } = planToElecClear(p);
+          const raw = planToElecClear(p);
+          const { x: cx, y: cy } = snapElecXY(raw.x, raw.y);
           const pt = addElecPoint({
             type: state.elecType,
             x: cx, y: cy, h: state.elecH,
