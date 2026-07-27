@@ -1178,7 +1178,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.12.0";
+  const APP_VERSION = "3.12.1";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -2761,25 +2761,29 @@
       fill: shFill,
       stroke: shStroke, "stroke-width": 1.6, rx: 2,
     }));
-    // odtok sprchy
+    // odtok v rohu — ať nepřekrývá popisek uprostřed
     g.appendChild(el("circle", {
-      cx: sh.x + sh.w / 2, cy: sh.y + sh.d / 2, r: 4,
+      cx: sh.x + Math.min(12, sh.w * 0.22),
+      cy: sh.y + sh.d - Math.min(12, sh.d * 0.22),
+      r: 3.5,
       fill: "none", stroke: shStroke, "stroke-width": 1,
       "pointer-events": "none",
     }));
     const shLab = el("text", {
-      x: sh.x + sh.w / 2, y: sh.y + sh.d / 2 - 8,
+      x: sh.x + sh.w / 2, y: sh.y + sh.d / 2 - 5,
       fill: badShower ? "#c0392b" : "#1a5276",
       "font-size": 9, "font-family": PLAN_FONT,
-      "text-anchor": "middle", "pointer-events": "none",
+      "text-anchor": "middle", "dominant-baseline": "middle",
+      "pointer-events": "none",
     });
     shLab.textContent = "Sprcha";
     g.appendChild(shLab);
     const shDim = el("text", {
-      x: sh.x + sh.w / 2, y: sh.y + sh.d / 2 + 6,
+      x: sh.x + sh.w / 2, y: sh.y + sh.d / 2 + 9,
       fill: badShower ? "#c0392b" : "#2980b9",
       "font-size": 9, "font-family": PLAN_FONT,
-      "text-anchor": "middle", "pointer-events": "none",
+      "text-anchor": "middle", "dominant-baseline": "middle",
+      "pointer-events": "none",
     });
     shDim.textContent = `${Math.round(sh.w)}×${Math.round(sh.d)}`;
     g.appendChild(shDim);
