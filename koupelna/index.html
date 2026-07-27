@@ -1265,6 +1265,10 @@
           <details class="side-block" open>
             <summary>Textury</summary>
             <div class="side-block-body">
+              <div class="row" style="gap:8px;margin-bottom:8px">
+                <button type="button" class="btn" id="tex-all-on">Vybrat vše</button>
+                <button type="button" class="btn" id="tex-all-off">Zrušit vše</button>
+              </div>
               <label class="chk"><input type="checkbox" id="tex-wood"> Dřevo (krov · obklad)</label>
               <label class="chk"><input type="checkbox" id="tex-wall"> Stěny · příčky · zaklopení</label>
               <label class="chk"><input type="checkbox" id="tex-floor"> Podlaha · terén</label>
@@ -1330,7 +1334,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.19.1";
+  const APP_VERSION = "3.19.2";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -6497,6 +6501,26 @@
       render();
     });
   }
+  function setAllTextures(on) {
+    state.texWood = on;
+    state.texWall = on;
+    state.texFloor = on;
+    state.texFurniture = on;
+    state.texCovering = on;
+    for (const [id, key] of [
+      ["tex-wood", "texWood"],
+      ["tex-wall", "texWall"],
+      ["tex-floor", "texFloor"],
+      ["tex-furniture", "texFurniture"],
+      ["tex-covering", "texCovering"],
+    ]) {
+      const el = document.getElementById(id);
+      if (el) el.checked = !!state[key];
+    }
+    render();
+  }
+  document.getElementById("tex-all-on")?.addEventListener("click", () => setAllTextures(true));
+  document.getElementById("tex-all-off")?.addEventListener("click", () => setAllTextures(false));
   document.getElementById("elev-wall")?.addEventListener("change", (e) => {
     const inp = e.target.closest("input[data-wall]");
     if (!inp) return;
