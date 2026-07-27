@@ -1318,7 +1318,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.18.1";
+  const APP_VERSION = "3.18.2";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -5146,8 +5146,8 @@
   }
 
   /**
-   * Krov: pozednice, krokve, hřeben, kleštiny (snížené nad obývákem), volitelná podlaha loftu.
-   * Boxy s `oriented: true` — střed + rotace (viewer).
+   * Krov: pozednice, krokve, kleštiny (snížené nad obývákem), volitelná podlaha loftu.
+   * Hřeben = styky krokví (bez silné vaznice). Boxy s `oriented: true` — střed + rotace.
    */
   function pushRoofStructure3d(boxes) {
     const r = roofParams();
@@ -5155,7 +5155,6 @@
     const wood = "#a67c52";
     const woodDark = "#8b6914";
     const woodLight = "#c4a574";
-    const ridgeZ = r.halfSpan;
 
     // Pozednice S + J — jen na koruně nad stěnou (bez průniku do zdiva → bez z-fight)
     const plateSec = 10;
@@ -5168,14 +5167,6 @@
     boxes.push({
       x: -2, y: CLEAR.h + 1, w: CLEAR.w + 4, d: plateD,
       h: plateSec, elev: r.plateH + 0.8,
-      color: woodDark,
-    });
-
-    // Hřebenová vaznice
-    const ridgeSec = 14;
-    boxes.push({
-      x: -2, y: ridgeZ - ridgeSec / 2, w: CLEAR.w + 4, d: ridgeSec,
-      h: ridgeSec, elev: r.ridgeH - ridgeSec * 0.35,
       color: woodDark,
     });
 
