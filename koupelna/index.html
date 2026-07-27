@@ -1238,7 +1238,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.14.3";
+  const APP_VERSION = "3.15.0";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1856,6 +1856,8 @@
   }
 
   const ELEC_TRUNK_H_DEFAULT = 15;
+  /** Fixed power-trunk heights (cm) — kept in sync with autoroute.mjs POWER_SLOTS. */
+  const POWER_SLOTS = [12, 16, 20, 24];
   const ELEC_STUB_ALONG_TOL = 5;
 
   /** Délka páteře ve světlých cm (approx, včetně přes roh). */
@@ -3353,6 +3355,21 @@
     return (c.room && String(c.room).trim()) || (c.name && String(c.name).trim()) || "Bez místnosti";
   }
 
+  /** Power-trunk heights already used by accepted (non-draft) sockets/lights runs in a room. */
+  function occupiedPowerSlots(roomKey) {
+    const slots = new Set();
+    for (const run of state.elecElevRuns) {
+      if (run.status === "draft") continue; // missing status => treat as accepted
+      const circ = findElecCircuit(run.circuitId);
+      if (!circ) continue;
+      if (circuitRoomKey(circ) !== roomKey) continue;
+      if (circ.kind !== "sockets" && circ.kind !== "lights") continue;
+      const h = runTrunkH(run);
+      if (POWER_SLOTS.includes(h)) slots.add(h);
+    }
+    return [...slots];
+  }
+
   function orderedElecRooms() {
     const seen = new Set();
     const rooms = [];
@@ -4075,6 +4092,12 @@
   let view3dPreset = "sofa";
   let view3dMountedOnce = false;
 
+  let autorouteMod = null;
+  async function ensureAutoroute() {
+    if (!autorouteMod) autorouteMod = await import("./autoroute.mjs");
+    return autorouteMod;
+  }
+
   function absToClearBox(box) {
     return {
       x: box.x - INNER.x,
@@ -4082,6 +4105,43 @@
       w: box.w,
       d: box.d,
     };
+  }
+
+  /** Wall segments (clear coords) usable as `WallSeg[]` input for autoroute.mjs. */
+  function buildElecWallSegs() {
+    const segs = [
+      { id: "north", x0: 0, y0: 0, x1: CLEAR.w, y1: 0 },
+      { id: "east", x0: CLEAR.w, y0: 0, x1: CLEAR.w, y1: CLEAR.h },
+      { id: "south", x0: CLEAR.w, y0: CLEAR.h, x1: 0, y1: CLEAR.h },
+      { id: "west", x0: 0, y0: CLEAR.h, x1: 0, y1: 0 },
+    ];
+
+    const [westPart, eastPart, southPart] = bathPartitionBoxes().map(absToClearBox);
+    // Living/clear-facing (outer) face of each bath partition.
+    segs.push({
+      id: "bath-west",
+      x0: westPart.x, y0: westPart.y,
+      x1: westPart.x, y1: westPart.y + westPart.d,
+    });
+    segs.push({
+      id: "bath-east",
+      x0: eastPart.x + eastPart.w, y0: eastPart.y,
+      x1: eastPart.x + eastPart.w, y1: eastPart.y + eastPart.d,
+    });
+    segs.push({
+      id: "bath-south",
+      x0: southPart.x, y0: southPart.y + southPart.d,
+      x1: southPart.x + southPart.w, y1: southPart.y + southPart.d,
+    });
+
+    const tv = absToClearBox(tvBox());
+    segs.push({
+      id: "tv-west",
+      x0: tv.x, y0: tv.y,
+      x1: tv.x, y1: tv.y + tv.d,
+    });
+
+    return segs;
   }
 
   function pushWallSegments(boxes, segs, wall, roomH) {
