@@ -622,6 +622,11 @@ export function createSkica(opts) {
                 <input type="number" id="skica-furn-w" min="40" max="400" step="1" style="flex:1">
                 <input type="number" id="skica-furn-d" min="40" max="400" step="1" style="flex:1">
               </div>
+              <div id="skica-furn-h-wrap" hidden style="margin-top:6px">
+                <label>Výška H (do 3D)</label>
+                <input type="number" id="skica-furn-h" min="10" max="280" step="1" style="width:100%;margin-top:4px">
+                <p class="hint" style="margin-top:4px">Např. vysoká skříň 180–210 cm.</p>
+              </div>
               <div id="skica-sofa-arms" hidden style="margin-top:6px">
                 <label>Hloubka ramen (Z / S)</label>
                 <div class="row" style="gap:6px;margin-top:4px">
@@ -803,10 +808,14 @@ export function createSkica(opts) {
       if (!layer) return;
       const wEl = panel.querySelector("#skica-furn-w");
       const dEl = panel.querySelector("#skica-furn-d");
+      const hEl = panel.querySelector("#skica-furn-h");
       const awEl = panel.querySelector("#skica-sofa-armw");
       const adEl = panel.querySelector("#skica-sofa-armd");
       if (wEl) layer.w = Math.min(400, Math.max(40, Number(wEl.value) || layer.w));
       if (dEl) layer.d = Math.min(400, Math.max(40, Number(dEl.value) || layer.d));
+      if (hEl && !hEl.closest("#skica-furn-h-wrap")?.hidden) {
+        layer.h = Math.min(280, Math.max(10, Number(hEl.value) || layer.h || 75));
+      }
       if (layer.kind === "sofa") {
         if (awEl) layer.armW = Math.min(layer.w, Math.max(40, Number(awEl.value) || layer.armW || 95));
         if (adEl) layer.armD = Math.min(layer.d, Math.max(40, Number(adEl.value) || layer.armD || 90));
@@ -815,7 +824,7 @@ export function createSkica(opts) {
       persist();
       render();
     };
-    for (const id of ["skica-furn-w", "skica-furn-d", "skica-sofa-armw", "skica-sofa-armd"]) {
+    for (const id of ["skica-furn-w", "skica-furn-d", "skica-furn-h", "skica-sofa-armw", "skica-sofa-armd"]) {
       const eln = panel.querySelector(`#${id}`);
       eln?.addEventListener("change", onFurnSize);
       eln?.addEventListener("keydown", (e) => {
@@ -952,7 +961,7 @@ export function createSkica(opts) {
       for (const layer of state.furnitureLayers) {
         const li = document.createElement("li");
         if (layer.id === state.furnSelectedId) li.classList.add("selected");
-        li.textContent = `${LM.FURN_KINDS[layer.kind]?.label || layer.kind}: ${layer.name} (${Math.round(layer.w)}×${Math.round(layer.d)})`;
+        li.textContent = `${LM.FURN_KINDS[layer.kind]?.label || layer.kind}: ${layer.name} (${Math.round(layer.w)}×${Math.round(layer.d)}${layer.kind === "generic" || layer.kind === "kitchen" || layer.kind === "tv" ? `×${Math.round(layer.h || 75)}` : ""})`;
         li.onclick = () => { state.furnSelectedId = layer.id; persist(); render(); };
         furnList.appendChild(li);
       }
@@ -978,6 +987,7 @@ export function createSkica(opts) {
     }
     const sizeWrap = panel.querySelector("#skica-size-wrap");
     const armsWrap = panel.querySelector("#skica-sofa-arms");
+    const hWrap = panel.querySelector("#skica-furn-h-wrap");
     if (sizeWrap) {
       if (!layer) sizeWrap.hidden = true;
       else {
@@ -986,6 +996,14 @@ export function createSkica(opts) {
         const dEl = panel.querySelector("#skica-furn-d");
         if (wEl && document.activeElement !== wEl) wEl.value = String(Math.round(layer.w));
         if (dEl && document.activeElement !== dEl) dEl.value = String(Math.round(layer.d));
+        const showH = layer.kind === "generic" || layer.kind === "kitchen" || layer.kind === "tv";
+        if (hWrap) {
+          hWrap.hidden = !showH;
+          if (showH) {
+            const hEl = panel.querySelector("#skica-furn-h");
+            if (hEl && document.activeElement !== hEl) hEl.value = String(Math.round(layer.h || 75));
+          }
+        }
         if (armsWrap) {
           armsWrap.hidden = layer.kind !== "sofa";
           if (layer.kind === "sofa") {
