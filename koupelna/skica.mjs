@@ -3,8 +3,9 @@
  * Plan edit + 3D validation. No electro.
  */
 import * as LM from "./layout-model.mjs";
+import { DEFAULT_LAYOUT } from "./default-layout.mjs";
 
-const STORAGE_KEY = "chata-kamyk-skica-v1";
+const STORAGE_KEY = "chata-kamyk-skica-v2";
 const CLEAR = { w: 906, h: 333 };
 const WALL = 10;
 const PART = LM.PART_THICK;
@@ -45,12 +46,26 @@ function absX(cx) { return INNER.x + cx; }
 function absY(cy) { return INNER.y + cy; }
 
 function defaultState() {
-  const seeded = LM.seedFromParametric({ clearW: CLEAR.w, clearH: CLEAR.h });
+  const seeded = LM.seedFromParametric({
+    ...DEFAULT_LAYOUT,
+    clearW: CLEAR.w,
+    clearH: CLEAR.h,
+  });
+  const extras = (DEFAULT_LAYOUT.furnitureLayers || []).map((f) =>
+    LM.normalizeFurnitureLayer({ ...f, kind: f.kind || "generic" }),
+  );
+  const sofa = seeded.furnitureLayers.find((l) => l.kind === "sofa");
+  if (sofa) {
+    sofa.w = Number(DEFAULT_LAYOUT.sofaNorthW) || sofa.w;
+    sofa.d = Number(DEFAULT_LAYOUT.sofaWestD) || sofa.d;
+    sofa.armW = Number(DEFAULT_LAYOUT.sofaArmW) || sofa.armW;
+    sofa.armD = Number(DEFAULT_LAYOUT.sofaArmD) || sofa.armD;
+  }
   return {
     mode: "plan", // plan | view3d
     partitions: seeded.partitions,
     openings: seeded.openings,
-    furnitureLayers: seeded.furnitureLayers,
+    furnitureLayers: [...seeded.furnitureLayers, ...extras],
     livingBoundaryId: seeded.livingBoundaryId,
     partSelectedId: null,
     openingSelectedId: null,
@@ -865,7 +880,7 @@ export function createSkica(opts) {
       render();
     });
     panel.querySelector("#skica-reseed")?.addEventListener("click", () => {
-      if (!confirm("Obnovit výchozí skicu (U-koupelna + TV + nábytek)?")) return;
+      if (!confirm("Obnovit výchozí skicu (aktuální vestavěné rozložení)?")) return;
       state = defaultState();
       persist();
       fillPanel();

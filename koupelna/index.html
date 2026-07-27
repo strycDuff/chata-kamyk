@@ -934,6 +934,7 @@
     <a class="brand" href="../">Chata Kamyk</a>
     <a href="../">Přehled</a>
     <a class="active" href="./">Plánovač</a>
+    <a href="../vybaveni/">Vybavení</a>
     <a href="../smarthome/">SmartHome</a>
   </nav>
 
@@ -1083,8 +1084,8 @@
           <div class="side-block-body">
             <label>Levý okraj od vnitřního Z: <strong id="kitchen-left-val">313</strong> cm</label>
             <input type="range" id="kitchen-left" min="307" max="806" value="313" step="1">
-            <label>Délka V–Z: <strong id="kitchen-len-val">160</strong> cm</label>
-            <input type="range" id="kitchen-len" min="100" max="280" value="160" step="1">
+            <label>Délka V–Z: <strong id="kitchen-len-val">181</strong> cm</label>
+            <input type="range" id="kitchen-len" min="100" max="280" value="181" step="1">
             <p class="hint">Hloubka od jihu: 60 cm · hard stop u vstupních dveří</p>
             <p class="hint" id="pass-hint">PR linky → JL koupelny</p>
           </div>
@@ -1360,7 +1361,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.25.3";
+  const APP_VERSION = "3.26.0";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1460,6 +1461,9 @@
   }
 
   const STORAGE_KEY = "chata-kamyk-planner-variants-v9";
+  /** Filled in boot() from default-layout.mjs */
+  let BUILTIN_DEFAULT_LAYOUT = null;
+  let BUILTIN_DEFAULT_NAME = "Výchozí rozložení";
   const FURN_MIN = 20;
   const FURN_DEFAULT_H = 75;
   const VIEW3D_H = {
@@ -1517,12 +1521,12 @@
     bathW: BATH_DEFAULTS.bathW,
     bathD: BATH_DEFAULTS.bathD,
     tvX: 324, // západní líc TV příčky od vnitřního Z
-    tvLen: 140,
+    tvLen: 139,
     kitchenLeft: 313, // od vnitřního Z, východně od vstupních dveří
-    kitchenLen: 160,
-    bedVariant: 160,
-    bedOuterW: 165, // celkový rám V–Z (cm)
-    bedOuterD: 205, // celkový rám S–J (cm)
+    kitchenLen: 181,
+    bedVariant: 140,
+    bedOuterW: 150, // celkový rám V–Z (cm)
+    bedOuterD: 215, // celkový rám S–J (cm)
     bedFrameOffset: 2.5, // legacy — migrace do bedOuter*
     sofaNorthW: 160, // délka severního ramene (= bounding w)
     sofaWestD: 240,  // délka západního ramene (= bounding d)
@@ -1534,7 +1538,7 @@
     showFurniture: true,
     showElectro: true,
     showDims: true,
-    view3dDoorOpen: false,
+    view3dDoorOpen: true,
     showInteriorLights: true,
     showRoof: true,
     showRoofCovering: false,
@@ -1547,20 +1551,20 @@
     texCovering: false,
     roofPitchDeg: 30, // fixní
     roofRafterSpacing: 90, // fixní osová vzdálenost
-    livingCollarBottom: 190, // loft kleštiny — default pod korunou, lze níž
-    livingCollarCount: 4, // kolik kleštin (od Z) se posouvá výškou
-    loftLengthCm: 325, // default = rozpon 4 kleštin (ne počet×90)
+    livingCollarBottom: 205, // loft kleštiny — default pod korunou, lze níž
+    livingCollarCount: 2, // kolik kleštin (od Z) se posouvá výškou
+    loftLengthCm: 160, // default = rozpon kleštin
     doorWidth: 70,
-    doorOffset: 90,
-    doorType: "A",
+    doorOffset: 65,
+    doorType: "B",
     pocketDir: "south",
     showerPreset: "80x80",
     showerRotate: false,
     showerFullDepth: 80,
     showerW: 80,
     showerD: 80,
-    showerClearX: null, // clear cm — NW roh vaničky; null = výchozí JV roh koupelny
-    showerClearY: null,
+    showerClearX: 601.5, // clear cm — NW roh vaničky; null = výchozí JV roh koupelny
+    showerClearY: 137.5,
     sinkW: 40,
     sinkD: 30,
     sinkOffset: 70,
@@ -6939,7 +6943,15 @@
     catch { return []; }
   }
   function saveVariants(list) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    // Never persist builtin entries
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list.filter((v) => !v.builtin)));
+  }
+  function variantsForUi() {
+    const user = loadVariants().filter((v) => !v.builtin);
+    const builtin = BUILTIN_DEFAULT_LAYOUT
+      ? [{ name: BUILTIN_DEFAULT_NAME, data: BUILTIN_DEFAULT_LAYOUT, builtin: true }]
+      : [];
+    return [...builtin, ...user];
   }
   function snapshot() {
     const {
@@ -7152,7 +7164,7 @@
     Object.assign(state, rest);
     ensureElevView();
     if (state.kitchenLeft == null) state.kitchenLeft = 313;
-    if (state.kitchenLen == null) state.kitchenLen = 160;
+    if (state.kitchenLen == null) state.kitchenLen = 181;
     if (state.bedFrameOffset == null) state.bedFrameOffset = 2.5;
     const matW = Number(state.bedVariant) === 140 ? 140 : 160;
     if (state.bedOuterW == null || !Number.isFinite(Number(state.bedOuterW))) {
@@ -7311,23 +7323,29 @@
   }
   function renderVariants() {
     const ul = document.getElementById("variant-list");
-    const list = loadVariants();
+    const list = variantsForUi();
     ul.innerHTML = "";
     list.forEach((v, idx) => {
       const li = document.createElement("li");
-      li.innerHTML = `<span>${v.name}</span>`;
+      li.innerHTML = `<span>${v.name}${v.builtin ? " · vestavěná" : ""}</span>`;
       const actions = document.createElement("span");
       const loadBtn = document.createElement("button");
       loadBtn.textContent = "Načíst";
       loadBtn.onclick = () => applySnapshot(v.data);
-      const delBtn = document.createElement("button");
-      delBtn.textContent = "Smazat";
-      delBtn.onclick = () => {
-        const next = loadVariants().filter((_, i) => i !== idx);
-        saveVariants(next);
-        renderVariants();
-      };
-      actions.append(loadBtn, delBtn);
+      actions.appendChild(loadBtn);
+      if (!v.builtin) {
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "Smazat";
+        delBtn.onclick = () => {
+          // idx includes builtin at 0 — map to user index
+          const user = loadVariants().filter((x) => !x.builtin);
+          const userIdx = idx - (BUILTIN_DEFAULT_LAYOUT ? 1 : 0);
+          const next = user.filter((_, i) => i !== userIdx);
+          saveVariants(next);
+          renderVariants();
+        };
+        actions.appendChild(delBtn);
+      }
       li.appendChild(actions);
       ul.appendChild(li);
     });
@@ -7405,11 +7423,22 @@
     }
   });
 
-  ensureDefaultElecCircuits();
-  ensureDefaultPanel();
-  syncSlidersFromState();
-  renderVariants();
-  render();
+  async function bootFromDefaultLayout() {
+    try {
+      const mod = await import("./default-layout.mjs");
+      BUILTIN_DEFAULT_LAYOUT = mod.DEFAULT_LAYOUT;
+      BUILTIN_DEFAULT_NAME = mod.DEFAULT_LAYOUT_NAME || "Výchozí rozložení";
+      applySnapshot(BUILTIN_DEFAULT_LAYOUT);
+    } catch (err) {
+      console.warn("Default layout load failed, using inline defaults", err);
+      ensureDefaultElecCircuits();
+      ensureDefaultPanel();
+    }
+    syncSlidersFromState();
+    renderVariants();
+    render();
+  }
+  bootFromDefaultLayout();
 })();
 </script>
 </body>

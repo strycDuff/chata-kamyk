@@ -1,0 +1,243 @@
+/** Built-in default cabin layout (parametric snapshot). */
+export const DEFAULT_LAYOUT_NAME = "Výchozí rozložení";
+
+export const DEFAULT_LAYOUT = {
+  "bathLeft": 569,
+  "bathW": 125,
+  "bathD": 230,
+  "tvX": 324,
+  "tvLen": 139.1,
+  "kitchenLeft": 313,
+  "kitchenLen": 181,
+  "bedVariant": 140,
+  "bedOuterW": 150,
+  "bedOuterD": 215,
+  "bedFrameOffset": 2.5,
+  "sofaNorthW": 160,
+  "sofaWestD": 240,
+  "sofaArmW": 95,
+  "sofaArmD": 90,
+  "tvVariant": 55,
+  "showSofa": true,
+  "showBed": true,
+  "showFurniture": true,
+  "showElectro": true,
+  "showDims": true,
+  "view3dDoorOpen": true,
+  "showInteriorLights": true,
+  "showRoof": true,
+  "showRoofCovering": false,
+  "showRoofSheathing": false,
+  "showLoftDeck": true,
+  "texWood": false,
+  "texWall": false,
+  "texFloor": false,
+  "texFurniture": false,
+  "texCovering": false,
+  "roofPitchDeg": 30,
+  "roofRafterSpacing": 90,
+  "livingCollarBottom": 205,
+  "livingCollarCount": 2,
+  "loftLengthCm": 160,
+  "doorWidth": 70,
+  "doorOffset": 65,
+  "doorType": "B",
+  "pocketDir": "south",
+  "showerPreset": "80x80",
+  "showerRotate": false,
+  "showerFullDepth": 80,
+  "showerW": 80,
+  "showerD": 80,
+  "showerClearX": 601.5,
+  "showerClearY": 137.5,
+  "sinkW": 40,
+  "sinkD": 30,
+  "sinkOffset": 70,
+  "furnitureLayers": [
+    {
+      "id": "fms31mqt0_1",
+      "name": "komoda",
+      "x": 261.2,
+      "y": 0.0,
+      "w": 60.0,
+      "d": 140.0,
+      "h": 75.0
+    },
+    {
+      "id": "fms320hb9_2",
+      "name": "STUL",
+      "x": 105.8,
+      "y": 107.4,
+      "w": 57.0,
+      "d": 60.0,
+      "h": 45.0
+    },
+    {
+      "id": "fms320wnp_3",
+      "name": "LEDNICE",
+      "x": 338.8,
+      "y": 1.2,
+      "w": 55.0,
+      "d": 55.1,
+      "h": 200.0
+    },
+    {
+      "id": "fms321gpx_4",
+      "name": "skrin na troubu",
+      "x": 338.8,
+      "y": 59.8,
+      "w": 60.0,
+      "d": 60.0,
+      "h": 75.0
+    },
+    {
+      "id": "fms34a36j_5",
+      "name": "skříň a komoda",
+      "x": 726.0,
+      "y": 291.0,
+      "w": 180.0,
+      "d": 42.0,
+      "h": 75.0
+    },
+    {
+      "id": "fms357nu5_6",
+      "name": "skrin obyvak",
+      "x": 53.5,
+      "y": 288.9,
+      "w": 120.0,
+      "d": 42.0,
+      "h": 75.0
+    }
+  ],
+  "elevWalls": [
+    "north"
+  ],
+  "roomClearH": 210,
+  "windowSillH": 90,
+  "doorOpeningH": 200,
+  "doorLeafH": 190,
+  "elecStep": "plan",
+  "elecCircuits": [
+    {
+      "id": "cms31l4j5_1",
+      "kind": "lights",
+      "name": "Ložnice",
+      "room": "Ložnice"
+    },
+    {
+      "id": "cms31l4j5_2",
+      "kind": "lights",
+      "name": "Chodba",
+      "room": "Chodba"
+    },
+    {
+      "id": "cms31l4j5_3",
+      "kind": "lights",
+      "name": "Kuchyně",
+      "room": "Kuchyně"
+    },
+    {
+      "id": "cms31l4j5_4",
+      "kind": "lights",
+      "name": "Obývak",
+      "room": "Obývak"
+    },
+    {
+      "id": "cms31l4j5_5",
+      "kind": "lights",
+      "name": "Venek",
+      "room": "Venek"
+    },
+    {
+      "id": "cms31l4j5_6",
+      "kind": "sockets",
+      "name": "Ložnice",
+      "room": "Ložnice"
+    },
+    {
+      "id": "cms31l4j5_7",
+      "kind": "sockets",
+      "name": "Chodba",
+      "room": "Chodba"
+    },
+    {
+      "id": "cms31l4j5_8",
+      "kind": "sockets",
+      "name": "Kuchyně",
+      "room": "Kuchyně"
+    },
+    {
+      "id": "cms31l4j5_9",
+      "kind": "sockets",
+      "name": "Obývak",
+      "room": "Obývak"
+    },
+    {
+      "id": "cms31l4j5_10",
+      "kind": "sockets",
+      "name": "Venek",
+      "room": "Venek"
+    },
+    {
+      "id": "cms31l4j5_11",
+      "kind": "data",
+      "name": "Ložnice",
+      "room": "Ložnice"
+    },
+    {
+      "id": "cms31l4j5_12",
+      "kind": "data",
+      "name": "Chodba",
+      "room": "Chodba"
+    },
+    {
+      "id": "cms31l4j5_13",
+      "kind": "data",
+      "name": "Kuchyně",
+      "room": "Kuchyně"
+    },
+    {
+      "id": "cms31l4j5_14",
+      "kind": "data",
+      "name": "Obývak",
+      "room": "Obývak"
+    },
+    {
+      "id": "cms31l4j5_15",
+      "kind": "data",
+      "name": "Venek",
+      "room": "Venek"
+    },
+    {
+      "id": "cms31l4j5_16",
+      "kind": "sockets",
+      "name": "Rozvaděč",
+      "room": "Rozvaděč"
+    }
+  ],
+  "elecActiveCircuitId": "cms31l4j5_1",
+  "elecNewKind": "sockets",
+  "elecTreeMode": "room",
+  "elecFilter": {
+    "data": true,
+    "lights": true,
+    "sockets": true
+  },
+  "elecCableType": "cyky15",
+  "elecOrtho": true,
+  "elecPoints": [
+    {
+      "id": "ems31l4j5_17",
+      "type": "panel",
+      "circuitId": "cms31l4j5_16",
+      "x": 548,
+      "y": 2,
+      "h": 150,
+      "name": "Rozvaděč"
+    }
+  ],
+  "elecRuns": [],
+  "elecElevRuns": [],
+  "elecType": "switch",
+  "elecH": 120
+};
