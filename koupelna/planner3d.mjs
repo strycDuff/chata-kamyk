@@ -16,11 +16,14 @@ function mat(color, opts = {}) {
   });
 }
 
-function addBox(group, { x, y, w, d, h, color, opacity, elev, rotX, rotY, rotZ }) {
+function addBox(group, { x, y, w, d, h, color, opacity, elev, rotX, rotY, rotZ, doubleSide }) {
   if (w <= 0 || d <= 0 || h <= 0) return;
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
-    mat(color || "#94a3b8", { opacity })
+    mat(color || "#94a3b8", {
+      opacity,
+      side: doubleSide ? THREE.DoubleSide : THREE.FrontSide,
+    })
   );
   const y0 = Number(elev) || 0;
   mesh.position.set(x + w / 2, y0 + h / 2, y + d / 2);
@@ -36,11 +39,14 @@ function addBox(group, { x, y, w, d, h, color, opacity, elev, rotX, rotY, rotZ }
  * Oriented timber: center at (cx, cy, cz), local size w×h×d along local axes,
  * then Euler YXZ rotation (radians).
  */
-function addOrientedBox(group, { cx, cy, cz, w, h, d, color, opacity, rotX, rotY, rotZ }) {
+function addOrientedBox(group, { cx, cy, cz, w, h, d, color, opacity, rotX, rotY, rotZ, doubleSide }) {
   if (w <= 0 || d <= 0 || h <= 0) return;
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
-    mat(color || "#94a3b8", { opacity })
+    mat(color || "#94a3b8", {
+      opacity,
+      side: doubleSide ? THREE.DoubleSide : THREE.FrontSide,
+    })
   );
   mesh.position.set(cx, cy, cz);
   mesh.rotation.order = "YXZ";

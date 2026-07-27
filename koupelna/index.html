@@ -1267,7 +1267,7 @@
             <div class="side-block-body">
               <label class="chk"><input type="checkbox" id="roof-show"> Zobrazit krov</label>
               <label class="chk"><input type="checkbox" id="roof-covering"> Krytina (plech)</label>
-              <label class="chk"><input type="checkbox" id="roof-sheathe"> Zaklopit (skrýt krokve · jen kleštiny)</label>
+              <label class="chk"><input type="checkbox" id="roof-sheathe"> Zaklopit (bílá deska na spodku krokví)</label>
               <label class="chk"><input type="checkbox" id="roof-loft-deck"> Podlaha loftu nad obývákem</label>
               <p class="hint">Fixní: sklon 30° · osová vzdálenost krokví 90 cm</p>
               <p class="hint">Kleština obývák — spodní líc: <strong>229</strong> cm (neposuvné)</p>
@@ -1318,7 +1318,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.18.0";
+  const APP_VERSION = "3.18.1";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1491,7 +1491,7 @@
     view3dDoorOpen: false,
     showRoof: true,
     showRoofCovering: false,
-    showRoofSheathing: false, // zaklopit = skrýt krokve, nechat kleštiny
+    showRoofSheathing: false, // zaklopit = bílá deska na spodním líci krokví
     showLoftDeck: true,
     roofPitchDeg: 30, // fixní
     roofRafterSpacing: 90, // fixní osová vzdálenost
@@ -4788,14 +4788,22 @@
     });
   }
 
-  /** Spodní líc krokví / střešní roviny nad clear Z (cm od podlahy). */
+  /** Spodní líc krokví nad clear Z (cm od podlahy). */
   function roofUndersideAtZ(z, r = roofParams()) {
     const along = z <= r.halfSpan ? z : Math.max(0, CLEAR.h - z);
     const h = r.plateH + (along / Math.max(1, r.halfSpan)) * r.rise;
     return h - r.rafterTh * 0.55;
   }
 
-  /** Min. výška ke střeše přes clear box (pro příčky jdoucí až pod krov). */
+  const ROOF_SHEATH_H = 1.8; // tloušťka zaklopení (cm)
+
+  /** Podhledová rovina: spodní líc krokve, nebo spodní líc zaklopení. */
+  function roofCeilingAtZ(z, r = roofParams()) {
+    const under = roofUndersideAtZ(z, r);
+    return state.showRoofSheathing ? under - ROOF_SHEATH_H : under;
+  }
+
+  /** Min. podhled přes clear box (pro limity / TV). */
   function heightToRoofForBox(clearBox, roomH) {
     const r = roofParams();
     let minRoof = r.ridgeH;
@@ -4804,9 +4812,48 @@
     const steps = Math.max(4, Math.ceil((z1 - z0) / 16));
     for (let i = 0; i <= steps; i++) {
       const z = z0 + ((z1 - z0) * i) / steps;
-      minRoof = Math.min(minRoof, roofUndersideAtZ(z, r));
+      minRoof = Math.min(minRoof, roofCeilingAtZ(z, r));
     }
     return Math.max(roomH, Math.round(minRoof));
+  }
+
+  /**
+   * Svislá deska se schodovitě ořízne pod střešní podhled (sleduje sklon S–J).
+   * clearBox: {x,y,w,d} ve clear cm (y = Z podél krokví).
+   */
+  function pushBoxToRoof(boxes, clearBox, color, opts = {}) {
+    const elev0 = Number(opts.elev) || 0;
+    const capTop = opts.capTop;
+    const step = opts.step || 6;
+    const r = roofParams();
+    if (clearBox.d <= 0.5 || clearBox.w <= 0) return;
+
+    const n = Math.max(1, Math.ceil(clearBox.d / step));
+    const segD = clearBox.d / n;
+    for (let i = 0; i < n; i++) {
+      const y = clearBox.y + i * segD;
+      const zA = y;
+      const zB = y + segD;
+      let top = Math.min(
+        roofCeilingAtZ(zA, r),
+        roofCeilingAtZ(zB, r),
+        roofCeilingAtZ((zA + zB) / 2, r)
+      );
+      if (capTop != null) top = Math.min(top, capTop);
+      const h = top - elev0;
+      if (h > 0.5) {
+        boxes.push({
+          x: clearBox.x,
+          y,
+          w: clearBox.w,
+          d: segD + (i < n - 1 ? 0.08 : 0),
+          h,
+          elev: elev0,
+          color,
+          opacity: opts.opacity,
+        });
+      }
+    }
   }
 
   function pushBathPartitions3d(boxes, roomH) {
@@ -4821,40 +4868,28 @@
       x: o.x + PART, y: o.y + o.d - PART,
       w: Math.max(0, o.w - 2 * PART), d: PART,
     });
-    const westSpanC = absToClearBox({ x: o.x, y: o.y, w: PART, d: o.d });
-    const partH = Math.max(
-      heightToRoofForBox(eastC, roomH),
-      heightToRoofForBox(southC, roomH),
-      heightToRoofForBox(westSpanC, roomH)
-    );
 
-    // Východní + jižní příčka — až pod střešní rovinu
-    boxes.push({ ...eastC, h: partH, color: col });
-    boxes.push({ ...southC, h: partH, color: col });
+    // Východní + jižní — schody pod sklon střechy (ne jedna výška přes celý S–J)
+    pushBoxToRoof(boxes, eastC, col);
+    pushBoxToRoof(boxes, southC, col);
 
-    // Západní příčka — výřez pro dveře, zbytek až ke střeše
+    // Západní příčka — výřez pro dveře, zbytek až pod podhled
     const northD = op.y - o.y;
     if (northD > 0.5) {
-      boxes.push({
-        ...absToClearBox({ x: o.x, y: o.y, w: PART, d: northD }),
-        h: partH, color: col,
-      });
+      pushBoxToRoof(boxes, absToClearBox({ x: o.x, y: o.y, w: PART, d: northD }), col);
     }
     const southY = op.y + op.d;
     const southD = o.y + o.d - southY;
     if (southD > 0.5) {
-      boxes.push({
-        ...absToClearBox({ x: o.x, y: southY, w: PART, d: southD }),
-        h: partH, color: col,
-      });
+      pushBoxToRoof(boxes, absToClearBox({ x: o.x, y: southY, w: PART, d: southD }), col);
     }
-    const lintelH = Math.max(0, partH - doorH);
-    if (lintelH > 0.5) {
-      boxes.push({
-        ...absToClearBox({ x: o.x, y: op.y, w: PART, d: op.d }),
-        h: lintelH, color: col, elev: doorH,
-      });
-    }
+    // Nadpraží — od horní hrany dveří po podhled (také po sklonu)
+    pushBoxToRoof(
+      boxes,
+      absToClearBox({ x: o.x, y: op.y, w: PART, d: op.d }),
+      col,
+      { elev: doorH }
+    );
 
     // Křídlo — tenké (~3,5 cm), ať v pouzdře nebliká s příčkou
     const leafW = 3.5;
@@ -4939,42 +4974,48 @@
     const struct = "#7f8c8d";
     const r = roofParams();
     clampRoofControls();
-    // výška příčky: ke krovu, pokud loft nedosahuje k TV; jinak po spod loftu
+    // výška: po spod loftu pokud dosahuje k TV; jinak schody pod podhled
     const loftX1 = state.showLoftDeck
       ? Math.min(r.livingX1, Math.max(0, r.rafterW * 0.5) + state.loftLengthCm)
       : 0;
     const loftReachesTv = state.showLoftDeck && loftX1 >= tv.x - 2;
-    let partH;
-    if (loftReachesTv) {
-      partH = r.livingBottom + r.collarH + (state.showLoftDeck ? 4 : 0);
-    } else {
-      partH = heightToRoofForBox(tv, roomH);
-    }
-    partH = Math.max(roomH, Math.round(partH));
-    // nosná příčka
-    boxes.push({ ...tv, h: partH, color: struct });
-    // obklad prkny na obývací (západní) straně: 60 cm → vrchol příčky
+    const loftCap = loftReachesTv
+      ? r.livingBottom + r.collarH + (state.showLoftDeck ? 4 : 0)
+      : null;
+    pushBoxToRoof(boxes, tv, struct, { capTop: loftCap });
+
+    // obklad prkny na obývací (západní) straně: 60 cm → podhled (po sklonu)
     const cladT = 2.2;
     const cladFrom = 60;
     const plank = 11;
     const gap = 0.8;
-    let elev = cladFrom;
-    let i = 0;
-    while (elev < partH - 0.5) {
-      const h = Math.min(plank, partH - elev);
-      boxes.push({
-        x: tv.x - cladT, y: tv.y, w: cladT, d: tv.d,
-        h, elev,
-        color: i % 2 === 0 ? "#c4a574" : "#b08968",
-      });
-      elev += plank + gap;
-      i += 1;
+    const n = Math.max(1, Math.ceil(tv.d / 6));
+    const segD = tv.d / n;
+    for (let i = 0; i < n; i++) {
+      const y = tv.y + i * segD;
+      let top = Math.min(roofCeilingAtZ(y, r), roofCeilingAtZ(y + segD, r));
+      if (loftCap != null) top = Math.min(top, loftCap);
+      let elev = cladFrom;
+      let pi = 0;
+      while (elev < top - 0.5) {
+        const h = Math.min(plank, top - elev);
+        boxes.push({
+          x: tv.x - cladT, y, w: cladT, d: segD + (i < n - 1 ? 0.08 : 0),
+          h, elev,
+          color: pi % 2 === 0 ? "#c4a574" : "#b08968",
+        });
+        elev += plank + gap;
+        pi += 1;
+      }
     }
     // TV panel na obkladu (16:9), střed přibližně ve výšce očí
+    const partHMid = loftCap != null
+      ? loftCap
+      : roofCeilingAtZ(tv.y + tv.d / 2, r);
     const screenAlong = Math.min(TV_WIDTHS[state.tvVariant] || 123, tv.d - 4);
     const screenH = screenAlong * (9 / 16);
     const screenT = 4;
-    const screenElev = Math.min(partH - screenH - 8, Math.max(cladFrom + 8, 180 - screenH / 2));
+    const screenElev = Math.min(partHMid - screenH - 8, Math.max(cladFrom + 8, 180 - screenH / 2));
     const along0 = tv.y + (tv.d - screenAlong) / 2;
     boxes.push({
       x: tv.x - cladT - screenT, y: along0,
@@ -5144,23 +5185,21 @@
     const movableSet = new Set(movableXs);
 
     for (const x of xs) {
-      // Krokve — skryté při „Zaklopit“ (vidět jen kleštiny / krytina)
-      if (!state.showRoofSheathing) {
-        boxes.push({
-          oriented: true,
-          cx: x, cy: r.plateH + r.rise / 2, cz: r.halfSpan / 2,
-          w: r.rafterW, h: r.rafterTh, d: r.rafterLen,
-          rotX: -r.pitch,
-          color: wood,
-        });
-        boxes.push({
-          oriented: true,
-          cx: x, cy: r.plateH + r.rise / 2, cz: r.halfSpan + r.halfSpan / 2,
-          w: r.rafterW, h: r.rafterTh, d: r.rafterLen,
-          rotX: r.pitch,
-          color: wood,
-        });
-      }
+      // Krokve — zůstávají; zaklopení je deska na jejich spodním líci
+      boxes.push({
+        oriented: true,
+        cx: x, cy: r.plateH + r.rise / 2, cz: r.halfSpan / 2,
+        w: r.rafterW, h: r.rafterTh, d: r.rafterLen,
+        rotX: -r.pitch,
+        color: wood,
+      });
+      boxes.push({
+        oriented: true,
+        cx: x, cy: r.plateH + r.rise / 2, cz: r.halfSpan + r.halfSpan / 2,
+        w: r.rafterW, h: r.rafterTh, d: r.rafterLen,
+        rotX: r.pitch,
+        color: wood,
+      });
 
       // Kleština mezi párem krokví — pohyblivé jen vybraný počet od západu
       const movable = movableSet.has(x);
@@ -5179,6 +5218,37 @@
         h: r.collarH,
         elev: collarBottom,
         color: movable ? "#b8956a" : woodLight,
+      });
+    }
+
+    // Zaklopení — bílá deska nalepená na spodní líc krokví (snižuje světlou výšku o výšku krokve)
+    if (state.showRoofSheathing) {
+      const sheet = "#f4f6f8";
+      const sheetH = ROOF_SHEATH_H;
+      const drop = r.rafterTh * 0.55 + sheetH * 0.5;
+      boxes.push({
+        oriented: true,
+        cx: CLEAR.w / 2,
+        cy: r.plateH + r.rise / 2 - drop,
+        cz: r.halfSpan / 2,
+        w: CLEAR.w + 12,
+        h: sheetH,
+        d: r.rafterLen + 6,
+        rotX: -r.pitch,
+        color: sheet,
+        doubleSide: true,
+      });
+      boxes.push({
+        oriented: true,
+        cx: CLEAR.w / 2,
+        cy: r.plateH + r.rise / 2 - drop,
+        cz: r.halfSpan + r.halfSpan / 2,
+        w: CLEAR.w + 12,
+        h: sheetH,
+        d: r.rafterLen + 6,
+        rotX: r.pitch,
+        color: sheet,
+        doubleSide: true,
       });
     }
 
