@@ -1209,6 +1209,7 @@
             <summary>Krov · kleštiny</summary>
             <div class="side-block-body">
               <label class="chk"><input type="checkbox" id="roof-show"> Zobrazit krov (sedlová střecha)</label>
+              <label class="chk"><input type="checkbox" id="roof-covering"> Krytina (plech, tmavě hnědočervená)</label>
               <label class="chk"><input type="checkbox" id="roof-loft-deck"> Podlaha loftu nad obývákem</label>
               <p class="hint">Fixní: sklon 30° · osová vzdálenost krokví 90 cm</p>
               <p class="hint">Kleština obývák — spodní líc: <strong>229</strong> cm (neposuvné)</p>
@@ -1259,7 +1260,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.16.1";
+  const APP_VERSION = "3.16.2";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1427,6 +1428,7 @@
     showDims: true,
     view3dDoorOpen: false,
     showRoof: true,
+    showRoofCovering: false,
     showLoftDeck: true,
     roofPitchDeg: 30, // fixní
     roofRafterSpacing: 90, // fixní osová vzdálenost
@@ -4541,6 +4543,35 @@
       }
     }
 
+    // Krytina — plech, tmavě hnědočervená (nad krokvemi)
+    if (state.showRoofCovering) {
+      const sheet = "#6b2a1f";
+      const sheetH = 1.8;
+      const lift = r.rafterTh * 0.55 + sheetH * 0.5;
+      boxes.push({
+        oriented: true,
+        cx: CLEAR.w / 2,
+        cy: r.plateH + r.rise / 2 + lift,
+        cz: r.halfSpan / 2,
+        w: CLEAR.w + 12,
+        h: sheetH,
+        d: r.rafterLen + 6,
+        rotX: -r.pitch,
+        color: sheet,
+      });
+      boxes.push({
+        oriented: true,
+        cx: CLEAR.w / 2,
+        cy: r.plateH + r.rise / 2 + lift,
+        cz: r.halfSpan + r.halfSpan / 2,
+        w: CLEAR.w + 12,
+        h: sheetH,
+        d: r.rafterLen + 6,
+        rotX: r.pitch,
+        color: sheet,
+      });
+    }
+
     // Podlaha loftu — délka nastavitelná (default = počet pohyblivých kleštin × osová)
     if (state.showLoftDeck && state.loftLengthCm > 0) {
       const deckT = 2.2;
@@ -4563,12 +4594,6 @@
             color: ((px / (plank + gap)) | 0) % 2 === 0 ? "#c4a574" : "#b8956a",
           });
         }
-        // nízké zábradlí na východním konci loftu
-        boxes.push({
-          x: Math.max(x0, x1 - 4), y: 12, w: 3, d: CLEAR.h - 24,
-          h: 42, elev: elevTop + deckT,
-          color: "#8b6914", opacity: 0.75,
-        });
       }
     }
   }
@@ -4703,14 +4728,14 @@
 
     if (state.showRoof) pushRoofStructure3d(boxes);
 
-    // před vstupními dveřmi — venkovní plocha (pro chůzi ven)
+    // před chatou — širší venkovní plocha (volnější pohyb kolem vchodu)
     const entry = southDoorClear();
-    const outDepth = 160;
-    const outPadX = 40;
+    const outDepth = 420;
+    const outSidePad = 180;
     boxes.push({
-      x: entry.x0 - outPadX,
+      x: -outSidePad,
       y: CLEAR.h + WALL * 0.15,
-      w: (entry.x1 - entry.x0) + outPadX * 2,
+      w: CLEAR.w + outSidePad * 2,
       d: outDepth,
       h: 1.5,
       color: "#cfd8dc",
@@ -4723,6 +4748,7 @@
       walk: {
         door: { x0: entry.x0, x1: entry.x1 },
         outsideDepth: outDepth,
+        outsidePadX: outSidePad,
       },
     };
   }
@@ -5355,6 +5381,8 @@
     }
     const roofShow = document.getElementById("roof-show");
     if (roofShow) roofShow.checked = !!state.showRoof;
+    const roofCover = document.getElementById("roof-covering");
+    if (roofCover) roofCover.checked = !!state.showRoofCovering;
     const loftDeck = document.getElementById("roof-loft-deck");
     if (loftDeck) loftDeck.checked = !!state.showLoftDeck;
     clampRoofControls();
@@ -5547,6 +5575,10 @@
   bindRange("roof-loft-len", "loftLengthCm", "roof-loft-len-val");
   document.getElementById("roof-show")?.addEventListener("change", (e) => {
     state.showRoof = e.target.checked;
+    render();
+  });
+  document.getElementById("roof-covering")?.addEventListener("change", (e) => {
+    state.showRoofCovering = e.target.checked;
     render();
   });
   document.getElementById("roof-loft-deck")?.addEventListener("change", (e) => {
@@ -6022,6 +6054,7 @@
     if (state.doorOpeningH == null) state.doorOpeningH = 200;
     if (state.doorLeafH == null) state.doorLeafH = 190;
     if (state.showRoof == null) state.showRoof = true;
+    if (state.showRoofCovering == null) state.showRoofCovering = false;
     if (state.showLoftDeck == null) state.showLoftDeck = true;
     state.roofPitchDeg = 30;
     state.roofRafterSpacing = 90;

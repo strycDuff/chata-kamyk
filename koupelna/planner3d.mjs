@@ -138,21 +138,22 @@ export function createViewer(container) {
     camera.position.addScaledVector(forwardV, forward);
     camera.position.addScaledVector(rightV, strafe);
     camera.position.y = eyeY();
-    // světlost místnosti; před vstupními dveřmi (jih / +Z) lze vyjít ven
+    // světlost uvnitř; venku před jižní stěnou — širší plocha kolem vchodu
     const m = 15;
     const door = viewer.room.door;
     const outD = Math.max(0, Number(viewer.room.outsideDepth) || 0);
+    const outPadX = Math.max(80, Number(viewer.room.outsidePadX) || 180);
     let x = camera.position.x;
     let z = camera.position.z;
-    const doorPad = 20;
+    const doorPad = 35;
     const southInside = viewer.room.d - m;
     const inDoorX = door
       && x >= door.x0 - doorPad
       && x <= door.x1 + doorPad;
     const isOutside = z > southInside;
-    if (isOutside && door && outD > 0) {
-      // venku — držet se v koridoru dveří
-      x = Math.min(door.x1 + doorPad, Math.max(door.x0 - doorPad, x));
+    if (isOutside && outD > 0) {
+      // venku — celá šířka chaty + boční přesahy
+      x = Math.min(viewer.room.w + outPadX - m, Math.max(-outPadX + m, x));
       z = Math.min(viewer.room.d + outD, Math.max(southInside, z));
     } else {
       x = Math.min(viewer.room.w - m, Math.max(m, x));
@@ -273,6 +274,7 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
     h: roomH,
     door: walk.door || null,
     outsideDepth: walk.outsideDepth || 0,
+    outsidePadX: walk.outsidePadX || 0,
   };
   viewer.cameras = spec.cameras || {};
 
