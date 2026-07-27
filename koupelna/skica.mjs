@@ -11,6 +11,8 @@ const PART = LM.PART_THICK;
 const INNER = { x: WALL, y: WALL, w: CLEAR.w, h: CLEAR.h };
 const OUTER = { w: CLEAR.w + 2 * WALL, h: CLEAR.h + 2 * WALL };
 const NS = "http://www.w3.org/2000/svg";
+const HANDLE = 14; // end-handle hit size (plan px ≈ cm)
+const PART_LEN_MIN = 40;
 
 const NORTH_SEGS = [
   { t: "wall", l: 220 }, { t: "win", l: 96.5 }, { t: "wall", l: 120 },
@@ -161,6 +163,7 @@ function buildPlanSvg(state, onPointer) {
       stroke: sel ? "#1a5276" : "#2c3e50",
       "stroke-width": sel ? 2.5 : 2,
       "data-part": p.id,
+      "data-part-act": "move",
       class: "skica-part",
     }));
   }
@@ -219,6 +222,37 @@ function buildPlanSvg(state, onPointer) {
       });
       t.textContent = layer.name || layer.kind;
       g.appendChild(t);
+    }
+  }
+  // Length handles on top so ends stay draggable
+  {
+    const p = state.partitions.find((x) => x.id === state.partSelectedId);
+    if (p) {
+      const box = partAbs(p);
+      const vert = LM.isVerticalPartition(p);
+      const hx = vert ? box.x + box.w / 2 - HANDLE / 2 : box.x - HANDLE / 2;
+      const hy = vert ? box.y - HANDLE / 2 : box.y + box.d / 2 - HANDLE / 2;
+      const hx2 = vert ? box.x + box.w / 2 - HANDLE / 2 : box.x + box.w - HANDLE / 2;
+      const hy2 = vert ? box.y + box.d - HANDLE / 2 : box.y + box.d / 2 - HANDLE / 2;
+      for (const [act, x, y] of [["len-a", hx, hy], ["len-b", hx2, hy2]]) {
+        g.appendChild(el("rect", {
+          x, y, width: HANDLE, height: HANDLE,
+          fill: "#1a5276", stroke: "#fff", "stroke-width": 1.5, rx: 2,
+          "data-part": p.id,
+          "data-part-act": act,
+          class: vert ? "skica-part-len-ns" : "skica-part-len-ew",
+        }));
+      }
+      const midX = box.x + box.w / 2;
+      const midY = box.y + box.d / 2;
+      const lenLab = el("text", {
+        x: midX, y: midY - (vert ? 0 : 14),
+        fill: "#1a5276", "font-size": 10, "font-weight": "700",
+        "text-anchor": "middle", "dominant-baseline": "middle",
+        "pointer-events": "none",
+      });
+      lenLab.textContent = `${Math.round(LM.partitionLength(p))} cm`;
+      g.appendChild(lenLab);
     }
   }
   if (state.draw) {
@@ -643,9 +677,15 @@ export function createSkica(opts) {
     if (drawBtn) drawBtn.classList.toggle("active", state.tool === "part-draw");
     const hint = panel.querySelector("#skica-hint");
     if (hint && state.mode === "plan") {
-      hint.textContent = state.tool === "part-draw"
-        ? "Táhni osa-aligned příčku na půdorysu…"
-        : `${state.partitions.length} příček · ${state.openings.length} dveří · ${state.furnitureLayers.length} kusů nábytku`;
+      if (state.tool === "part-draw") {
+        hint.textContent = "Táhni osa-aligned příčku na půdorysu…";
+      } else if (state.partSelectedId) {
+        const pr = state.partitions.find((p) => p.id === state.partSelectedId);
+        const len = pr ? Math.round(LM.partitionLength(pr)) : 0;
+        hint.textContent = `Vybraná příčka ${len} cm · táhni tělo = posun · úchyty na koncích = délka`;
+      } else {
+        hint.textContent = `${state.partitions.length} příček · ${state.openings.length} dveří · ${state.furnitureLayers.length} kusů · klikni příčku pro úpravu délky`;
+      }
     }
   }
 
@@ -684,16 +724,40 @@ export function createSkica(opts) {
     const part = t.closest?.("[data-part]");
     if (part) {
       const id = part.getAttribute("data-part");
+      const act = part.getAttribute("data-part-act") || "move";
       const pr = state.partitions.find((x) => x.id === id);
       if (pr) {
         state.partSelectedId = id;
+        state.openingSelectedId = null;
         state.drag = {
-          type: "part-move", id, start: p,
+          type: act === "len-a" || act === "len-b" ? `part-${act}` : "part-move",
+          id, start: p,
           ox1: pr.x1, oy1: pr.y1, ox2: pr.x2, oy2: pr.y2,
         };
         evt.preventDefault();
         render();
       }
+    }
+  }
+
+  /** Keep doors inside shortened partitions. */
+  function clampOpeningsOnPartition(partId) {
+    const pr = state.partitions.find((x) => x.id === partId);
+    if (!pr) return;
+    const len = LM.partitionLength(pr);
+    for (const op of state.openings) {
+      if (op.partitionId !== partId) continue;
+      op.width = Math.min(op.width, Math.max(40, len));
+      op.offset = Math.min(Math.max(0, op.offset), Math.max(0, len - op.width));
+    }
+  }
+
+  /** When the geometric min end moves, keep openings fixed in world space. */
+  function shiftOpeningOffsets(partId, dMin) {
+    if (!dMin) return;
+    for (const op of state.openings) {
+      if (op.partitionId !== partId) continue;
+      op.offset -= dMin;
     }
   }
 
@@ -733,6 +797,38 @@ export function createSkica(opts) {
           let ny = Math.min(CLEAR.h - PART, Math.max(0, state.drag.oy1 + dy));
           pr.y1 = ny; pr.y2 = ny;
         }
+      }
+      if (!raf) raf = requestAnimationFrame(() => { raf = 0; renderPlanOnly(); });
+      return;
+    }
+    if (state.drag.type === "part-len-a" || state.drag.type === "part-len-b") {
+      const pr = state.partitions.find((x) => x.id === state.drag.id);
+      if (pr) {
+        const dragMin = state.drag.type === "part-len-a"; // visual handle at geometric min end
+        if (LM.isVerticalPartition(pr)) {
+          const startMin = Math.min(state.drag.oy1, state.drag.oy2);
+          const startMax = Math.max(state.drag.oy1, state.drag.oy2);
+          const oldMin = Math.min(pr.y1, pr.y2);
+          let yMin = startMin;
+          let yMax = startMax;
+          if (dragMin) yMin = Math.min(startMax - PART_LEN_MIN, Math.max(0, startMin + dy));
+          else yMax = Math.max(startMin + PART_LEN_MIN, Math.min(CLEAR.h, startMax + dy));
+          pr.y1 = yMin;
+          pr.y2 = yMax;
+          shiftOpeningOffsets(pr.id, yMin - oldMin);
+        } else {
+          const startMin = Math.min(state.drag.ox1, state.drag.ox2);
+          const startMax = Math.max(state.drag.ox1, state.drag.ox2);
+          const oldMin = Math.min(pr.x1, pr.x2);
+          let xMin = startMin;
+          let xMax = startMax;
+          if (dragMin) xMin = Math.min(startMax - PART_LEN_MIN, Math.max(0, startMin + dx));
+          else xMax = Math.max(startMin + PART_LEN_MIN, Math.min(CLEAR.w, startMax + dx));
+          pr.x1 = xMin;
+          pr.x2 = xMax;
+          shiftOpeningOffsets(pr.id, xMin - oldMin);
+        }
+        clampOpeningsOnPartition(pr.id);
       }
       if (!raf) raf = requestAnimationFrame(() => { raf = 0; renderPlanOnly(); });
     }
