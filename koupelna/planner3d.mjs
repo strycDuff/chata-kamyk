@@ -1,9 +1,8 @@
 /**
- * Planner 3D viewer — Three.js + OrbitControls (CDN ESM).
+ * Planner 3D viewer — Three.js first-person POV (look around standing point).
  * Spec boxes use clear-floor cm: x→X, y→Z, h→Y (up).
  */
 import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 function mat(color, opts = {}) {
   return new THREE.MeshStandardMaterial({
@@ -41,16 +40,39 @@ function clearGroup(group) {
   }
 }
 
+function applyLook(viewer) {
+  viewer.camera.rotation.order = "YXZ";
+  viewer.camera.rotation.y = viewer.look.yaw;
+  viewer.camera.rotation.x = viewer.look.pitch;
+  viewer.camera.rotation.z = 0;
+}
+
+function lookAtFromEye(viewer, eye, target) {
+  const dx = target.x - eye.x;
+  const dy = target.y - eye.y;
+  const dz = target.z - eye.z;
+  // Three.js default forward is -Z; yaw/pitch in YXZ order
+  viewer.look.yaw = Math.atan2(-dx, -dz);
+  viewer.look.pitch = Math.atan2(dy, Math.hypot(dx, dz));
+  const lim = Math.PI * 0.45;
+  viewer.look.pitch = Math.max(-lim, Math.min(lim, viewer.look.pitch));
+  applyLook(viewer);
+}
+
 export function createViewer(container) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#e8eef3");
 
-  const camera = new THREE.PerspectiveCamera(50, 1, 1, 5000);
+  const camera = new THREE.PerspectiveCamera(68, 1, 1, 5000);
+  camera.rotation.order = "YXZ";
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  container.appendChild(renderer.domElement);
+  const canvas = renderer.domElement;
+  canvas.style.touchAction = "none";
+  canvas.style.cursor = "grab";
+  container.appendChild(canvas);
 
   const root = new THREE.Group();
   scene.add(root);
@@ -61,38 +83,72 @@ export function createViewer(container) {
   dir.position.set(400, 600, 200);
   dir.castShadow = true;
   dir.shadow.mapSize.set(1024, 1024);
-  dir.shadow.camera.near = 10;
-  dir.shadow.camera.far = 2500;
-  dir.shadow.camera.left = -600;
-  dir.shadow.camera.right = 600;
-  dir.shadow.camera.top = 600;
-  dir.shadow.camera.bottom = -600;
   scene.add(dir);
-
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.08;
-  controls.maxPolarAngle = Math.PI * 0.495;
-  controls.minDistance = 40;
-  controls.maxDistance = 2200;
 
   const viewer = {
     scene,
     camera,
     renderer,
-    controls,
     root,
     container,
     preset: "sofa",
     cameras: {},
     room: { w: 906, d: 333, h: 210 },
+    look: { yaw: 0, pitch: 0 },
     raf: 0,
     _ro: null,
+    _drag: null,
+  };
+
+  const onDown = (e) => {
+    viewer._drag = { x: e.clientX, y: e.clientY };
+    canvas.setPointerCapture?.(e.pointerId);
+    canvas.style.cursor = "grabbing";
+  };
+  const onUp = () => {
+    viewer._drag = null;
+    canvas.style.cursor = "grab";
+  };
+  const onMove = (e) => {
+    if (!viewer._drag) return;
+    const dx = e.clientX - viewer._drag.x;
+    const dy = e.clientY - viewer._drag.y;
+    viewer._drag.x = e.clientX;
+    viewer._drag.y = e.clientY;
+    const sens = 0.0045;
+    viewer.look.yaw -= dx * sens;
+    viewer.look.pitch -= dy * sens;
+    const lim = Math.PI * 0.45;
+    viewer.look.pitch = Math.max(-lim, Math.min(lim, viewer.look.pitch));
+    applyLook(viewer);
+  };
+  const onWheel = (e) => {
+    e.preventDefault();
+    const dirV = new THREE.Vector3();
+    camera.getWorldDirection(dirV);
+    // scroll = krok vpřed/vzad ve směru pohledu (zůstat zhruba ve výšce očí)
+    const step = -e.deltaY * 0.12;
+    camera.position.addScaledVector(dirV, step);
+    // drž výšku očí
+    const eyeY = viewer.cameras?.[viewer.preset]?.eye?.y || 180;
+    camera.position.y = eyeY;
+  };
+
+  canvas.addEventListener("pointerdown", onDown);
+  canvas.addEventListener("pointerup", onUp);
+  canvas.addEventListener("pointercancel", onUp);
+  canvas.addEventListener("pointermove", onMove);
+  canvas.addEventListener("wheel", onWheel, { passive: false });
+  viewer._disposeInput = () => {
+    canvas.removeEventListener("pointerdown", onDown);
+    canvas.removeEventListener("pointerup", onUp);
+    canvas.removeEventListener("pointercancel", onUp);
+    canvas.removeEventListener("pointermove", onMove);
+    canvas.removeEventListener("wheel", onWheel);
   };
 
   const tick = () => {
     viewer.raf = requestAnimationFrame(tick);
-    controls.update();
     renderer.render(scene, camera);
   };
   tick();
@@ -118,12 +174,11 @@ export function setCameraView(viewer, name) {
   viewer.preset = name;
   const { eye, target } = cam;
   viewer.camera.position.set(eye.x, eye.y, eye.z);
-  viewer.controls.target.set(target.x, target.y, target.z);
   if (cam.fov) {
     viewer.camera.fov = cam.fov;
     viewer.camera.updateProjectionMatrix();
   }
-  viewer.controls.update();
+  lookAtFromEye(viewer, eye, target);
 }
 
 export function rebuild(viewer, spec, { applyCamera = false } = {}) {
@@ -150,7 +205,7 @@ export function dispose(viewer) {
   if (!viewer) return;
   cancelAnimationFrame(viewer.raf);
   viewer._ro?.disconnect();
-  viewer.controls.dispose();
+  viewer._disposeInput?.();
   clearGroup(viewer.root);
   viewer.renderer.dispose();
   viewer.renderer.domElement.remove();

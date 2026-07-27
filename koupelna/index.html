@@ -940,7 +940,7 @@
             <button type="button" data-v="fridge">Od lednice</button>
           </div>
           <label class="chk" style="margin:0"><input type="checkbox" id="view3d-door-open"> Dveře koupelny otevřené</label>
-          <span class="hint" style="margin:0">Orbit myší · scroll zoom</span>
+          <span class="hint" style="margin:0">Táhni = rozhlížet se · scroll = krok</span>
         </div>
         <div class="canvas-wrap" id="canvas-wrap"></div>
       </div>
@@ -1238,7 +1238,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.14.1";
+  const APP_VERSION = "3.14.2";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -4295,33 +4295,35 @@
 
   function buildView3dCameras() {
     const EYE = 180;
-    const lookY = 120;
+    const lookY = 140;
     const s = sofaPolylines();
     const west = absToClearBox(s.west);
     const k = absToClearBox(kitchenBox());
-    const op = absToClearBox(doorOpeningBox());
     const tv = absToClearBox(tvBox());
-    // z gauče — stojící POV u sedací zóny, výhled k TV / středu
+    const entry = southDoorClear();
+    const entryMid = (entry.x0 + entry.x1) / 2;
+
+    // z gauče — stání u sedací zóny, výhled k TV
     const sofa = {
       eye: {
-        x: west.x + Math.min(85, west.w * 0.7),
+        x: west.x + Math.min(90, west.w * 0.75),
         y: EYE,
-        z: west.y + west.d * 0.45,
+        z: west.y + west.d * 0.5,
       },
-      target: { x: tv.x - 30, y: lookY, z: tv.y + tv.d * 0.5 },
-      fov: 65,
+      target: { x: tv.x - 40, y: lookY, z: tv.y + tv.d * 0.55 },
+      fov: 70,
     };
-    // ze dveří koupelny — ven do obýváku
+    // ze vstupních dveří (jih) — dovnitř chaty (na sever)
     const door = {
-      eye: { x: op.x - 50, y: EYE, z: op.y + op.d * 0.5 },
-      target: { x: CLEAR.w * 0.22, y: lookY, z: CLEAR.h * 0.4 },
-      fov: 68,
+      eye: { x: entryMid, y: EYE, z: CLEAR.h - 18 },
+      target: { x: entryMid, y: lookY, z: CLEAR.h * 0.35 },
+      fov: 72,
     };
     // od lednice (u linky) — do místnosti / k gauči
     const fridge = {
-      eye: { x: k.x + k.w * 0.85, y: EYE, z: Math.max(25, k.y - 40) },
-      target: { x: west.x + 60, y: lookY, z: west.y + 80 },
-      fov: 65,
+      eye: { x: k.x + k.w * 0.88, y: EYE, z: Math.max(30, k.y - 45) },
+      target: { x: west.x + 70, y: lookY, z: west.y + 100 },
+      fov: 70,
     };
     return { sofa, door, fridge };
   }
