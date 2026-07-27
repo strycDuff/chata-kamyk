@@ -781,6 +781,11 @@
     cursor: crosshair;
     font-family: var(--plan-font);
   }
+  .canvas-wrap svg.elev-svg {
+    height: 100%;
+    max-height: none;
+    min-height: 280px;
+  }
   .canvas-wrap svg.measuring { cursor: crosshair; }
   .canvas-wrap svg.elev-space-pan { cursor: grab; }
   .canvas-wrap svg.elev-panning { cursor: grabbing; }
@@ -1301,7 +1306,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.17.0";
+  const APP_VERSION = "3.17.1";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1869,6 +1874,7 @@
   }
 
   const ELEV_PAD = 36;
+  let elevViewBootstrapped = false;
 
   /** Full-strip viewBox rectangle at scale 1 (before elevView pan/zoom is applied). */
   function elevBaseViewBox() {
@@ -1894,13 +1900,25 @@
     return state.elevView;
   }
 
-  /** Current elev SVG viewBox as `x y w h`, incorporating elevView zoom/pan. */
+  /** Canvas wrap aspect (width/height) — elev viewBox matches this so walls aren't a thin ribbon. */
+  function elevCanvasAspect() {
+    const wrap = document.getElementById("canvas-wrap");
+    const cw = Math.max(160, wrap?.clientWidth || 900);
+    const ch = Math.max(120, wrap?.clientHeight || 480);
+    return cw / ch;
+  }
+
+  /**
+   * Elev viewBox: height = full strip height / scale (scale 1 = readable wall height),
+   * width = height × canvas aspect so the SVG fills the canvas instead of letterboxing
+   * a ~8:1 full-strip rectangle into a short band.
+   */
   function elevViewBoxString() {
     const base = elevBaseViewBox();
     const view = ensureElevView();
     const scale = clampElevScale(view.scale);
-    const vw = base.baseW / scale;
     const vh = base.baseH / scale;
+    const vw = vh * elevCanvasAspect();
     const vx = base.cx - vw / 2 + (view.panX || 0);
     const vy = base.cy - vh / 2 + (view.panY || 0);
     return `${vx} ${vy} ${vw} ${vh}`;
@@ -1909,9 +1927,13 @@
   /** Zoom/pan so the given logical (cm) bounds are centered and fully visible. */
   function fitElevToBounds(x0, x1, y0, y1) {
     const base = elevBaseViewBox();
+    const aspect = elevCanvasAspect();
     const desiredW = Math.max(1, x1 - x0);
     const desiredH = Math.max(1, y1 - y0);
-    const scale = clampElevScale(Math.min(base.baseW / desiredW, base.baseH / desiredH));
+    const scale = clampElevScale(Math.min(
+      base.baseH / desiredH,
+      (base.baseH * aspect) / desiredW
+    ));
     state.elevView = {
       scale,
       panX: (x0 + x1) / 2 - base.cx,
@@ -1919,8 +1941,18 @@
     };
   }
 
+  /** Fit pás: full wall height, start of strip (pan horizontally to see the rest). */
   function resetElevView() {
-    state.elevView = { scale: 1, panX: 0, panY: 0 };
+    const base = elevBaseViewBox();
+    const scale = 1;
+    const vh = base.baseH / scale;
+    const vw = vh * elevCanvasAspect();
+    const vx = -ELEV_PAD;
+    state.elevView = {
+      scale,
+      panX: vx - (base.cx - vw / 2),
+      panY: 0,
+    };
   }
 
   /** Fit to the selected point's wall panel, else the first visible panel. */
@@ -3427,10 +3459,16 @@
   }
 
   function renderElevationView() {
+    if (!elevViewBootstrapped) {
+      resetElevView();
+      elevViewBootstrapped = true;
+    }
     const { panels, totalW, roomH } = elevStripLayout();
     const svg = el("svg", {
       viewBox: elevViewBoxString(),
       id: "plan-svg",
+      class: "elev-svg",
+      preserveAspectRatio: "xMidYMid meet",
     });
     if (spacePanning) svg.classList.add("elev-space-pan");
     if (state.drag && state.drag.type === "elev-pan") svg.classList.add("elev-panning");
@@ -4365,12 +4403,18 @@
   }
 
   /** Wall segments (clear coords) usable as `WallSeg[]` input for autoroute.mjs. */
+  /**
+   * Wall segments for autoroute — along must match elev/plan convention:
+   * north/south: along = clear X (Z→V), east/west: along = clear Y (S→J).
+   * (Earlier clockwise segs reversed south/west and made N→E→S routes
+   * render on the wrong end of the south elevation — past the entry door.)
+   */
   function buildElecWallSegs() {
     const segs = [
       { id: "north", x0: 0, y0: 0, x1: CLEAR.w, y1: 0 },
       { id: "east", x0: CLEAR.w, y0: 0, x1: CLEAR.w, y1: CLEAR.h },
-      { id: "south", x0: CLEAR.w, y0: CLEAR.h, x1: 0, y1: CLEAR.h },
-      { id: "west", x0: 0, y0: CLEAR.h, x1: 0, y1: 0 },
+      { id: "south", x0: 0, y0: CLEAR.h, x1: CLEAR.w, y1: CLEAR.h },
+      { id: "west", x0: 0, y0: 0, x1: 0, y1: CLEAR.h },
     ];
 
     const [westPart, eastPart, southPart] = bathPartitionBoxes().map(absToClearBox);
@@ -4451,6 +4495,7 @@
       trunkH: draft.trunkH,
       points: draft.points, // may include wall ids beyond ELEV_WALL_ORDER — keep them
       status: "draft",
+      alongBasis: "elev",
       excludePointIds: [],
       includePointIds: [],
     };
@@ -5489,17 +5534,18 @@
     const p = svgPoint(svg, evt);
     const base = elevBaseViewBox();
     const view = ensureElevView();
+    const aspect = elevCanvasAspect();
     const oldScale = clampElevScale(view.scale);
-    const oldVw = base.baseW / oldScale;
     const oldVh = base.baseH / oldScale;
+    const oldVw = oldVh * aspect;
     const oldVx = base.cx - oldVw / 2 + (view.panX || 0);
     const oldVy = base.cy - oldVh / 2 + (view.panY || 0);
     const fx = (p.x - oldVx) / oldVw;
     const fy = (p.y - oldVy) / oldVh;
     const factor = Math.exp(-evt.deltaY * 0.0015);
     const newScale = clampElevScale(oldScale * factor);
-    const newVw = base.baseW / newScale;
     const newVh = base.baseH / newScale;
+    const newVw = newVh * aspect;
     const newVx = p.x - fx * newVw;
     const newVy = p.y - fy * newVh;
     view.scale = newScale;
@@ -6329,6 +6375,7 @@
         };
         out.status = r.status === "draft" ? "draft" : "accepted";
         out.pointIds = idList(r.pointIds);
+        out.alongBasis = "elev";
         if (runIsSocketTrunk(r) || r.trunkH != null || idList(r.excludePointIds).length || idList(r.includePointIds).length) {
           out.trunkH = runTrunkH(r);
           out.excludePointIds = idList(r.excludePointIds);
@@ -6442,7 +6489,7 @@
         circuitId = ensureKindCircuit(circuits, kindMap, legacyKind);
       }
       const fallbackWall = ALL_ELEC_WALL_IDS.includes(r.wall) ? r.wall : "north";
-      const points = Array.isArray(r.points)
+      let points = Array.isArray(r.points)
         ? r.points.map((p) => ({
           wall: ALL_ELEC_WALL_IDS.includes(p.wall) ? p.wall : fallbackWall,
           along: Number(p.along) || 0,
@@ -6453,6 +6500,19 @@
       const excludePointIds = idList(r.excludePointIds);
       const includePointIds = idList(r.includePointIds);
       const pointIds = idList(r.pointIds);
+      // Pre-3.17.1 autoroute used clockwise south/west (along from E/S). Elev uses
+      // Z→V / S→J. Migrate once for propose-based runs missing alongBasis.
+      let alongBasis = r.alongBasis === "elev" ? "elev" : null;
+      if (pointIds.length && alongBasis !== "elev") {
+        points = points.map((p) => {
+          if (p.wall === "south") return { ...p, along: CLEAR.w - p.along };
+          if (p.wall === "west") return { ...p, along: CLEAR.h - p.along };
+          return p;
+        });
+        alongBasis = "elev";
+      } else if (!alongBasis) {
+        alongBasis = "elev";
+      }
       return {
         id: typeof r.id === "string" ? r.id : newElecId("er"),
         wall: points[0]?.wall || fallbackWall,
@@ -6462,6 +6522,7 @@
         points,
         status: r.status === "draft" ? "draft" : "accepted",
         pointIds,
+        alongBasis,
         trunkH: Number.isFinite(trunkN) ? trunkN : ELEC_TRUNK_H_DEFAULT,
         excludePointIds,
         includePointIds,
