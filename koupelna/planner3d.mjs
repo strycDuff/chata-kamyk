@@ -386,6 +386,8 @@ export function createViewer(container) {
     room: { w: 906, d: 333, h: 210 },
     look: { yaw: 0, pitch: 0 },
     keys: new Set(),
+    /** Virtual stick axes in [-1, 1]: fwd (+forward), strafe (+right), vert (+up). */
+    axes: { fwd: 0, strafe: 0, vert: 0 },
     flyY: 180,
     raf: 0,
     _ro: null,
@@ -540,6 +542,10 @@ export function createViewer(container) {
     if (viewer.keys.has("ArrowRight") || viewer.keys.has("d")) strafe += speed;
     if (viewer.keys.has("Space")) vert += vSpeed;
     if (viewer.keys.has("ControlLeft")) vert -= vSpeed;
+    const ax = viewer.axes || { fwd: 0, strafe: 0, vert: 0 };
+    fwd += (Number(ax.fwd) || 0) * speed;
+    strafe += (Number(ax.strafe) || 0) * speed;
+    vert += (Number(ax.vert) || 0) * vSpeed;
     if (fwd || strafe || vert) moveBy(fwd, strafe, vert);
     renderer.render(scene, camera);
   };
@@ -631,11 +637,31 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
   if (applyCamera) setCameraView(viewer, viewer.preset || "sofa");
 }
 
+/** Set virtual stick axes (values clamped to [-1, 1]). Pass partial or null to clear. */
+export function setAxes(viewer, partial) {
+  if (!viewer?.axes) return;
+  if (!partial) {
+    viewer.axes.fwd = 0;
+    viewer.axes.strafe = 0;
+    viewer.axes.vert = 0;
+    return;
+  }
+  const clamp = (v) => Math.max(-1, Math.min(1, Number(v) || 0));
+  if ("fwd" in partial) viewer.axes.fwd = clamp(partial.fwd);
+  if ("strafe" in partial) viewer.axes.strafe = clamp(partial.strafe);
+  if ("vert" in partial) viewer.axes.vert = clamp(partial.vert);
+}
+
 export function dispose(viewer) {
   if (!viewer) return;
   cancelAnimationFrame(viewer.raf);
   viewer._ro?.disconnect();
   viewer._disposeInput?.();
+  if (viewer.axes) {
+    viewer.axes.fwd = 0;
+    viewer.axes.strafe = 0;
+    viewer.axes.vert = 0;
+  }
   clearGroup(viewer.root);
   viewer.renderer.dispose();
   viewer.renderer.domElement.remove();
