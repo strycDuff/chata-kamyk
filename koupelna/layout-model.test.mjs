@@ -5,6 +5,8 @@ import {
   migrateSnapshotToV10,
   partitionBox,
   openingBox,
+  openingLeafBox,
+  normalizeOpening,
   livingBoundaryX,
   partitionsToWallSegs,
   rotateFurniture90,
@@ -91,5 +93,28 @@ describe("layout-model seed", () => {
     const p1 = bedPartsFromLayer(layer);
     assert.equal(p1.mattress.w, 200);
     assert.equal(p1.mattress.d, 160);
+  });
+
+  it("openingLeafBox swings about hinge end", () => {
+    const part = { x1: 100, y1: 0, x2: 100, y2: 200, thickness: 12.5 };
+    const op = normalizeOpening({
+      partitionId: "p", offset: 40, width: 70, kind: "door",
+      hinge: "end", side: "pos", leafOpen: true,
+    });
+    const leaf = openingLeafBox(op, part);
+    assert.ok(leaf.x >= 100);
+    assert.equal(leaf.y, 40 + 70 - 3.5);
+  });
+
+  it("normalizeOpening accepts slide kind", () => {
+    const op = normalizeOpening({ kind: "slide", width: 80 });
+    assert.equal(op.kind, "slide");
+    assert.equal(op.width, 80);
+  });
+
+  it("seed bath door defaults to slide (type A)", () => {
+    const s = seedFromParametric({ doorType: "A" });
+    const op = s.openings.find((o) => o.id === "bath-door");
+    assert.equal(op.kind, "slide");
   });
 });

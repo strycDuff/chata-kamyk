@@ -156,17 +156,114 @@ export function normalizePartition(raw, i = 0) {
 }
 
 export function normalizeOpening(raw, i = 0) {
+  let kind = "door";
+  if (raw.kind === "pocket") kind = "pocket";
+  else if (raw.kind === "slide" || raw.kind === "external") kind = "slide";
   return {
     id: typeof raw.id === "string" ? raw.id : newLayoutId("o"),
     partitionId: typeof raw.partitionId === "string" ? raw.partitionId : "",
     name: (raw.name && String(raw.name).trim()) || `Dveře ${i + 1}`,
     offset: Number(raw.offset) || 0,
-    width: Math.max(40, Number(raw.width) || 70),
-    kind: raw.kind === "pocket" ? "pocket" : "door",
+    width: Math.min(120, Math.max(40, Number(raw.width) || 70)),
+    kind,
+    /** Along-partition: hinge at opening start (offset) or end (offset+width). */
+    hinge: raw.hinge === "end" ? "end" : "start",
+    /** Slide direction when open (pocket/slide). */
     pocketDir: raw.pocketDir === "neg" ? "neg" : "pos",
+    /** Perpendicular face the leaf sits on / swings toward. */
     side: raw.side === "neg" ? "neg" : "pos",
     leafOpen: !!raw.leafOpen,
   };
+}
+
+/**
+ * Door leaf AABB in clear coords.
+ * - door (hinged): closed in slot; open = 90° swing about hinge onto `side`
+ * - pocket: closed in slot; open = slides along partition inside wall thickness
+ * - slide: closed in slot; open = slides along outer face on `side`
+ */
+export function openingLeafBox(op, partition, thick = PART_THICK) {
+  const box = openingBox(op, partition, thick);
+  const leafT = 3.5;
+  const kind = op.kind === "pocket" || op.kind === "slide" ? op.kind : "door";
+  const vert = isVerticalPartition(partition);
+  const side = op.side === "neg" ? -1 : 1;
+  const hingeEnd = op.hinge === "end";
+  const slideNeg = op.pocketDir === "neg";
+
+  if (kind === "door") {
+    if (vert) {
+      if (!op.leafOpen) {
+        return { x: box.x + (box.w - leafT) / 2, y: box.y, w: leafT, d: box.d };
+      }
+      const len = box.d;
+      return {
+        x: side > 0 ? box.x + box.w : box.x - len,
+        y: hingeEnd ? box.y + len - leafT : box.y,
+        w: len,
+        d: leafT,
+      };
+    }
+    if (!op.leafOpen) {
+      return { x: box.x, y: box.y + (box.d - leafT) / 2, w: box.w, d: leafT };
+    }
+    const len = box.w;
+    return {
+      x: hingeEnd ? box.x + len - leafT : box.x,
+      y: side > 0 ? box.y + box.d : box.y - len,
+      w: leafT,
+      d: len,
+    };
+  }
+
+  // Sliding (pocket or external)
+  if (vert) {
+    const closed = { x: box.x + (box.w - leafT) / 2, y: box.y, w: leafT, d: box.d };
+    if (!op.leafOpen) {
+      if (kind === "slide") {
+        return {
+          x: side > 0 ? box.x + box.w - leafT : box.x,
+          y: box.y, w: leafT, d: box.d,
+        };
+      }
+      return closed;
+    }
+    const y = slideNeg ? box.y - box.d : box.y + box.d;
+    if (kind === "slide") {
+      return {
+        x: side > 0 ? box.x + box.w : box.x - leafT,
+        y, w: leafT, d: box.d,
+      };
+    }
+    return { x: closed.x, y, w: leafT, d: box.d };
+  }
+
+  const closedH = { x: box.x, y: box.y + (box.d - leafT) / 2, w: box.w, d: leafT };
+  if (!op.leafOpen) {
+    if (kind === "slide") {
+      return {
+        x: box.x,
+        y: side > 0 ? box.y + box.d - leafT : box.y,
+        w: box.w, d: leafT,
+      };
+    }
+    return closedH;
+  }
+  const x = slideNeg ? box.x - box.w : box.x + box.w;
+  if (kind === "slide") {
+    return {
+      x,
+      y: side > 0 ? box.y + box.d : box.y - leafT,
+      w: box.w, d: leafT,
+    };
+  }
+  return { x, y: closedH.y, w: box.w, d: leafT };
+}
+
+export function openingKindLabel(kind) {
+  if (kind === "pocket") return "Pouzdro";
+  if (kind === "slide") return "Posuv po stěně";
+  return "Klasické";
 }
 
 export function normalizeFurnitureLayer(raw, i = 0) {
@@ -208,7 +305,7 @@ export function seedFromParametric(p = {}) {
   const tvLen = Number(p.tvLen) || 140;
   const doorOffset = Number(p.doorOffset) || 90;
   const doorWidth = Number(p.doorWidth) || 70;
-  const doorType = p.doorType === "B" ? "pocket" : "door";
+  const doorType = p.doorType === "B" ? "pocket" : "slide"; // A = po stěně, B = pouzdro
   const pocketDir = p.pocketDir === "north" ? "neg" : "pos";
   const kitchenLeft = Number(p.kitchenLeft) || 313;
   const kitchenLen = Number(p.kitchenLen) || 160;
@@ -283,7 +380,7 @@ export function seedFromParametric(p = {}) {
       name: "Dveře ložnice",
       offset: 0,
       width: corridorW,
-      kind: p.bedDoorType === "B" ? "pocket" : "door",
+      kind: p.bedDoorType === "B" ? "pocket" : (p.bedDoorType === "A" ? "slide" : "door"),
       pocketDir: p.bedDoorPocketDir === "west" ? "neg" : "pos",
       side: "pos",
       leafOpen: !!p.view3dBedDoorOpen,

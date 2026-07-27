@@ -109,33 +109,9 @@ function openingAbs(op, part) {
   return { x: absX(c.x), y: absY(c.y), w: c.w, d: c.d };
 }
 
-/** Door leaf in clear coords — closed in slot, open swung 90° onto `side`. */
+/** Door leaf in clear coords — delegates to layout-model. */
 function doorLeafBox(op, part) {
-  const box = LM.openingBox(op, part);
-  const leafT = 3.5;
-  const side = op.side === "neg" ? -1 : 1;
-  if (LM.isVerticalPartition(part)) {
-    if (!op.leafOpen) {
-      return { x: box.x + (box.w - leafT) / 2, y: box.y, w: leafT, d: box.d };
-    }
-    const len = box.d;
-    return {
-      x: side > 0 ? box.x + box.w : box.x - len,
-      y: box.y,
-      w: len,
-      d: leafT,
-    };
-  }
-  if (!op.leafOpen) {
-    return { x: box.x, y: box.y + (box.d - leafT) / 2, w: box.w, d: leafT };
-  }
-  const len = box.w;
-  return {
-    x: box.x,
-    y: side > 0 ? box.y + box.d : box.y - len,
-    w: leafT,
-    d: len,
-  };
+  return LM.openingLeafBox(op, part);
 }
 
 function furnAbs(layer) {
@@ -293,12 +269,26 @@ function buildPlanSvg(state, onPointer) {
       stroke: "#8a6d00", "stroke-width": 1,
       "pointer-events": "none",
     }));
+    // Hinge / slide cue
+    if (op.kind === "door") {
+      const vert = LM.isVerticalPartition(part);
+      const hx = vert
+        ? box.x + box.w / 2
+        : (op.hinge === "end" ? box.x + box.w - 3 : box.x + 3);
+      const hy = vert
+        ? (op.hinge === "end" ? box.y + box.d - 3 : box.y + 3)
+        : box.y + box.d / 2;
+      g.appendChild(el("circle", {
+        cx: hx, cy: hy, r: 3.5,
+        fill: "#8a6d00", "pointer-events": "none",
+      }));
+    }
     const t = el("text", {
       x: box.x + box.w / 2, y: box.y + box.d / 2,
       fill: "#8a6d00", "font-size": 9, "text-anchor": "middle",
       "dominant-baseline": "middle", "pointer-events": "none",
     });
-    t.textContent = op.leafOpen ? "O" : "D";
+    t.textContent = op.leafOpen ? "O" : (op.kind === "door" ? "D" : (op.kind === "pocket" ? "P" : "S"));
     g.appendChild(t);
   }
   // Length handles when editing partition (not when dragging a door)
@@ -504,6 +494,43 @@ export function createSkica(opts) {
 
   function persist() { saveState(state); }
 
+  function setDoorWidth(op, w) {
+    const pr = state.partitions.find((p) => p.id === op.partitionId);
+    const len = pr ? LM.partitionLength(pr) : 999;
+    op.width = Math.min(Math.max(40, Math.round(w) || 70), Math.min(120, len));
+    op.offset = Math.min(Math.max(0, op.offset), Math.max(0, len - op.width));
+  }
+
+  /** Compass-ish labels for hinge/side relative to partition orientation. */
+  function doorDirLabels(part) {
+    if (part && LM.isVerticalPartition(part)) {
+      return {
+        hingeStart: "Severní pant",
+        hingeEnd: "Jižní pant",
+        sidePos: "Na východ",
+        sideNeg: "Na západ",
+        slideNeg: "Na sever",
+        slidePos: "Na jih",
+        hingeLab: "Pant (levé / pravé podél S–J)",
+        sideLab: "Otevírání (dovnitř / ven = V / Z)",
+        slideLab: "Směr posunu (S / J)",
+        slideSideLab: "Líc posuvu (V / Z)",
+      };
+    }
+    return {
+      hingeStart: "Západní pant",
+      hingeEnd: "Východní pant",
+      sidePos: "Na jih",
+      sideNeg: "Na sever",
+      slideNeg: "Na západ",
+      slidePos: "Na východ",
+      hingeLab: "Pant (levé / pravé podél Z–V)",
+      sideLab: "Otevírání (dovnitř / ven = J / S)",
+      slideLab: "Směr posunu (Z / V)",
+      slideSideLab: "Líc posuvu (J / S)",
+    };
+  }
+
   function fillPanel() {
     panel.innerHTML = `
       <p class="hint">Explorace alternativ — <strong>neovlivní</strong> hlavní půdorys / elektro. Obálka chaty je fixní.</p>
@@ -528,12 +555,53 @@ export function createSkica(opts) {
           <summary>Dveře na příčce</summary>
           <div class="side-block-body">
             <button type="button" class="btn" id="skica-door-add" style="width:100%;margin-bottom:8px">＋ Dveře na vybranou příčku</button>
-            <div class="row" style="margin-bottom:8px;gap:6px">
-              <button type="button" class="btn" id="skica-door-toggle" style="flex:1">Otevřít / Zavřít</button>
-              <button type="button" class="btn" id="skica-door-side" style="flex:1">Strana otevírání</button>
+            <div id="skica-door-cfg" hidden>
+              <label>Typ</label>
+              <div class="row seg" id="skica-door-kind" style="margin-bottom:8px;flex-wrap:wrap">
+                <button type="button" data-v="door">Klasické</button>
+                <button type="button" data-v="pocket">Pouzdro</button>
+                <button type="button" data-v="slide">Posuv po stěně</button>
+              </div>
+              <label>Šířka otvoru</label>
+              <div class="row seg" id="skica-door-width" style="margin-bottom:6px">
+                <button type="button" data-v="60">60</button>
+                <button type="button" data-v="70">70</button>
+                <button type="button" data-v="80">80</button>
+                <button type="button" data-v="90">90</button>
+              </div>
+              <input type="number" id="skica-door-width-n" min="40" max="120" step="1" value="70" style="width:100%;margin-bottom:8px">
+              <div id="skica-door-hinged">
+                <label id="skica-door-hinge-lab">Pant (levé / pravé)</label>
+                <div class="row seg" id="skica-door-hinge" style="margin-bottom:8px">
+                  <button type="button" data-v="start">Levé</button>
+                  <button type="button" data-v="end">Pravé</button>
+                </div>
+                <label id="skica-door-side-lab">Otevírání (dovnitř / ven)</label>
+                <div class="row seg" id="skica-door-side" style="margin-bottom:8px">
+                  <button type="button" data-v="pos">Strana +</button>
+                  <button type="button" data-v="neg">Strana −</button>
+                </div>
+              </div>
+              <div id="skica-door-sliding" hidden>
+                <label id="skica-door-slide-lab">Směr posunu</label>
+                <div class="row seg" id="skica-door-pocket-dir" style="margin-bottom:8px">
+                  <button type="button" data-v="neg">−</button>
+                  <button type="button" data-v="pos">+</button>
+                </div>
+                <div id="skica-door-slide-side-wrap">
+                  <label id="skica-door-slide-side-lab">Líc posuvu</label>
+                  <div class="row seg" id="skica-door-slide-side" style="margin-bottom:8px">
+                    <button type="button" data-v="pos">Strana +</button>
+                    <button type="button" data-v="neg">Strana −</button>
+                  </div>
+                </div>
+              </div>
+              <div class="row" style="margin-bottom:8px;gap:6px">
+                <button type="button" class="btn" id="skica-door-toggle" style="flex:1">Otevřít / Zavřít</button>
+                <button type="button" class="btn" id="skica-door-del" style="flex:1">Smazat</button>
+              </div>
             </div>
-            <button type="button" class="btn" id="skica-door-del" style="width:100%;margin-bottom:8px">Smazat dveře</button>
-            <p class="hint">Vybrané dveře táhni po příčce. Tlačítko otevře/zavře křídlo (vidět na půdorysu i ve 3D).</p>
+            <p class="hint">Vyber dveře · táhni po příčce. Klasické: pant + strana otevírání. Posuv: pouzdro ve stěně nebo po vnějším líci.</p>
             <ul class="furn-list" id="skica-door-list"></ul>
           </div>
         </details>
@@ -621,7 +689,8 @@ export function createSkica(opts) {
       const op = LM.normalizeOpening({
         partitionId: state.partSelectedId,
         name: `Dveře ${state.openings.length + 1}`,
-        offset: 40, width: 70, kind: "door", side: "pos",
+        offset: 40, width: 70, kind: "door",
+        hinge: "start", side: "pos", pocketDir: "pos",
         leafOpen: false,
       });
       state.openings.push(op);
@@ -629,17 +698,72 @@ export function createSkica(opts) {
       persist();
       render();
     });
-    panel.querySelector("#skica-door-toggle")?.addEventListener("click", () => {
-      const op = state.openings.find((o) => o.id === state.openingSelectedId);
-      if (!op) { alert("Nejdřív vyber dveře na půdorysu nebo v seznamu."); return; }
-      op.leafOpen = !op.leafOpen;
+    const selectedDoor = () => state.openings.find((o) => o.id === state.openingSelectedId);
+
+    panel.querySelector("#skica-door-kind")?.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-v]");
+      const op = selectedDoor();
+      if (!btn || !op) return;
+      op.kind = btn.dataset.v;
       persist();
       render();
     });
-    panel.querySelector("#skica-door-side")?.addEventListener("click", () => {
-      const op = state.openings.find((o) => o.id === state.openingSelectedId);
-      if (!op) { alert("Nejdřív vyber dveře."); return; }
-      op.side = op.side === "neg" ? "pos" : "neg";
+    panel.querySelector("#skica-door-width")?.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-v]");
+      const op = selectedDoor();
+      if (!btn || !op) return;
+      setDoorWidth(op, Number(btn.dataset.v));
+      persist();
+      render();
+    });
+    const widthN = panel.querySelector("#skica-door-width-n");
+    const onWidthN = () => {
+      const op = selectedDoor();
+      if (!op || !widthN) return;
+      setDoorWidth(op, Number(widthN.value));
+      persist();
+      render();
+    };
+    widthN?.addEventListener("change", onWidthN);
+    widthN?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); onWidthN(); }
+    });
+    panel.querySelector("#skica-door-hinge")?.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-v]");
+      const op = selectedDoor();
+      if (!btn || !op) return;
+      op.hinge = btn.dataset.v === "end" ? "end" : "start";
+      persist();
+      render();
+    });
+    panel.querySelector("#skica-door-side")?.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-v]");
+      const op = selectedDoor();
+      if (!btn || !op) return;
+      op.side = btn.dataset.v === "neg" ? "neg" : "pos";
+      persist();
+      render();
+    });
+    panel.querySelector("#skica-door-pocket-dir")?.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-v]");
+      const op = selectedDoor();
+      if (!btn || !op) return;
+      op.pocketDir = btn.dataset.v === "neg" ? "neg" : "pos";
+      persist();
+      render();
+    });
+    panel.querySelector("#skica-door-slide-side")?.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-v]");
+      const op = selectedDoor();
+      if (!btn || !op) return;
+      op.side = btn.dataset.v === "neg" ? "neg" : "pos";
+      persist();
+      render();
+    });
+    panel.querySelector("#skica-door-toggle")?.addEventListener("click", () => {
+      const op = selectedDoor();
+      if (!op) { alert("Nejdřív vyber dveře na půdorysu nebo v seznamu."); return; }
+      op.leafOpen = !op.leafOpen;
       persist();
       render();
     });
@@ -767,22 +891,60 @@ export function createSkica(opts) {
         if (o.id === state.openingSelectedId) li.classList.add("selected");
         const part = state.partitions.find((p) => p.id === o.partitionId);
         const partName = part?.name || o.partitionId;
-        li.textContent = `${o.name || "Dveře"} · ${partName} · ${Math.round(o.offset)}→${Math.round(o.offset + o.width)} · ${o.leafOpen ? "otevřeno" : "zavřeno"}`;
+        li.textContent = `${o.name || "Dveře"} · ${LM.openingKindLabel(o.kind)} ${Math.round(o.width)} · ${partName} · ${o.leafOpen ? "otevřeno" : "zavřeno"}`;
         li.onclick = () => { state.openingSelectedId = o.id; state.partSelectedId = o.partitionId; persist(); render(); };
         doorList.appendChild(li);
       }
     }
+    const op = state.openings.find((o) => o.id === state.openingSelectedId);
+    const part = op && state.partitions.find((p) => p.id === op.partitionId);
+    const cfg = panel.querySelector("#skica-door-cfg");
+    if (cfg) cfg.hidden = !op;
+    if (op) {
+      const labs = doorDirLabels(part);
+      const hinged = op.kind === "door";
+      const sliding = !hinged;
+      const hingWrap = panel.querySelector("#skica-door-hinged");
+      const slidWrap = panel.querySelector("#skica-door-sliding");
+      if (hingWrap) hingWrap.hidden = !hinged;
+      if (slidWrap) slidWrap.hidden = !sliding;
+      const slideSideWrap = panel.querySelector("#skica-door-slide-side-wrap");
+      if (slideSideWrap) slideSideWrap.hidden = op.kind !== "slide";
+      const setLab = (id, text) => { const n = panel.querySelector(`#${id}`); if (n) n.textContent = text; };
+      setLab("skica-door-hinge-lab", labs.hingeLab);
+      setLab("skica-door-side-lab", labs.sideLab);
+      setLab("skica-door-slide-lab", labs.slideLab);
+      setLab("skica-door-slide-side-lab", labs.slideSideLab);
+      const markSeg = (rootId, value) => {
+        panel.querySelectorAll(`#${rootId} button`).forEach((b) => {
+          b.classList.toggle("active", b.dataset.v === String(value));
+        });
+      };
+      markSeg("skica-door-kind", op.kind);
+      markSeg("skica-door-width", String(Math.round(op.width)));
+      markSeg("skica-door-hinge", op.hinge === "end" ? "end" : "start");
+      markSeg("skica-door-side", op.side);
+      markSeg("skica-door-pocket-dir", op.pocketDir);
+      markSeg("skica-door-slide-side", op.side);
+      const hingeBtns = panel.querySelectorAll("#skica-door-hinge button");
+      if (hingeBtns[0]) hingeBtns[0].textContent = labs.hingeStart;
+      if (hingeBtns[1]) hingeBtns[1].textContent = labs.hingeEnd;
+      const sideBtns = panel.querySelectorAll("#skica-door-side button");
+      if (sideBtns[0]) sideBtns[0].textContent = labs.sidePos;
+      if (sideBtns[1]) sideBtns[1].textContent = labs.sideNeg;
+      const slideBtns = panel.querySelectorAll("#skica-door-pocket-dir button");
+      if (slideBtns[0]) slideBtns[0].textContent = labs.slideNeg;
+      if (slideBtns[1]) slideBtns[1].textContent = labs.slidePos;
+      const slideSideBtns = panel.querySelectorAll("#skica-door-slide-side button");
+      if (slideSideBtns[0]) slideSideBtns[0].textContent = labs.sidePos;
+      if (slideSideBtns[1]) slideSideBtns[1].textContent = labs.sideNeg;
+      const widthN = panel.querySelector("#skica-door-width-n");
+      if (widthN && document.activeElement !== widthN) widthN.value = String(Math.round(op.width));
+    }
     const toggleBtn = panel.querySelector("#skica-door-toggle");
     if (toggleBtn) {
-      const op = state.openings.find((o) => o.id === state.openingSelectedId);
       toggleBtn.textContent = !op ? "Otevřít / Zavřít" : (op.leafOpen ? "Zavřít dveře" : "Otevřít dveře");
       toggleBtn.disabled = !op;
-    }
-    const sideBtn = panel.querySelector("#skica-door-side");
-    if (sideBtn) {
-      const op = state.openings.find((o) => o.id === state.openingSelectedId);
-      sideBtn.textContent = !op ? "Strana otevírání" : (op.side === "neg" ? "Strana: −" : "Strana: +");
-      sideBtn.disabled = !op;
     }
     const furnList = panel.querySelector("#skica-furn-list");
     if (furnList) {
@@ -851,7 +1013,7 @@ export function createSkica(opts) {
       } else if (state.openingSelectedId) {
         const op = state.openings.find((o) => o.id === state.openingSelectedId);
         hint.textContent = op
-          ? `Dveře · táhni po příčce · ${op.leafOpen ? "otevřeno" : "zavřeno"} (tlačítko Otevřít/Zavřít)`
+          ? `Dveře · ${LM.openingKindLabel(op.kind)} ${Math.round(op.width)} cm · táhni po příčce · ${op.leafOpen ? "otevřeno" : "zavřeno"}`
           : "Vyber dveře";
       } else if (state.partSelectedId) {
         const pr = state.partitions.find((p) => p.id === state.partSelectedId);
