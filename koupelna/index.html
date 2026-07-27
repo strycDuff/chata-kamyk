@@ -1209,6 +1209,7 @@
             <summary>Krov · kleštiny</summary>
             <div class="side-block-body">
               <label class="chk"><input type="checkbox" id="roof-show"> Zobrazit krov (sedlová střecha)</label>
+              <label class="chk"><input type="checkbox" id="roof-sdk"> Zaklopit krokve SDK (vidět jen kleštiny)</label>
               <label class="chk"><input type="checkbox" id="roof-covering"> Krytina (plech, tmavě hnědočervená)</label>
               <label class="chk"><input type="checkbox" id="roof-loft-deck"> Podlaha loftu nad obývákem</label>
               <p class="hint">Fixní: sklon 30° · osová vzdálenost krokví 90 cm</p>
@@ -1217,8 +1218,8 @@
               <input type="range" id="roof-living-collar" min="175" max="228" value="190" step="1">
               <label>Počet pohyblivých kleštin: <strong id="roof-collar-count-val">4</strong></label>
               <input type="range" id="roof-collar-count" min="1" max="8" value="4" step="1">
-              <label>Délka loftu: <strong id="roof-loft-len-val">360</strong> cm</label>
-              <input type="range" id="roof-loft-len" min="90" max="450" value="360" step="5">
+              <label>Délka loftu: <strong id="roof-loft-len-val">325</strong> cm</label>
+              <input type="range" id="roof-loft-len" min="90" max="450" value="325" step="5">
               <p class="hint" id="roof-hint">Hřeben po delší straně · krokve S–J · kleštiny jinde v polovině krokoví · nad obývákem snížené.</p>
             </div>
           </details>
@@ -1260,7 +1261,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.16.4";
+  const APP_VERSION = "3.17.0";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1428,6 +1429,7 @@
     showDims: true,
     view3dDoorOpen: false,
     showRoof: true,
+    showRoofSdk: true,
     showRoofCovering: false,
     showLoftDeck: true,
     roofPitchDeg: 30, // fixní
@@ -4476,29 +4478,31 @@
     const wood = "#a67c52";
     const woodDark = "#8b6914";
     const woodLight = "#c4a574";
+    const sdkCol = "#eceff1";
     const ridgeZ = r.halfSpan;
+    const cladSdk = !!state.showRoofSdk;
 
-    // Pozednice S + J — jen na koruně nad stěnou (bez průniku do zdiva → bez z-fight)
-    const plateSec = 10;
-    const plateD = Math.max(3, WALL - 2);
-    boxes.push({
-      x: -2, y: -WALL + 1, w: CLEAR.w + 4, d: plateD,
-      h: plateSec, elev: r.plateH + 0.8,
-      color: woodDark,
-    });
-    boxes.push({
-      x: -2, y: CLEAR.h + 1, w: CLEAR.w + 4, d: plateD,
-      h: plateSec, elev: r.plateH + 0.8,
-      color: woodDark,
-    });
-
-    // Hřebenová vaznice
-    const ridgeSec = 14;
-    boxes.push({
-      x: -2, y: ridgeZ - ridgeSec / 2, w: CLEAR.w + 4, d: ridgeSec,
-      h: ridgeSec, elev: r.ridgeH - ridgeSec * 0.35,
-      color: woodDark,
-    });
+    // Pozednice / hřeben / krokve — jen bez SDK (jinak zaklopené, z interiéru nevidět)
+    if (!cladSdk) {
+      const plateSec = 10;
+      const plateD = Math.max(3, WALL - 2);
+      boxes.push({
+        x: -2, y: -WALL + 1, w: CLEAR.w + 4, d: plateD,
+        h: plateSec, elev: r.plateH + 0.8,
+        color: woodDark,
+      });
+      boxes.push({
+        x: -2, y: CLEAR.h + 1, w: CLEAR.w + 4, d: plateD,
+        h: plateSec, elev: r.plateH + 0.8,
+        color: woodDark,
+      });
+      const ridgeSec = 14;
+      boxes.push({
+        x: -2, y: ridgeZ - ridgeSec / 2, w: CLEAR.w + 4, d: ridgeSec,
+        h: ridgeSec, elev: r.ridgeH - ridgeSec * 0.35,
+        color: woodDark,
+      });
+    }
 
     const xs = roofRafterXs(r);
     const livingXs = livingCollarCandidates(r, xs);
@@ -4506,24 +4510,26 @@
     const movableSet = new Set(movableXs);
 
     for (const x of xs) {
-      // Severní krokve: z = 0 → ridge, stoupá s +Z
-      boxes.push({
-        oriented: true,
-        cx: x, cy: r.plateH + r.rise / 2, cz: r.halfSpan / 2,
-        w: r.rafterW, h: r.rafterTh, d: r.rafterLen,
-        rotX: -r.pitch,
-        color: wood,
-      });
-      // Jižní krokve: z = ridge → CLEAR.h, klesá s +Z
-      boxes.push({
-        oriented: true,
-        cx: x, cy: r.plateH + r.rise / 2, cz: r.halfSpan + r.halfSpan / 2,
-        w: r.rafterW, h: r.rafterTh, d: r.rafterLen,
-        rotX: r.pitch,
-        color: wood,
-      });
+      if (!cladSdk) {
+        // Severní krokve: z = 0 → ridge, stoupá s +Z
+        boxes.push({
+          oriented: true,
+          cx: x, cy: r.plateH + r.rise / 2, cz: r.halfSpan / 2,
+          w: r.rafterW, h: r.rafterTh, d: r.rafterLen,
+          rotX: -r.pitch,
+          color: wood,
+        });
+        // Jižní krokve: z = ridge → CLEAR.h, klesá s +Z
+        boxes.push({
+          oriented: true,
+          cx: x, cy: r.plateH + r.rise / 2, cz: r.halfSpan + r.halfSpan / 2,
+          w: r.rafterW, h: r.rafterTh, d: r.rafterLen,
+          rotX: r.pitch,
+          color: wood,
+        });
+      }
 
-      // Kleština mezi párem krokví — pohyblivé jen vybraný počet od západu
+      // Kleština — vždy viditelná (i pod SDK podhledem)
       const movable = movableSet.has(x);
       const collarBottom = movable ? r.livingBottom : r.midCollarBottom;
       const collarMidY = collarBottom + r.collarH / 2;
@@ -4543,8 +4549,36 @@
       });
     }
 
+    // SDK podhled — zaklopí krokve; kleštiny zůstávají pod ním
+    if (cladSdk) {
+      const sdkH = 1.3; // ~12,5 mm deska
+      const inset = r.rafterTh * 0.55 + sdkH * 0.5;
+      boxes.push({
+        oriented: true,
+        cx: CLEAR.w / 2,
+        cy: r.plateH + r.rise / 2 - inset,
+        cz: r.halfSpan / 2,
+        w: CLEAR.w + 4,
+        h: sdkH,
+        d: r.rafterLen + 2,
+        rotX: -r.pitch,
+        color: sdkCol,
+      });
+      boxes.push({
+        oriented: true,
+        cx: CLEAR.w / 2,
+        cy: r.plateH + r.rise / 2 - inset,
+        cz: r.halfSpan + r.halfSpan / 2,
+        w: CLEAR.w + 4,
+        h: sdkH,
+        d: r.rafterLen + 2,
+        rotX: r.pitch,
+        color: sdkCol,
+      });
+    }
+
     // Štítové výplně Z + V (nad korunou → hřeben) — hrubý schodový náznak
-    const gableCol = "#c5d0d6";
+    const gableCol = cladSdk ? "#dfe4e8" : "#c5d0d6";
     const steps = 8;
     for (const wallX of [-WALL * 0.35, CLEAR.w - WALL * 0.65]) {
       for (let i = 0; i < steps; i++) {
@@ -4560,13 +4594,13 @@
         boxes.push({
           x: wallX, y: z0, w: WALL * 0.7, d: depth,
           h: Math.max(2, y1 - y0), elev: y0,
-          color: gableCol, opacity: 0.55,
+          color: gableCol, opacity: cladSdk ? 0.92 : 0.55,
         });
         if (inset1 > inset0 + 1) {
           boxes.push({
             x: wallX, y: inset1, w: WALL * 0.7, d: Math.max(4, CLEAR.h - 2 * inset1),
             h: 1.2, elev: y1 - 0.6,
-            color: gableCol, opacity: 0.35,
+            color: gableCol, opacity: cladSdk ? 0.5 : 0.35,
           });
         }
       }
@@ -5416,6 +5450,8 @@
     }
     const roofShow = document.getElementById("roof-show");
     if (roofShow) roofShow.checked = !!state.showRoof;
+    const roofSdk = document.getElementById("roof-sdk");
+    if (roofSdk) roofSdk.checked = !!state.showRoofSdk;
     const roofCover = document.getElementById("roof-covering");
     if (roofCover) roofCover.checked = !!state.showRoofCovering;
     const loftDeck = document.getElementById("roof-loft-deck");
@@ -5610,6 +5646,10 @@
   bindRange("roof-loft-len", "loftLengthCm", "roof-loft-len-val");
   document.getElementById("roof-show")?.addEventListener("change", (e) => {
     state.showRoof = e.target.checked;
+    render();
+  });
+  document.getElementById("roof-sdk")?.addEventListener("change", (e) => {
+    state.showRoofSdk = e.target.checked;
     render();
   });
   document.getElementById("roof-covering")?.addEventListener("change", (e) => {
@@ -6089,6 +6129,7 @@
     if (state.doorOpeningH == null) state.doorOpeningH = 200;
     if (state.doorLeafH == null) state.doorLeafH = 190;
     if (state.showRoof == null) state.showRoof = true;
+    if (state.showRoofSdk == null) state.showRoofSdk = true;
     if (state.showRoofCovering == null) state.showRoofCovering = false;
     if (state.showLoftDeck == null) state.showLoftDeck = true;
     state.roofPitchDeg = 30;
