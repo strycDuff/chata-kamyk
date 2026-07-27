@@ -120,25 +120,13 @@ export function createViewer(container) {
     room: { w: 906, d: 333, h: 210 },
     look: { yaw: 0, pitch: 0 },
     keys: new Set(),
+    flyY: 180,
     raf: 0,
     _ro: null,
     _drag: null,
   };
 
-  const eyeY = () => viewer.cameras?.[viewer.preset]?.eye?.y || 180;
-
-  const moveBy = (forward, strafe) => {
-    if (!forward && !strafe) return;
-    const forwardV = new THREE.Vector3();
-    camera.getWorldDirection(forwardV);
-    forwardV.y = 0;
-    if (forwardV.lengthSq() < 1e-6) forwardV.set(0, 0, -1);
-    forwardV.normalize();
-    const rightV = new THREE.Vector3().crossVectors(forwardV, new THREE.Vector3(0, 1, 0)).normalize();
-    camera.position.addScaledVector(forwardV, forward);
-    camera.position.addScaledVector(rightV, strafe);
-    camera.position.y = eyeY();
-    // světlost uvnitř; venku před jižní stěnou — širší plocha kolem vchodu
+  const clampHoriz = () => {
     const m = 15;
     const door = viewer.room.door;
     const outD = Math.max(0, Number(viewer.room.outsideDepth) || 0);
@@ -150,11 +138,12 @@ export function createViewer(container) {
     const inDoorX = door
       && x >= door.x0 - doorPad
       && x <= door.x1 + doorPad;
-    const isOutside = z > southInside;
+    const beyondSides = x < m || x > viewer.room.w - m;
+    const isOutside = z > southInside || beyondSides;
     if (isOutside && outD > 0) {
-      // venku — celá šířka chaty + boční přesahy
       x = Math.min(viewer.room.w + outPadX - m, Math.max(-outPadX + m, x));
-      z = Math.min(viewer.room.d + outD, Math.max(southInside, z));
+      const zMin = inDoorX ? m : southInside;
+      z = Math.min(viewer.room.d + outD, Math.max(zMin, z));
     } else {
       x = Math.min(viewer.room.w - m, Math.max(m, x));
       const zMax = (inDoorX && outD > 0) ? viewer.room.d + outD : southInside;
@@ -162,6 +151,32 @@ export function createViewer(container) {
     }
     camera.position.x = x;
     camera.position.z = z;
+  };
+
+  const clampFlyY = () => {
+    const yMin = 40;
+    const yMax = Math.max(220, (viewer.room.h || 210) + 180);
+    viewer.flyY = Math.min(yMax, Math.max(yMin, viewer.flyY));
+    camera.position.y = viewer.flyY;
+  };
+
+  const moveBy = (forward, strafe, vertical = 0) => {
+    if (!forward && !strafe && !vertical) return;
+    if (forward || strafe) {
+      const forwardV = new THREE.Vector3();
+      camera.getWorldDirection(forwardV);
+      forwardV.y = 0;
+      if (forwardV.lengthSq() < 1e-6) forwardV.set(0, 0, -1);
+      forwardV.normalize();
+      const rightV = new THREE.Vector3().crossVectors(forwardV, new THREE.Vector3(0, 1, 0)).normalize();
+      camera.position.addScaledVector(forwardV, forward);
+      camera.position.addScaledVector(rightV, strafe);
+      clampHoriz();
+    }
+    if (vertical) {
+      viewer.flyY += vertical;
+    }
+    clampFlyY();
   };
 
   const onDown = (e) => {
@@ -188,19 +203,34 @@ export function createViewer(container) {
   };
   const onWheel = (e) => {
     e.preventDefault();
-    moveBy(-e.deltaY * 0.12, 0);
+    moveBy(-e.deltaY * 0.12, 0, 0);
   };
   const isTypingTarget = (t) =>
     t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+
+  const MOVE_KEYS = new Set([
+    "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+    "w", "W", "a", "A", "s", "S", "d", "D",
+    " ", "Control",
+  ]);
+
   const onKeyDown = (e) => {
     if (isTypingTarget(e.target)) return;
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+    // LCtrl = e.code ControlLeft; Space = " "
+    if (e.code === "ControlLeft" || e.code === "Space" || MOVE_KEYS.has(e.key)) {
       e.preventDefault();
-      viewer.keys.add(e.key);
+      if (e.code === "ControlLeft") viewer.keys.add("ControlLeft");
+      else if (e.code === "Space") viewer.keys.add("Space");
+      else viewer.keys.add(e.key.length === 1 ? e.key.toLowerCase() : e.key);
     }
   };
   const onKeyUp = (e) => {
-    viewer.keys.delete(e.key);
+    if (e.code === "ControlLeft") viewer.keys.delete("ControlLeft");
+    else if (e.code === "Space") viewer.keys.delete("Space");
+    else {
+      viewer.keys.delete(e.key);
+      if (e.key.length === 1) viewer.keys.delete(e.key.toLowerCase());
+    }
   };
 
   canvas.addEventListener("pointerdown", onDown);
@@ -223,13 +253,17 @@ export function createViewer(container) {
   const tick = () => {
     viewer.raf = requestAnimationFrame(tick);
     const speed = 4.2; // cm / frame @60fps ≈ 2.5 m/s
+    const vSpeed = 3.2;
     let fwd = 0;
     let strafe = 0;
-    if (viewer.keys.has("ArrowUp")) fwd += speed;
-    if (viewer.keys.has("ArrowDown")) fwd -= speed;
-    if (viewer.keys.has("ArrowLeft")) strafe -= speed;
-    if (viewer.keys.has("ArrowRight")) strafe += speed;
-    if (fwd || strafe) moveBy(fwd, strafe);
+    let vert = 0;
+    if (viewer.keys.has("ArrowUp") || viewer.keys.has("w")) fwd += speed;
+    if (viewer.keys.has("ArrowDown") || viewer.keys.has("s")) fwd -= speed;
+    if (viewer.keys.has("ArrowLeft") || viewer.keys.has("a")) strafe -= speed;
+    if (viewer.keys.has("ArrowRight") || viewer.keys.has("d")) strafe += speed;
+    if (viewer.keys.has("Space")) vert += vSpeed;
+    if (viewer.keys.has("ControlLeft")) vert -= vSpeed;
+    if (fwd || strafe || vert) moveBy(fwd, strafe, vert);
     renderer.render(scene, camera);
   };
   tick();
@@ -255,6 +289,7 @@ export function setCameraView(viewer, name) {
   viewer.preset = name;
   const { eye, target } = cam;
   viewer.camera.position.set(eye.x, eye.y, eye.z);
+  viewer.flyY = eye.y;
   if (cam.fov) {
     viewer.camera.fov = cam.fov;
     viewer.camera.updateProjectionMatrix();
