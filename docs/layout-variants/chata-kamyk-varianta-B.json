@@ -5,11 +5,11 @@
     "tab": "plan",
     "bathLeft": 535,
     "bathW": 160,
-    "bathD": 240,
-    "tvX": 380,
-    "tvLen": 160,
+    "bathD": 230,
+    "tvX": 360,
+    "tvLen": 155,
     "kitchenLeft": 313,
-    "kitchenLen": 140,
+    "kitchenLen": 130,
     "bedVariant": 140,
     "bedOuterW": 150,
     "bedOuterD": 210,
@@ -38,7 +38,7 @@
     "livingCollarCount": 2,
     "loftLengthCm": 160,
     "doorWidth": 70,
-    "doorOffset": 75,
+    "doorOffset": 80,
     "doorType": "B",
     "pocketDir": "south",
     "showerPreset": "80x80",
@@ -47,24 +47,24 @@
     "showerW": 80,
     "showerD": 80,
     "showerClearX": 602.5,
-    "showerClearY": 147.5,
+    "showerClearY": 137.5,
     "sinkW": 40,
     "sinkD": 30,
-    "sinkOffset": 95,
+    "sinkOffset": 100,
     "furnitureLayers": [
       {
         "id": "b1",
         "name": "STUL",
-        "x": 430,
-        "y": 95,
-        "w": 90,
+        "x": 170,
+        "y": 150,
+        "w": 70,
         "d": 70,
         "h": 75
       },
       {
         "id": "b2",
         "name": "LEDNICE",
-        "x": 398,
+        "x": 388,
         "y": 273,
         "w": 55,
         "d": 60,
@@ -73,7 +73,7 @@
       {
         "id": "b3",
         "name": "skrin na troubu",
-        "x": 338,
+        "x": 328,
         "y": 273,
         "w": 60,
         "d": 60,
@@ -82,28 +82,37 @@
       {
         "id": "b4",
         "name": "komoda",
-        "x": 200,
-        "y": 243,
-        "w": 120,
+        "x": 0,
+        "y": 245,
+        "w": 95,
         "d": 40,
         "h": 75
       },
       {
         "id": "b5",
-        "name": "skrin obyvak",
-        "x": 10,
-        "y": 291,
-        "w": 100,
-        "d": 42,
+        "name": "konzole",
+        "x": 445,
+        "y": 0,
+        "w": 75,
+        "d": 32,
         "h": 75
       },
       {
         "id": "b6",
+        "name": "skrin obyvak",
+        "x": 100,
+        "y": 291,
+        "w": 90,
+        "d": 42,
+        "h": 75
+      },
+      {
+        "id": "b7",
         "name": "skříň ložnice",
-        "x": 760,
-        "y": 250,
+        "x": 864,
+        "y": 220,
         "w": 42,
-        "d": 83,
+        "d": 100,
         "h": 200
       }
     ],
@@ -152,7 +161,7 @@
     "appVersion": "3.21.0",
     "appBuild": 97,
     "appCommit": "alt-layout",
-    "savedAt": 1785179533288,
-    "variantLabel": "Varianta B — Salon + střední zóna"
+    "savedAt": 1785179767937,
+    "variantLabel": "Varianta B — Salon + širší koupelna"
   }
 }

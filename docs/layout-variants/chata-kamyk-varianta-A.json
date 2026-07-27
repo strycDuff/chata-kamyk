@@ -5,11 +5,11 @@
     "tab": "plan",
     "bathLeft": 569,
     "bathW": 125,
-    "bathD": 230,
+    "bathD": 200,
     "tvX": 324,
-    "tvLen": 150,
+    "tvLen": 170,
     "kitchenLeft": 313,
-    "kitchenLen": 240,
+    "kitchenLen": 230,
     "bedVariant": 140,
     "bedOuterW": 150,
     "bedOuterD": 210,
@@ -47,24 +47,24 @@
     "showerW": 80,
     "showerD": 80,
     "showerClearX": 601.5,
-    "showerClearY": 137.5,
+    "showerClearY": 107.5,
     "sinkW": 40,
     "sinkD": 30,
-    "sinkOffset": 100,
+    "sinkOffset": 85,
     "furnitureLayers": [
       {
         "id": "a1",
         "name": "STUL",
-        "x": 130,
-        "y": 145,
-        "w": 80,
-        "d": 80,
+        "x": 115,
+        "y": 120,
+        "w": 90,
+        "d": 75,
         "h": 75
       },
       {
         "id": "a2",
         "name": "LEDNICE",
-        "x": 498,
+        "x": 488,
         "y": 273,
         "w": 55,
         "d": 60,
@@ -73,7 +73,7 @@
       {
         "id": "a3",
         "name": "skrin na troubu",
-        "x": 438,
+        "x": 428,
         "y": 273,
         "w": 60,
         "d": 60,
@@ -81,12 +81,12 @@
       },
       {
         "id": "a4",
-        "name": "komoda",
-        "x": 170,
-        "y": 0,
-        "w": 45,
+        "name": "TV stolek",
+        "x": 264,
+        "y": 40,
+        "w": 60,
         "d": 40,
-        "h": 75
+        "h": 45
       },
       {
         "id": "a5",
@@ -152,7 +152,7 @@
     "appVersion": "3.21.0",
     "appBuild": 97,
     "appCommit": "alt-layout",
-    "savedAt": 1785179533288,
-    "variantLabel": "Varianta A — Denní provoz / kuchyňská osa"
+    "savedAt": 1785179767937,
+    "variantLabel": "Varianta A — Obývak s jídelnou + volný průchod"
   }
 }
