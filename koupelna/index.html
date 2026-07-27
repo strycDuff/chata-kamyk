@@ -1691,6 +1691,10 @@
   function activateElecCircuit(circ) {
     if (!circ) return;
     state.elecActiveCircuitId = circ.id;
+    if (state.elecDraftRunId) {
+      const draft = findElecElevRun(state.elecDraftRunId);
+      if (!draft || draft.circuitId !== circ.id) state.elecDraftRunId = null;
+    }
     state.elecCableType = KIND_TO_CABLE[circ.kind];
     const isPanel = circ.name === "Rozvaděč" || circ.room === "Rozvaděč";
     state.elecType = isPanel ? "panel" : KIND_TO_POINT[circ.kind];
@@ -3450,17 +3454,26 @@
     return rooms.concat(rest);
   }
 
-  /** Draft route for the given circuit, if any (missing status is treated as accepted). */
-  function activeDraftRun(circ) {
+  /**
+   * Draft route for the active circuit, if any (missing status is treated as
+   * accepted). Scoped to the active circuit first — `elecDraftRunId` is only
+   * used as a tiebreaker among that circuit's drafts, since switching circuits
+   * can leave it pointing at a stale draft belonging to a different circuit.
+   */
+  function activeDraftRun() {
+    const circ = activeCircuit();
     if (!circ) return null;
-    return state.elecElevRuns.find((r) => r.status === "draft" && r.circuitId === circ.id) || null;
+    const drafts = state.elecElevRuns.filter((r) => r.status === "draft" && r.circuitId === circ.id);
+    if (!drafts.length) return null;
+    const byId = state.elecDraftRunId && drafts.find((r) => r.id === state.elecDraftRunId);
+    return byId || drafts[0];
   }
 
   function updateElecRouteActions(circ) {
     const proposeBtn = document.getElementById("btn-elec-propose-route");
     const acceptBtn = document.getElementById("btn-elec-accept-route");
     const discardBtn = document.getElementById("btn-elec-discard-route");
-    const draft = activeDraftRun(circ);
+    const draft = activeDraftRun();
     if (proposeBtn) {
       proposeBtn.hidden = !circ;
       proposeBtn.textContent = draft ? "🧭 Navrhnout znovu" : "🧭 Navrhnout trasu";
@@ -4326,23 +4339,19 @@
   }
 
   function acceptElecRoute() {
-    const run = findElecElevRun(state.elecDraftRunId) || state.elecElevRuns.find((r) => r.status === "draft" && r.circuitId === activeCircuit()?.id);
+    const run = activeDraftRun();
     if (!run) return;
     run.status = "accepted";
-    state.elecDraftRunId = null;
+    if (state.elecDraftRunId === run.id) state.elecDraftRunId = null;
     state.elecRoutePointIds = [];
     render();
   }
 
   function discardElecRoute() {
-    const id = state.elecDraftRunId;
-    const circ = activeCircuit();
-    state.elecElevRuns = state.elecElevRuns.filter((r) => {
-      if (id && r.id === id) return false;
-      if (!id && circ && r.status === "draft" && r.circuitId === circ.id) return false;
-      return true;
-    });
-    state.elecDraftRunId = null;
+    const run = activeDraftRun();
+    if (!run) return;
+    state.elecElevRuns = state.elecElevRuns.filter((r) => r.id !== run.id);
+    if (state.elecDraftRunId === run.id) state.elecDraftRunId = null;
     render();
   }
 
