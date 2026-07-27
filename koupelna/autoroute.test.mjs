@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   projectPointToWalls,
   buildWallGraph,
+  findShortestPath,
   shortestPath,
   pickTrunkSlot,
   proposeRoute,
@@ -31,6 +32,31 @@ describe("shortestPath", () => {
     assert.ok(path.length >= 2);
     assert.equal(path[0].wall, "north");
     assert.equal(path[path.length - 1].wall, "east");
+  });
+});
+
+describe("buildWallGraph T-junctions", () => {
+  it("connects a mid-wall partition (T-junction) into the rest of the graph", () => {
+    const rectWalls = [
+      { id: "north", x0: 0, y0: 0, x1: 400, y1: 0 },
+      { id: "east", x0: 400, y0: 0, x1: 400, y1: 300 },
+      { id: "south", x0: 400, y0: 300, x1: 0, y1: 300 },
+      { id: "west", x0: 0, y0: 300, x1: 0, y1: 0 },
+      // vertical partition dropping from mid north wall, dead-ending mid-room
+      { id: "part", x0: 200, y0: 0, x1: 200, y1: 150 },
+    ];
+    const g = buildWallGraph(rectWalls);
+    const { path, cost } = findShortestPath(
+      g,
+      { wall: "north", along: 50 },
+      { wall: "part", along: 100 }
+    );
+    assert.ok(Number.isFinite(cost) && cost > 0, `expected finite positive cost, got ${cost}`);
+    // A disconnected graph falls back to a naive 2-point path; a real route
+    // through the T-junction must pass through at least one extra node.
+    assert.ok(path.length >= 3, `expected path to traverse the T-junction, got ${path.length} points`);
+    assert.equal(path[0].wall, "north");
+    assert.equal(path[path.length - 1].wall, "part");
   });
 });
 

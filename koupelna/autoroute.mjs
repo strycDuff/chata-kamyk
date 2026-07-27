@@ -22,7 +22,17 @@ function nodeId(wall, along) {
   return `${wall}:${Math.round(along * 100) / 100}`;
 }
 
-/** @param {WallSeg[]} walls */
+/**
+ * Builds a routing graph over a set of wall segments.
+ *
+ * Beyond simple corner joins (endpoints within 1 cm of each other), this also
+ * detects T-junctions: a wall segment (e.g. a partition) whose endpoint lands
+ * within 1 cm of the *interior* of another wall's line (e.g. an outer wall).
+ * Without this, partition segments that meet outer walls mid-edge would be
+ * disconnected islands in the graph.
+ *
+ * @param {WallSeg[]} walls
+ */
 export function buildWallGraph(walls) {
   /** @type {Map<string, WallPos>} */
   const nodes = new Map();
@@ -39,31 +49,82 @@ export function buildWallGraph(walls) {
   }
 
   function addEdge(a, b, cost) {
+    if (a === b) return;
     adj.get(a).push({ id: b, cost });
     adj.get(b).push({ id: a, cost });
   }
 
-  /** @type {{ wall: string, along: number, x: number, y: number, nodeId: string }[]} */
-  const endpoints = [];
-
-  for (const w of walls) {
+  const meta = walls.map((w) => {
     const len = Math.hypot(w.x1 - w.x0, w.y1 - w.y0) || 1;
-    const id0 = addNode(w.id, 0);
-    const id1 = addNode(w.id, len);
-    addEdge(id0, id1, len);
-    endpoints.push(
-      { wall: w.id, along: 0, x: w.x0, y: w.y0, nodeId: id0 },
-      { wall: w.id, along: len, x: w.x1, y: w.y1, nodeId: id1 }
-    );
+    return {
+      id: w.id,
+      x0: w.x0,
+      y0: w.y0,
+      x1: w.x1,
+      y1: w.y1,
+      len,
+      ux: (w.x1 - w.x0) / len,
+      uy: (w.y1 - w.y0) / len,
+    };
+  });
+
+  /** @type {{ wall: string, along: number, x: number, y: number }[]} */
+  const endpoints = [];
+  for (const w of meta) {
+    endpoints.push({ wall: w.id, along: 0, x: w.x0, y: w.y0 });
+    endpoints.push({ wall: w.id, along: w.len, x: w.x1, y: w.y1 });
   }
 
+  // Split points along each wall: its own endpoints plus any other wall's
+  // endpoint that projects onto this wall's line within 1 cm (T-junction).
+  const splitsByWall = new Map(meta.map((w) => [w.id, new Set([0, w.len])]));
+  /** @type {{ wall: string, along: number, otherWall: string, otherAlong: number }[]} */
+  const tLinks = [];
+
+  for (const w of meta) {
+    for (const ep of endpoints) {
+      if (ep.wall === w.id) continue;
+      const t = (ep.x - w.x0) * w.ux + (ep.y - w.y0) * w.uy;
+      if (t < 0 || t > w.len) continue;
+      const qx = w.x0 + w.ux * t;
+      const qy = w.y0 + w.uy * t;
+      const d = Math.hypot(ep.x - qx, ep.y - qy);
+      if (d < 1) {
+        splitsByWall.get(w.id).add(t);
+        tLinks.push({ wall: w.id, along: t, otherWall: ep.wall, otherAlong: ep.along });
+      }
+    }
+  }
+
+  // Add nodes + edges between consecutive splits along each wall.
+  for (const w of meta) {
+    const alongs = [...splitsByWall.get(w.id)].sort((a, b) => a - b);
+    let prevId = null;
+    let prevAlong = null;
+    for (const a of alongs) {
+      const id = addNode(w.id, a);
+      if (prevId !== null) addEdge(prevId, id, a - prevAlong);
+      prevId = id;
+      prevAlong = a;
+    }
+  }
+
+  // Zero-cost edges at each T-junction, connecting the split node on wall A
+  // to the endpoint node on wall B.
+  for (const link of tLinks) {
+    const a = addNode(link.wall, link.along);
+    const b = addNode(link.otherWall, link.otherAlong);
+    addEdge(a, b, 0);
+  }
+
+  // Existing corner joins: endpoints of different walls within 1 cm of each other.
   for (let i = 0; i < endpoints.length; i++) {
     for (let j = i + 1; j < endpoints.length; j++) {
       const a = endpoints[i];
       const b = endpoints[j];
       if (a.wall === b.wall) continue;
       const d = Math.hypot(a.x - b.x, a.y - b.y);
-      if (d < 1) addEdge(a.nodeId, b.nodeId, 0);
+      if (d < 1) addEdge(addNode(a.wall, a.along), addNode(b.wall, b.along), 0);
     }
   }
 
@@ -74,7 +135,7 @@ export function buildWallGraph(walls) {
 }
 
 /** @param {ReturnType<typeof buildWallGraph>} graph @param {WallPos} from @param {WallPos} to @param {Set<string>} [forbidden] @returns {{ path: WallPos[], cost: number }} */
-function findShortestPath(graph, from, to, forbidden = new Set()) {
+export function findShortestPath(graph, from, to, forbidden = new Set()) {
   const nodes = new Map(graph.nodes);
   /** @type {Map<string, { id: string, cost: number }[]>} */
   const adj = new Map();
