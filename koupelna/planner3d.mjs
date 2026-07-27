@@ -1,6 +1,7 @@
 /**
  * Planner 3D viewer — Three.js first-person POV (look around standing point).
  * Spec boxes use clear-floor cm: x→X, y→Z, h→Y (up).
+ * Optional rotX/rotY/rotZ (radians) rotate around box center after placement.
  */
 import * as THREE from "three";
 
@@ -15,7 +16,7 @@ function mat(color, opts = {}) {
   });
 }
 
-function addBox(group, { x, y, w, d, h, color, opacity, elev }) {
+function addBox(group, { x, y, w, d, h, color, opacity, elev, rotX, rotY, rotZ }) {
   if (w <= 0 || d <= 0 || h <= 0) return;
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
@@ -23,6 +24,29 @@ function addBox(group, { x, y, w, d, h, color, opacity, elev }) {
   );
   const y0 = Number(elev) || 0;
   mesh.position.set(x + w / 2, y0 + h / 2, y + d / 2);
+  if (rotX) mesh.rotation.x = rotX;
+  if (rotY) mesh.rotation.y = rotY;
+  if (rotZ) mesh.rotation.z = rotZ;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+}
+
+/**
+ * Oriented timber: center at (cx, cy, cz), local size w×h×d along local axes,
+ * then Euler YXZ rotation (radians).
+ */
+function addOrientedBox(group, { cx, cy, cz, w, h, d, color, opacity, rotX, rotY, rotZ }) {
+  if (w <= 0 || d <= 0 || h <= 0) return;
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    mat(color || "#94a3b8", { opacity })
+  );
+  mesh.position.set(cx, cy, cz);
+  mesh.rotation.order = "YXZ";
+  if (rotY) mesh.rotation.y = rotY;
+  if (rotX) mesh.rotation.x = rotX;
+  if (rotZ) mesh.rotation.z = rotZ;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   group.add(mesh);
@@ -54,7 +78,7 @@ function lookAtFromEye(viewer, eye, target) {
   // Three.js default forward is -Z; yaw/pitch in YXZ order
   viewer.look.yaw = Math.atan2(-dx, -dz);
   viewer.look.pitch = Math.atan2(dy, Math.hypot(dx, dz));
-  const lim = Math.PI * 0.45;
+  const lim = Math.PI * 0.48;
   viewer.look.pitch = Math.max(-lim, Math.min(lim, viewer.look.pitch));
   applyLook(viewer);
 }
@@ -63,7 +87,7 @@ export function createViewer(container) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#e8eef3");
 
-  const camera = new THREE.PerspectiveCamera(68, 1, 1, 5000);
+  const camera = new THREE.PerspectiveCamera(68, 1, 1, 8000);
   camera.rotation.order = "YXZ";
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -77,10 +101,10 @@ export function createViewer(container) {
   const root = new THREE.Group();
   scene.add(root);
 
-  const hemi = new THREE.HemisphereLight(0xf0f4f8, 0x8a9aaa, 0.9);
+  const hemi = new THREE.HemisphereLight(0xf0f4f8, 0x8a9aaa, 0.95);
   scene.add(hemi);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.7);
-  dir.position.set(400, 600, 200);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.75);
+  dir.position.set(400, 800, 200);
   dir.castShadow = true;
   dir.shadow.mapSize.set(1024, 1024);
   scene.add(dir);
@@ -138,7 +162,7 @@ export function createViewer(container) {
     const sens = 0.0045;
     viewer.look.yaw -= dx * sens;
     viewer.look.pitch -= dy * sens;
-    const lim = Math.PI * 0.45;
+    const lim = Math.PI * 0.48;
     viewer.look.pitch = Math.max(-lim, Math.min(lim, viewer.look.pitch));
     applyLook(viewer);
   };
@@ -232,7 +256,11 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
   });
 
   for (const b of spec.boxes || []) {
-    addBox(viewer.root, b);
+    if (b.oriented) {
+      addOrientedBox(viewer.root, b);
+    } else {
+      addBox(viewer.root, b);
+    }
   }
 
   if (applyCamera) setCameraView(viewer, viewer.preset || "sofa");
