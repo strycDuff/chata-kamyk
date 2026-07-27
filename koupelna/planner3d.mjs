@@ -459,6 +459,7 @@ export function createViewer(container) {
   };
 
   const onDown = (e) => {
+    e.preventDefault();
     viewer._drag = { x: e.clientX, y: e.clientY };
     canvas.setPointerCapture?.(e.pointerId);
     canvas.style.cursor = "grabbing";
@@ -469,6 +470,7 @@ export function createViewer(container) {
   };
   const onMove = (e) => {
     if (!viewer._drag) return;
+    e.preventDefault();
     const dx = e.clientX - viewer._drag.x;
     const dy = e.clientY - viewer._drag.y;
     viewer._drag.x = e.clientX;

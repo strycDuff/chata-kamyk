@@ -7276,6 +7276,15 @@
   document.getElementById("view3d-fs-exit")?.addEventListener("click", () => {
     exitView3dFullscreen();
   });
+  // Block page rubber-band / pull-to-refresh while immersive — look swipe must not dismiss.
+  document.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!document.documentElement.classList.contains("is-view3d-fs-lock")) return;
+      e.preventDefault();
+    },
+    { passive: false },
+  );
   // Fullscreen exits only via the buttons (not Escape / swipe / browser chrome).
   syncView3dFsButtons();
 
