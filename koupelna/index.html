@@ -1263,6 +1263,18 @@
           </details>
 
           <details class="side-block" open>
+            <summary>Textury</summary>
+            <div class="side-block-body">
+              <label class="chk"><input type="checkbox" id="tex-wood"> Dřevo (krov · obklad)</label>
+              <label class="chk"><input type="checkbox" id="tex-wall"> Stěny · příčky · zaklopení</label>
+              <label class="chk"><input type="checkbox" id="tex-floor"> Podlaha · terén</label>
+              <label class="chk"><input type="checkbox" id="tex-furniture"> Nábytek</label>
+              <label class="chk"><input type="checkbox" id="tex-covering"> Krytina</label>
+              <p class="hint">Procedurální náhled — vypni, pokud to sedí hůř než flat barvy.</p>
+            </div>
+          </details>
+
+          <details class="side-block" open>
             <summary>Krov · kleštiny</summary>
             <div class="side-block-body">
               <label class="chk"><input type="checkbox" id="roof-show"> Zobrazit krov</label>
@@ -1318,7 +1330,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.18.2";
+  const APP_VERSION = "3.19.0";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1493,6 +1505,11 @@
     showRoofCovering: false,
     showRoofSheathing: false, // zaklopit = bílá deska na spodním líci krokví
     showLoftDeck: true,
+    texWood: false,
+    texWall: false,
+    texFloor: false,
+    texFurniture: false,
+    texCovering: false,
     roofPitchDeg: 30, // fixní
     roofRafterSpacing: 90, // fixní osová vzdálenost
     livingCollarBottom: 190, // loft kleštiny — default pod korunou, lze níž
@@ -4785,6 +4802,7 @@
       color: box.color,
       opacity: box.opacity,
       elev: y0,
+      matKind: inset ? null : "wall",
     });
   }
 
@@ -4825,6 +4843,7 @@
     const elev0 = Number(opts.elev) || 0;
     const capTop = opts.capTop;
     const step = opts.step || 6;
+    const matKind = opts.matKind || "wall";
     const r = roofParams();
     if (clearBox.d <= 0.5 || clearBox.w <= 0) return;
 
@@ -4851,6 +4870,7 @@
           elev: elev0,
           color,
           opacity: opts.opacity,
+          matKind,
         });
       }
     }
@@ -4903,11 +4923,12 @@
         d: travelC.d,
         h: leafH,
         color: "#e1b12c",
+        matKind: "wood",
       });
     } else {
       boxes.push({
         ...absToClearBox({ x: op.x + (PART - leafW) / 2, y: op.y, w: leafW, d: op.d }),
-        h: leafH, color: "#e1b12c",
+        h: leafH, color: "#e1b12c", matKind: "wood",
       });
     }
     // Dráha — jen tenká linka, mimo tloušťku křídla
@@ -4936,14 +4957,14 @@
     boxes.push({
       x: west.x + backT, y: west.y,
       w: Math.max(1, west.w - backT), d: west.d,
-      h: seatH, color: seat,
+      h: seatH, color: seat, matKind: "furniture",
     });
     const northSeatW = Math.max(0, north.w - west.w);
     if (northSeatW > 1) {
       boxes.push({
         x: west.x + west.w, y: north.y + backT,
         w: northSeatW, d: Math.max(1, north.d - backT),
-        h: seatH, color: seat,
+        h: seatH, color: seat, matKind: "furniture",
       });
     }
     // opěradla bez společného rohu (Z pak N)
@@ -4951,12 +4972,12 @@
     boxes.push({
       x: west.x, y: north.y + backT,
       w: backT, d: westBackD,
-      h: backH, color: back,
+      h: backH, color: back, matKind: "furniture",
     });
     boxes.push({
       x: north.x, y: north.y,
       w: north.w, d: backT,
-      h: backH, color: back,
+      h: backH, color: back, matKind: "furniture",
     });
     // područka — jen nad sedákem severního ramene
     const armW = 16;
@@ -4964,7 +4985,7 @@
       boxes.push({
         x: north.x + north.w - armW, y: north.y + backT,
         w: armW, d: Math.max(8, north.d - backT),
-        h: 58, color: back,
+        h: 58, color: back, matKind: "furniture",
       });
     }
   }
@@ -5003,6 +5024,7 @@
           x: tv.x - cladT, y, w: cladT, d: segD + (i < n - 1 ? 0.08 : 0),
           h, elev,
           color: pi % 2 === 0 ? "#c4a574" : "#b08968",
+          matKind: "wood",
         });
         elev += plank + gap;
         pi += 1;
@@ -5162,12 +5184,12 @@
     boxes.push({
       x: -2, y: -WALL + 1, w: CLEAR.w + 4, d: plateD,
       h: plateSec, elev: r.plateH + 0.8,
-      color: woodDark,
+      color: woodDark, matKind: "wood",
     });
     boxes.push({
       x: -2, y: CLEAR.h + 1, w: CLEAR.w + 4, d: plateD,
       h: plateSec, elev: r.plateH + 0.8,
-      color: woodDark,
+      color: woodDark, matKind: "wood",
     });
 
     const xs = roofRafterXs(r);
@@ -5182,14 +5204,14 @@
         cx: x, cy: r.plateH + r.rise / 2, cz: r.halfSpan / 2,
         w: r.rafterW, h: r.rafterTh, d: r.rafterLen,
         rotX: -r.pitch,
-        color: wood,
+        color: wood, matKind: "wood",
       });
       boxes.push({
         oriented: true,
         cx: x, cy: r.plateH + r.rise / 2, cz: r.halfSpan + r.halfSpan / 2,
         w: r.rafterW, h: r.rafterTh, d: r.rafterLen,
         rotX: r.pitch,
-        color: wood,
+        color: wood, matKind: "wood",
       });
 
       // Kleština mezi párem krokví — pohyblivé jen vybraný počet od západu
@@ -5209,6 +5231,7 @@
         h: r.collarH,
         elev: collarBottom,
         color: movable ? "#b8956a" : woodLight,
+        matKind: "wood",
       });
     }
 
@@ -5228,6 +5251,7 @@
         rotX: -r.pitch,
         color: sheet,
         doubleSide: true,
+        matKind: "wall",
       });
       boxes.push({
         oriented: true,
@@ -5240,6 +5264,7 @@
         rotX: r.pitch,
         color: sheet,
         doubleSide: true,
+        matKind: "wall",
       });
     }
 
@@ -5260,13 +5285,13 @@
         boxes.push({
           x: wallX, y: z0, w: WALL * 0.7, d: depth,
           h: Math.max(2, y1 - y0), elev: y0,
-          color: gableCol, opacity: 0.55,
+          color: gableCol, opacity: 0.55, matKind: "wall",
         });
         if (inset1 > inset0 + 1) {
           boxes.push({
             x: wallX, y: inset1, w: WALL * 0.7, d: Math.max(4, CLEAR.h - 2 * inset1),
             h: 1.2, elev: y1 - 0.6,
-            color: gableCol, opacity: 0.35,
+            color: gableCol, opacity: 0.35, matKind: "wall",
           });
         }
       }
@@ -5286,7 +5311,7 @@
         h: sheetH,
         d: r.rafterLen + 6,
         rotX: -r.pitch,
-        color: sheet,
+        color: sheet, matKind: "covering",
       });
       boxes.push({
         oriented: true,
@@ -5297,7 +5322,7 @@
         h: sheetH,
         d: r.rafterLen + 6,
         rotX: r.pitch,
-        color: sheet,
+        color: sheet, matKind: "covering",
       });
     }
 
@@ -5319,7 +5344,7 @@
         boxes.push({
           x: x0, y: zN, w: Math.max(10, x1 - x0), d: deckD,
           h: deckT * 0.5, elev: elevTop,
-          color: "#9a7b4f", opacity: 0.92,
+          color: "#9a7b4f", opacity: 0.92, matKind: "wood",
         });
         for (let px = x0 + 1; px < x1 - 2; px += plank + gap) {
           const pw = Math.min(plank, x1 - px - 1);
@@ -5327,6 +5352,7 @@
             x: px, y: zN + 2, w: pw, d: Math.max(12, deckD - 4),
             h: deckT, elev: elevTop + deckT * 0.4,
             color: ((px / (plank + gap)) | 0) % 2 === 0 ? "#c4a574" : "#b8956a",
+            matKind: "wood",
           });
         }
       }
@@ -5418,7 +5444,7 @@
     // Kitchen
     {
       const c = absToClearBox(kitchenBox());
-      boxes.push({ ...c, h: VIEW3D_H.kitchen, color: "#27ae60" });
+      boxes.push({ ...c, h: VIEW3D_H.kitchen, color: "#27ae60", matKind: "furniture" });
     }
     if (state.showBed) {
       const bed = absToClearBox(bedBox());
@@ -5426,29 +5452,29 @@
       const matH = VIEW3D_H.mattress;
       const baseH = Math.max(8, VIEW3D_H.bed - matH);
       // rám nižší než matrace — bez společné horní plochy (z-fighting)
-      boxes.push({ ...bed, h: baseH, color: "#d35400" });
-      boxes.push({ ...mat, h: matH, color: "#f5cd79", elev: baseH });
+      boxes.push({ ...bed, h: baseH, color: "#d35400", matKind: "wood" });
+      boxes.push({ ...mat, h: matH, color: "#f5cd79", elev: baseH, matKind: "furniture" });
     }
     if (state.showSofa) pushSofa3d(boxes);
     {
       const c = absToClearBox(showerBox());
-      boxes.push({ ...c, h: VIEW3D_H.shower, color: "#3498db" });
+      boxes.push({ ...c, h: VIEW3D_H.shower, color: "#3498db", matKind: "furniture" });
     }
     {
       const c = absToClearBox(wcBox());
-      boxes.push({ ...c, h: VIEW3D_H.wc, color: "#ecf0f1" });
+      boxes.push({ ...c, h: VIEW3D_H.wc, color: "#ecf0f1", matKind: "furniture" });
     }
     {
       const c = absToClearBox(sinkBox());
       // umyvadlo na stěně / desce — ne od země
       const basinH = 16;
       const basinElev = Math.max(70, (VIEW3D_H.sink || 85) - basinH);
-      boxes.push({ ...c, h: basinH, elev: basinElev, color: "#ecf0f1" });
+      boxes.push({ ...c, h: basinH, elev: basinElev, color: "#ecf0f1", matKind: "furniture" });
       // tenký konzolový / nožičkový náznak
       boxes.push({
         x: c.x + c.w * 0.35, y: c.y + c.d * 0.35,
         w: Math.max(4, c.w * 0.3), d: Math.max(4, c.d * 0.3),
-        h: basinElev, color: "#bdc3c7",
+        h: basinElev, color: "#bdc3c7", matKind: "furniture",
       });
     }
     if (state.showFurniture) {
@@ -5457,6 +5483,7 @@
         boxes.push({
           x: layer.x, y: layer.y, w: layer.w, d: layer.d,
           h: layer.h, color: furnCollides(layer) ? "#c0392b" : "#2980b9",
+          matKind: "furniture",
         });
       }
     }
@@ -5473,11 +5500,19 @@
       h: 1.5,
       color: "#cfd8dc",
       opacity: 0.95,
+      matKind: "yard",
     });
 
     return {
       roomH, clearW: CLEAR.w, clearH: CLEAR.h, boxes,
       cameras: buildView3dCameras(),
+      textures: {
+        wood: !!state.texWood,
+        wall: !!state.texWall,
+        floor: !!state.texFloor,
+        furniture: !!state.texFurniture,
+        covering: !!state.texCovering,
+      },
       walk: {
         door: { x0: southDoorClear().x0, x1: southDoorClear().x1 },
         outsidePad: yardPad,
@@ -6205,6 +6240,16 @@
     if (roofSheathe) roofSheathe.checked = !!state.showRoofSheathing;
     const loftDeck = document.getElementById("roof-loft-deck");
     if (loftDeck) loftDeck.checked = !!state.showLoftDeck;
+    for (const [id, key] of [
+      ["tex-wood", "texWood"],
+      ["tex-wall", "texWall"],
+      ["tex-floor", "texFloor"],
+      ["tex-furniture", "texFurniture"],
+      ["tex-covering", "texCovering"],
+    ]) {
+      const el = document.getElementById(id);
+      if (el) el.checked = !!state[key];
+    }
     clampRoofControls();
     syncRoofHint();
     clampBedOuter();
@@ -6409,6 +6454,18 @@
     state.showLoftDeck = e.target.checked;
     render();
   });
+  for (const [id, key] of [
+    ["tex-wood", "texWood"],
+    ["tex-wall", "texWall"],
+    ["tex-floor", "texFloor"],
+    ["tex-furniture", "texFurniture"],
+    ["tex-covering", "texCovering"],
+  ]) {
+    document.getElementById(id)?.addEventListener("change", (e) => {
+      state[key] = e.target.checked;
+      render();
+    });
+  }
   document.getElementById("elev-wall")?.addEventListener("change", (e) => {
     const inp = e.target.closest("input[data-wall]");
     if (!inp) return;
@@ -6922,6 +6979,11 @@
     if (state.showRoofCovering == null) state.showRoofCovering = false;
     if (state.showRoofSheathing == null) state.showRoofSheathing = false;
     if (state.showLoftDeck == null) state.showLoftDeck = true;
+    if (state.texWood == null) state.texWood = false;
+    if (state.texWall == null) state.texWall = false;
+    if (state.texFloor == null) state.texFloor = false;
+    if (state.texFurniture == null) state.texFurniture = false;
+    if (state.texCovering == null) state.texCovering = false;
     state.roofPitchDeg = 30;
     state.roofRafterSpacing = 90;
     if (state.livingCollarBottom == null || state.livingCollarBottom > 228) {

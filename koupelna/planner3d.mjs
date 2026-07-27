@@ -2,11 +2,203 @@
  * Planner 3D viewer — Three.js first-person POV (look around standing point).
  * Spec boxes use clear-floor cm: x→X, y→Z, h→Y (up).
  * Optional rotX/rotY/rotZ (radians) rotate around box center after placement.
+ * Optional matKind: "wood" | "wall" | "floor" | "furniture" | "covering"
+ * Optional textures: { wood, wall, floor, furniture, covering } booleans.
  */
 import * as THREE from "three";
 
+const TEX_CACHE = new Map();
+
+function hash2(x, y) {
+  const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+function canvasTex(key, draw, size = 256) {
+  if (TEX_CACHE.has(key)) return TEX_CACHE.get(key);
+  const c = document.createElement("canvas");
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext("2d");
+  draw(ctx, size);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.userData.cached = true;
+  TEX_CACHE.set(key, tex);
+  return tex;
+}
+
+function woodMap() {
+  return canvasTex("wood", (ctx, s) => {
+    const img = ctx.createImageData(s, s);
+    const data = img.data;
+    for (let y = 0; y < s; y++) {
+      for (let x = 0; x < s; x++) {
+        const wobble = Math.sin(x * 0.08) * 3 + Math.sin(x * 0.31) * 1.5;
+        const n = hash2(x * 0.04, y * 0.9 + wobble);
+        const ring = ((y + wobble * 2) % 18 < 1) ? -0.08 : 0;
+        const shade = 0.82 + n * 0.28 + ring;
+        const i = (y * s + x) * 4;
+        data[i] = Math.floor(160 * shade);
+        data[i + 1] = Math.floor(120 * shade);
+        data[i + 2] = Math.floor(70 * shade);
+        data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    ctx.globalAlpha = 0.2;
+    for (let i = 0; i < 12; i++) {
+      const x0 = (i / 12) * s + hash2(i, 2) * 8;
+      ctx.strokeStyle = "#5c3d1e";
+      ctx.lineWidth = 1 + hash2(i, 9) * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x0, 0);
+      for (let y = 0; y <= s; y += 8) ctx.lineTo(x0 + Math.sin(y * 0.05 + i) * 4, y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  });
+}
+
+function wallMap() {
+  return canvasTex("wall", (ctx, s) => {
+    ctx.fillStyle = "#d8dde2";
+    ctx.fillRect(0, 0, s, s);
+    for (let i = 0; i < 9000; i++) {
+      const x = (hash2(i, 1) * s) | 0;
+      const y = (hash2(i, 2) * s) | 0;
+      const v = 200 + ((hash2(i, 3) * 40) | 0);
+      ctx.fillStyle = `rgb(${v},${v + 2},${v + 4})`;
+      ctx.fillRect(x, y, 1 + (hash2(i, 4) > 0.85 ? 1 : 0), 1);
+    }
+  }, 128);
+}
+
+function floorMap() {
+  return canvasTex("floor", (ctx, s) => {
+    const plank = 28;
+    for (let y = 0; y < s; y += plank) {
+      const row = (y / plank) | 0;
+      for (let x = 0; x < s; x++) {
+        const n = hash2(x * 0.07 + row * 3, y * 0.02);
+        const base = row % 2 === 0 ? 168 : 155;
+        const shade = 0.9 + n * 0.2;
+        const r = Math.floor(base * shade);
+        const g = Math.floor((base - 35) * shade);
+        const b = Math.floor((base - 70) * shade);
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(x, y, 1, plank - 1);
+      }
+      ctx.fillStyle = "#6b4f32";
+      ctx.fillRect(0, y + plank - 1, s, 1);
+    }
+    ctx.fillStyle = "rgba(80,50,20,0.12)";
+    for (let x = 40; x < s; x += 52) ctx.fillRect(x, 0, 1, s);
+  });
+}
+
+function furnitureMap() {
+  return canvasTex("furniture", (ctx, s) => {
+    ctx.fillStyle = "#6d7b88";
+    ctx.fillRect(0, 0, s, s);
+    for (let y = 0; y < s; y++) {
+      for (let x = 0; x < s; x++) {
+        const n = hash2(x * 0.2, y * 0.2);
+        if (n > 0.55) {
+          const v = 90 + ((n * 50) | 0);
+          ctx.fillStyle = `rgb(${v},${v + 8},${v + 12})`;
+          ctx.fillRect(x, y, 1, 1);
+        }
+      }
+    }
+    ctx.strokeStyle = "rgba(255,255,255,0.06)";
+    for (let i = 0; i < s; i += 6) {
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(s, i + 2);
+      ctx.stroke();
+    }
+  }, 128);
+}
+
+function coveringMap() {
+  return canvasTex("covering", (ctx, s) => {
+    ctx.fillStyle = "#6b2a1f";
+    ctx.fillRect(0, 0, s, s);
+    const rib = 10;
+    for (let x = 0; x < s; x += rib) {
+      const grad = ctx.createLinearGradient(x, 0, x + rib, 0);
+      grad.addColorStop(0, "#5a2218");
+      grad.addColorStop(0.35, "#8a3a28");
+      grad.addColorStop(0.55, "#4a1a12");
+      grad.addColorStop(1, "#5a2218");
+      ctx.fillStyle = grad;
+      ctx.fillRect(x, 0, rib, s);
+    }
+    ctx.fillStyle = "rgba(255,220,180,0.08)";
+    for (let y = 0; y < s; y += 32) ctx.fillRect(0, y, s, 1);
+  }, 128);
+}
+
+function yardMap() {
+  return canvasTex("yard", (ctx, s) => {
+    ctx.fillStyle = "#9aa7ad";
+    ctx.fillRect(0, 0, s, s);
+    for (let i = 0; i < 6000; i++) {
+      const x = (hash2(i, 5) * s) | 0;
+      const y = (hash2(i, 6) * s) | 0;
+      const v = 140 + ((hash2(i, 7) * 50) | 0);
+      ctx.fillStyle = `rgb(${v},${v + 4},${v - 6})`;
+      ctx.fillRect(x, y, 2, 2);
+    }
+  }, 128);
+}
+
+function texForKind(kind) {
+  if (kind === "wood") return woodMap();
+  if (kind === "wall") return wallMap();
+  if (kind === "floor") return floorMap();
+  if (kind === "furniture") return furnitureMap();
+  if (kind === "covering") return coveringMap();
+  if (kind === "yard") return yardMap();
+  return null;
+}
+
+function cmPerTile(kind) {
+  if (kind === "wood") return 45;
+  if (kind === "floor") return 55;
+  if (kind === "covering") return 35;
+  if (kind === "furniture") return 40;
+  if (kind === "yard") return 80;
+  return 60; // wall
+}
+
+function matOptsForKind(kind) {
+  if (kind === "wood") return { roughness: 0.72, metalness: 0.02 };
+  if (kind === "covering") return { roughness: 0.45, metalness: 0.35 };
+  if (kind === "floor") return { roughness: 0.78, metalness: 0.02 };
+  if (kind === "furniture") return { roughness: 0.88, metalness: 0.04 };
+  if (kind === "yard") return { roughness: 0.95, metalness: 0 };
+  return { roughness: 0.9, metalness: 0.02 }; // wall
+}
+
+function applyUvRepeat(map, kind, sx, sy) {
+  if (!map) return;
+  const tile = cmPerTile(kind);
+  const mx = map.clone();
+  mx.wrapS = THREE.RepeatWrapping;
+  mx.wrapT = THREE.RepeatWrapping;
+  mx.colorSpace = THREE.SRGBColorSpace;
+  mx.repeat.set(Math.max(0.5, sx / tile), Math.max(0.5, sy / tile));
+  mx.needsUpdate = true;
+  return mx;
+}
+
 function mat(color, opts = {}) {
-  return new THREE.MeshStandardMaterial({
+  const m = new THREE.MeshStandardMaterial({
     color,
     roughness: opts.roughness ?? 0.85,
     metalness: opts.metalness ?? 0.05,
@@ -14,16 +206,48 @@ function mat(color, opts = {}) {
     opacity: opts.opacity ?? 1,
     side: opts.side ?? THREE.FrontSide,
   });
+  if (opts.map) {
+    m.map = opts.map;
+    m.color = new THREE.Color(opts.mapTint || "#ffffff");
+  }
+  return m;
 }
 
-function addBox(group, { x, y, w, d, h, color, opacity, elev, rotX, rotY, rotZ, doubleSide }) {
+function resolveMaterial(box, textures, sizeHint) {
+  const kind = box.matKind;
+  const enabled = kind && textures && textures[kind];
+  const base = matOptsForKind(kind || "wall");
+  const side = box.doubleSide ? THREE.DoubleSide : THREE.FrontSide;
+  if (!enabled) {
+    return mat(box.color || "#94a3b8", {
+      opacity: box.opacity,
+      side,
+      roughness: base.roughness,
+      metalness: base.metalness,
+    });
+  }
+  const src = texForKind(kind);
+  const map = applyUvRepeat(src, kind, sizeHint.u, sizeHint.v);
+  // Keep a hint of original color via slight tint for furniture variants
+  const tint = kind === "furniture" || kind === "wood" ? box.color : "#ffffff";
+  return mat(box.color || "#94a3b8", {
+    opacity: box.opacity,
+    side,
+    roughness: base.roughness,
+    metalness: base.metalness,
+    map,
+    mapTint: tint && kind === "furniture" ? tint : "#ffffff",
+  });
+}
+
+function addBox(group, box, textures) {
+  const { x, y, w, d, h, elev, rotX, rotY, rotZ } = box;
   if (w <= 0 || d <= 0 || h <= 0) return;
+  // UV: largest face-ish — wall uses height×length
+  const sizeHint = { u: Math.max(w, d), v: Math.max(h, d) };
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
-    mat(color || "#94a3b8", {
-      opacity,
-      side: doubleSide ? THREE.DoubleSide : THREE.FrontSide,
-    })
+    resolveMaterial(box, textures, sizeHint)
   );
   const y0 = Number(elev) || 0;
   mesh.position.set(x + w / 2, y0 + h / 2, y + d / 2);
@@ -39,14 +263,13 @@ function addBox(group, { x, y, w, d, h, color, opacity, elev, rotX, rotY, rotZ, 
  * Oriented timber: center at (cx, cy, cz), local size w×h×d along local axes,
  * then Euler YXZ rotation (radians).
  */
-function addOrientedBox(group, { cx, cy, cz, w, h, d, color, opacity, rotX, rotY, rotZ, doubleSide }) {
+function addOrientedBox(group, box, textures) {
+  const { cx, cy, cz, w, h, d, rotX, rotY, rotZ } = box;
   if (w <= 0 || d <= 0 || h <= 0) return;
+  const sizeHint = { u: Math.max(w, d), v: Math.max(h, d) };
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
-    mat(color || "#94a3b8", {
-      opacity,
-      side: doubleSide ? THREE.DoubleSide : THREE.FrontSide,
-    })
+    resolveMaterial(box, textures, sizeHint)
   );
   mesh.position.set(cx, cy, cz);
   mesh.rotation.order = "YXZ";
@@ -64,8 +287,13 @@ function clearGroup(group) {
     group.remove(ch);
     ch.geometry?.dispose?.();
     if (ch.material) {
-      if (Array.isArray(ch.material)) ch.material.forEach((m) => m.dispose());
-      else ch.material.dispose();
+      const mats = Array.isArray(ch.material) ? ch.material : [ch.material];
+      for (const m of mats) {
+        if (m.map && !m.map.userData?.cached) {
+          try { m.map.dispose(); } catch { /* ignore */ }
+        }
+        m.dispose();
+      }
     }
   }
 }
@@ -319,6 +547,14 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
   const clearW = spec.clearW || 906;
   const clearD = spec.clearH || 333;
   const walk = spec.walk || {};
+  const textures = {
+    wood: !!spec.textures?.wood,
+    wall: !!spec.textures?.wall,
+    floor: !!spec.textures?.floor,
+    furniture: !!spec.textures?.furniture,
+    covering: !!spec.textures?.covering,
+    yard: !!spec.textures?.floor, // yard uses floor toggle
+  };
   viewer.room = {
     w: clearW,
     d: clearD,
@@ -333,13 +569,14 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
   addBox(viewer.root, {
     x: 0, y: 0, w: clearW, d: clearD, h: 2,
     color: "#dfe6e9",
-  });
+    matKind: "floor",
+  }, textures);
 
   for (const b of spec.boxes || []) {
     if (b.oriented) {
-      addOrientedBox(viewer.root, b);
+      addOrientedBox(viewer.root, b, textures);
     } else {
-      addBox(viewer.root, b);
+      addBox(viewer.root, b, textures);
     }
   }
 
