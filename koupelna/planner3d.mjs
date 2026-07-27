@@ -197,74 +197,6 @@ function applyUvRepeat(map, kind, sx, sy) {
   return mx;
 }
 
-const SURROUND_URL = new URL("./assets/site-surround.jpg", import.meta.url).href;
-let surroundTexPromise = null;
-
-function loadSurroundTexture() {
-  if (!surroundTexPromise) {
-    surroundTexPromise = new Promise((resolve, reject) => {
-      const loader = new THREE.TextureLoader();
-      loader.load(
-        SURROUND_URL,
-        (tex) => {
-          tex.colorSpace = THREE.SRGBColorSpace;
-          tex.anisotropy = 4;
-          tex.wrapS = THREE.ClampToEdgeWrapping;
-          tex.wrapT = THREE.ClampToEdgeWrapping;
-          tex.userData.cached = true;
-          resolve(tex);
-        },
-        undefined,
-        reject
-      );
-    });
-  }
-  return surroundTexPromise;
-}
-
-/**
- * Vzdálené satelitní okolí — prstenec kolem chaty (ne pod budovou).
- * Textura north-up; local −Z = „severní“ stěna plánu @ northWallBearingDeg.
- */
-function addSiteSurround(group, {
-  clearW, clearD,
-  halfExtentM = 800,
-  nearClearM = 25,
-  northWallBearingDeg = 343,
-  map,
-}) {
-  const outer = Math.max(5000, halfExtentM * 100);
-  const inner = Math.min(outer * 0.85, Math.max(1500, nearClearM * 100));
-  const geo = new THREE.RingGeometry(inner, outer, 128, 1);
-  // UV: střed textury = chata, ortofoto north-up v rovině XY před rotací
-  const pos = geo.attributes.position;
-  const uv = geo.attributes.uv;
-  const span = outer * 2;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const y = pos.getY(i);
-    // Ring XY → po rotaci X−90°: +Y = world −Z (sever). Textura north-up: V = y/span+0.5.
-    uv.setXY(i, x / span + 0.5, y / span + 0.5);
-  }
-  uv.needsUpdate = true;
-
-  const mesh = new THREE.Mesh(
-    geo,
-    new THREE.MeshStandardMaterial({
-      map,
-      roughness: 1,
-      metalness: 0,
-      color: "#ffffff",
-      side: THREE.DoubleSide,
-    })
-  );
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.rotation.y = THREE.MathUtils.degToRad(360 - northWallBearingDeg);
-  mesh.position.set(clearW / 2, -2, clearD / 2);
-  mesh.receiveShadow = true;
-  group.add(mesh);
-}
-
 function mat(color, opts = {}) {
   const m = new THREE.MeshStandardMaterial({
     color,
@@ -682,18 +614,6 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
     lamps[1].visible = true;
   }
 
-  const surround = spec.siteSurround;
-  if (surround?.enabled && surround.map) {
-    addSiteSurround(viewer.root, {
-      clearW,
-      clearD,
-      halfExtentM: surround.halfExtentM,
-      nearClearM: surround.nearClearM,
-      northWallBearingDeg: surround.northWallBearingDeg,
-      map: surround.map,
-    });
-  }
-
   addBox(viewer.root, {
     x: 0, y: 0, w: clearW, d: clearD, h: 2,
     color: "#dfe6e9",
@@ -709,21 +629,6 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
   }
 
   if (applyCamera) setCameraView(viewer, viewer.preset || "sofa");
-}
-
-export function loadSiteOrthoTexture() {
-  return loadSurroundTexture();
-}
-
-/** Load distant surround texture when enabled. */
-export async function ensureSiteOrtho(spec) {
-  if (!spec?.siteSurround?.enabled) return null;
-  try {
-    return await loadSurroundTexture();
-  } catch (err) {
-    console.warn("site surround load failed", err);
-    return null;
-  }
 }
 
 export function dispose(viewer) {
