@@ -335,10 +335,10 @@ export function createViewer(container) {
   const root = new THREE.Group();
   scene.add(root);
 
-  const hemi = new THREE.HemisphereLight(0xf0f4f8, 0x7a8a98, 0.48);
+  const hemi = new THREE.HemisphereLight(0xf0f4f8, 0x7a8a98, 0.32);
   scene.add(hemi);
-  // Hlavní světlo z SZ — severní a jižní sklon střechy se liší jasem (hřeben = zlom)
-  const dir = new THREE.DirectionalLight(0xfff8f0, 1.05);
+  // Slunce z SZ — sklon střechy + exteriér
+  const dir = new THREE.DirectionalLight(0xfff8f0, 0.95);
   dir.position.set(-280, 920, -420);
   dir.castShadow = true;
   dir.shadow.mapSize.set(1024, 1024);
@@ -349,9 +349,23 @@ export function createViewer(container) {
   dir.shadow.camera.top = 800;
   dir.shadow.camera.bottom = -800;
   scene.add(dir);
-  const fill = new THREE.DirectionalLight(0xdde8f5, 0.28);
+  const fill = new THREE.DirectionalLight(0xdde8f5, 0.18);
   fill.position.set(420, 380, 520);
   scene.add(fill);
+
+  // Interiérové lampy — stíny i pod krytinou (slunce neprojde střešním pláštěm)
+  const lampA = new THREE.PointLight(0xfff1dd, 1.15, 780, 1.55);
+  lampA.castShadow = true;
+  lampA.shadow.mapSize.set(512, 512);
+  lampA.shadow.bias = -0.002;
+  lampA.shadow.normalBias = 0.8;
+  scene.add(lampA);
+  const lampB = new THREE.PointLight(0xffe8cc, 0.7, 620, 1.7);
+  lampB.castShadow = true;
+  lampB.shadow.mapSize.set(512, 512);
+  lampB.shadow.bias = -0.002;
+  lampB.shadow.normalBias = 0.8;
+  scene.add(lampB);
 
   const viewer = {
     scene,
@@ -368,6 +382,7 @@ export function createViewer(container) {
     raf: 0,
     _ro: null,
     _drag: null,
+    interiorLights: [lampA, lampB],
   };
 
   const clampHoriz = () => {
@@ -575,6 +590,12 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
     outsidePadX: walk.outsidePadX || 0,
   };
   viewer.cameras = spec.cameras || {};
+
+  // Interiérové lampy podle světlosti místnosti (Z / V zóna)
+  const lamps = viewer.interiorLights || [];
+  const lampY = Math.max(140, Math.min(roomH - 12, roomH * 0.92));
+  if (lamps[0]) lamps[0].position.set(clearW * 0.32, lampY, clearD * 0.48);
+  if (lamps[1]) lamps[1].position.set(clearW * 0.72, lampY, clearD * 0.52);
 
   addBox(viewer.root, {
     x: 0, y: 0, w: clearW, d: clearD, h: 2,
