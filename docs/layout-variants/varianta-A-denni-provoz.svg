@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1242 519" width="1242" height="519">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="48.00" y="22.00" font-size="16" font-weight="700" font-family="Helvetica,Arial,sans-serif" fill="#1a1a1a">Varianta A — Denní provoz / kuchyňská osa</text>
+<text x="48.00" y="40.00" font-size="11" font-family="Helvetica,Arial,sans-serif" fill="#555">Dlouhá linka u jihu · spotřebiče v kuchyni · volný severní průchod</text>
+<rect x="48.00" y="48.00" width="926.00" height="353.00" fill="#f4f1ea" stroke="#2c3e50" stroke-width="2.5"/>
+<rect x="58.00" y="58.00" width="906.00" height="333.00" fill="#fafafa" stroke="none"/>
+<rect x="278.00" y="48.00" width="96.50" height="10.00" fill="#b8e0ff" stroke="#1a73e8" stroke-width="1.2"/>
+<text x="326.25" y="55.50" font-size="7" text-anchor="middle" fill="#1557b0" font-family="Helvetica,Arial,sans-serif">96.5</text>
+<rect x="494.50" y="48.00" width="90.50" height="10.00" fill="#b8e0ff" stroke="#1a73e8" stroke-width="1.2"/>
+<text x="539.75" y="55.50" font-size="7" text-anchor="middle" fill="#1557b0" font-family="Helvetica,Arial,sans-serif">90.5</text>
+<rect x="684.00" y="48.00" width="56.50" height="10.00" fill="#b8e0ff" stroke="#1a73e8" stroke-width="1.2"/>
+<text x="712.25" y="55.50" font-size="7" text-anchor="middle" fill="#1557b0" font-family="Helvetica,Arial,sans-serif">56.5</text>
+<rect x="262.00" y="391.00" width="103.00" height="10.00" fill="#ffe8a3" stroke="#b8860b" stroke-width="1.5"/>
+<text x="313.50" y="398.50" font-size="7" text-anchor="middle" fill="#8a6d00" font-family="Helvetica,Arial,sans-serif">vstup 103</text>
+<rect x="444.00" y="391.00" width="87.00" height="10.00" fill="#b8e0ff" stroke="#1a73e8" stroke-width="1.2"/>
+<text x="487.50" y="398.50" font-size="7" text-anchor="middle" fill="#1557b0" font-family="Helvetica,Arial,sans-serif">okno 87</text>
+<rect x="48.00" y="114.00" width="10.00" height="83.00" fill="#b8e0ff" stroke="#1a73e8" stroke-width="1.2"/>
+<rect x="48.00" y="247.00" width="10.00" height="83.00" fill="#b8e0ff" stroke="#1a73e8" stroke-width="1.2"/>
+<rect x="964.00" y="182.00" width="10.00" height="85.00" fill="#b8e0ff" stroke="#1a73e8" stroke-width="1.2"/>
+<rect x="58.00" y="58.00" width="95.00" height="240.00" fill="#c8d6e5" stroke="#576574" stroke-width="1" opacity="0.95"/>
+<rect x="58.00" y="58.00" width="160.00" height="90.00" fill="#c8d6e5" stroke="#576574" stroke-width="1" opacity="0.95"/>
+<text x="108.00" y="198.00" font-size="10" text-anchor="middle" fill="#2c3e50" font-family="Helvetica,Arial,sans-serif">sedačka</text>
+<rect x="382.00" y="58.00" width="12.50" height="150.00" fill="#5d6d7e" stroke="#2c3e50" stroke-width="1"/>
+<text x="388.25" y="133.00" font-size="8" text-anchor="middle" fill="#fff" font-family="Helvetica,Arial,sans-serif" transform="rotate(-90 388.2 133.0)">TV</text>
+<rect x="378.00" y="71.50" width="4.00" height="123.00" fill="#111" stroke="none"/>
+<rect x="371.00" y="331.00" width="240.00" height="60.00" fill="#a8e6a1" stroke="#2d6a2d" stroke-width="1.2"/>
+<text x="491.00" y="364.00" font-size="9" text-anchor="middle" fill="#222" font-family="Helvetica,Arial,sans-serif">kuchyň 240</text>
+<rect x="627.00" y="58.00" width="12.50" height="230.00" fill="#5d6d7e" stroke="#2c3e50" stroke-width="1"/>
+<rect x="739.50" y="58.00" width="12.50" height="230.00" fill="#5d6d7e" stroke="#2c3e50" stroke-width="1"/>
+<rect x="627.00" y="275.50" width="125.00" height="12.50" fill="#5d6d7e" stroke="#2c3e50" stroke-width="1"/>
+<rect x="639.50" y="58.00" width="100.00" height="217.50" fill="#e8f4fc" stroke="none" opacity="0.5"/>
+<text x="689.50" y="216.75" font-size="11" text-anchor="middle" fill="#1a5276" font-family="Helvetica,Arial,sans-serif" font-weight="700" opacity="0.7">KOUPELNA</text>
+<rect x="627.00" y="128.00" width="12.50" height="70.00" fill="#fff" stroke="#b8860b" stroke-width="1.5"/>
+<text x="617.00" y="166.00" font-size="9" text-anchor="middle" fill="#8a6d00" font-family="Helvetica,Arial,sans-serif">D</text>
+<rect x="686.00" y="58.00" width="37.00" height="63.00" fill="#dfe6e9" stroke="#2c3e50" stroke-width="1.2"/>
+<text x="704.50" y="92.50" font-size="8" text-anchor="middle" fill="#222" font-family="Helvetica,Arial,sans-serif">WC</text>
+<text x="704.50" y="131.00" font-size="7" text-anchor="middle" fill="#c0392b" font-family="Helvetica,Arial,sans-serif" font-weight="700">FIXNÍ</text>
+<rect x="659.50" y="195.50" width="80.00" height="80.00" fill="#74b9ff" stroke="#0984e3" stroke-width="1.2"/>
+<text x="699.50" y="238.50" font-size="8" text-anchor="middle" fill="#222" font-family="Helvetica,Arial,sans-serif">sprcha 80×80</text>
+<rect x="709.50" y="158.00" width="30.00" height="40.00" fill="#81ecec" stroke="#00a8a8" stroke-width="1.2"/>
+<text x="724.50" y="181.00" font-size="7" text-anchor="middle" fill="#222" font-family="Helvetica,Arial,sans-serif">umyv.</text>
+<rect x="814.00" y="58.00" width="150.00" height="210.00" fill="#f5d76e" stroke="#b7950b" stroke-width="1.2"/>
+<text x="889.00" y="166.00" font-size="9" text-anchor="middle" fill="#222" font-family="Helvetica,Arial,sans-serif">postel 140</text>
+<rect x="819.00" y="63.00" width="140.00" height="200.00" fill="none" stroke="#9a7d0a" stroke-width="0.8" stroke-dasharray="4,3"/>
+<line x1="752.00" y1="163.00" x2="814.00" y2="163.00" stroke="#e74c3c" stroke-width="1.2"/>
+<text x="783.00" y="157.00" font-size="8" text-anchor="middle" fill="#c0392b" font-family="Helvetica,Arial,sans-serif">průchod 62</text>
+<rect x="188.00" y="203.00" width="80.00" height="80.00" fill="#ffeaa7" stroke="#fdcb6e" stroke-width="1.2"/>
+<text x="228.00" y="246.00" font-size="8" text-anchor="middle" fill="#222" font-family="Helvetica,Arial,sans-serif">STUL</text>
+<rect x="556.00" y="331.00" width="55.00" height="60.00" fill="#a29bfe" stroke="#6c5ce7" stroke-width="1.2"/>
+<text x="583.50" y="364.00" font-size="8" text-anchor="middle" fill="#222" font-family="Helvetica,Arial,sans-serif">LEDNICE</text>
+<rect x="496.00" y="331.00" width="60.00" height="60.00" fill="#fdcb6e" stroke="#e17055" stroke-width="1.2"/>
+<text x="526.00" y="364.00" font-size="8" text-anchor="middle" fill="#222" font-family="Helvetica,Arial,sans-serif">skrin na tro…</text>
+<rect x="228.00" y="58.00" width="45.00" height="40.00" fill="#fab1a0" stroke="#d63031" stroke-width="1.2"/>
+<text x="250.50" y="81.00" font-size="8" text-anchor="middle" fill="#222" font-family="Helvetica,Arial,sans-serif">komoda</text>
+<rect x="68.00" y="349.00" width="120.00" height="42.00" fill="#b2bec3" stroke="#636e72" stroke-width="1.2"/>
+<text x="128.00" y="373.00" font-size="8" text-anchor="middle" fill="#222" font-family="Helvetica,Arial,sans-serif">skrin obyvak</text>
+<rect x="784.00" y="349.00" width="180.00" height="42.00" fill="#b2bec3" stroke="#636e72" stroke-width="1.2"/>
+<text x="874.00" y="373.00" font-size="8" text-anchor="middle" fill="#222" font-family="Helvetica,Arial,sans-serif">skříň ložnice</text>
+<text x="218.00" y="313.00" font-size="12" text-anchor="middle" fill="#7f8c8d" font-family="Helvetica,Arial,sans-serif" font-weight="700" opacity="0.55">OBÝVÁK</text>
+<text x="508.00" y="218.00" font-size="12" text-anchor="middle" fill="#7f8c8d" font-family="Helvetica,Arial,sans-serif" font-weight="700" opacity="0.55">KORIDOR</text>
+<text x="878.00" y="308.00" font-size="12" text-anchor="middle" fill="#7f8c8d" font-family="Helvetica,Arial,sans-serif" font-weight="700" opacity="0.55">LOŽNICE</text>
+<line x1="58.00" y1="419.00" x2="964.00" y2="419.00" stroke="#7f8c8d" stroke-width="1"/>
+<text x="511.00" y="433.00" font-size="10" text-anchor="middle" fill="#555" font-family="Helvetica,Arial,sans-serif">světlost 906 × 333 cm</text>
+<text x="994.00" y="58.00" font-size="13" font-weight="700" fill="#1a1a1a" font-family="Helvetica,Arial,sans-serif">Princip</text>
+<text x="994.00" y="76.00" font-size="10" fill="#333" font-family="Helvetica,Arial,sans-serif">• Lednice + trouba v kuchyni (ne v koridoru)</text>
+<text x="994.00" y="92.00" font-size="10" fill="#333" font-family="Helvetica,Arial,sans-serif">• Linka 240 cm podél jihu / okna</text>
+<text x="994.00" y="108.00" font-size="10" fill="#333" font-family="Helvetica,Arial,sans-serif">• Severní pás TV→koupelna volný</text>
+<text x="994.00" y="124.00" font-size="10" fill="#333" font-family="Helvetica,Arial,sans-serif">• Postel 140 = širší průchod k ložnici</text>
+<text x="994.00" y="140.00" font-size="10" fill="#333" font-family="Helvetica,Arial,sans-serif">• Úložný nábytek u jižní stěny</text>
+<text x="994.00" y="164.00" font-size="12" font-weight="700" fill="#c0392b" font-family="Helvetica,Arial,sans-serif">Fixní</text>
+<text x="994.00" y="180.00" font-size="10" fill="#555" font-family="Helvetica,Arial,sans-serif">• stavební otvory (okna/dveře)</text>
+<text x="994.00" y="195.00" font-size="10" fill="#555" font-family="Helvetica,Arial,sans-serif">• poloha WC</text>
+<text x="994.00" y="220.00" font-size="12" font-weight="700" fill="#1a1a1a" font-family="Helvetica,Arial,sans-serif">Klíčové míry</text>
+<text x="994.00" y="236.00" font-size="10" fill="#333" font-family="Helvetica,Arial,sans-serif">• TV příčka @ 324, L=150</text>
+<text x="994.00" y="251.00" font-size="10" fill="#333" font-family="Helvetica,Arial,sans-serif">• Kuchyň 313–553 (240)</text>
+<text x="994.00" y="266.00" font-size="10" fill="#333" font-family="Helvetica,Arial,sans-serif">• Koupelna 569 / 125 / 230</text>
+<text x="994.00" y="281.00" font-size="10" fill="#333" font-family="Helvetica,Arial,sans-serif">• Postel 140 × 200</text>
+<text x="994.00" y="296.00" font-size="10" fill="#333" font-family="Helvetica,Arial,sans-serif">• Průchod koupelna↔postel 62 cm</text>
+<text x="944.00" y="40.00" font-size="12" text-anchor="middle" fill="#2c3e50" font-family="Helvetica,Arial,sans-serif" font-weight="700">S ↑</text>
+</svg>
