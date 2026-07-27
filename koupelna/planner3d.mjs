@@ -353,18 +353,26 @@ export function createViewer(container) {
   fill.position.set(420, 380, 520);
   scene.add(fill);
 
-  // Interiérové lampy — stíny i pod krytinou (slunce neprojde střešním pláštěm)
-  const lampA = new THREE.PointLight(0xfff1dd, 1.15, 780, 1.55);
+  // Interiérové lampy (candela — r155+ physical lights; intensity ~1 = svíčka → neviditelné)
+  const LAMP_A_I = 2200;
+  const LAMP_B_I = 1600;
+  const lampA = new THREE.PointLight(0xfff1dd, LAMP_A_I, 0, 2);
   lampA.castShadow = true;
   lampA.shadow.mapSize.set(512, 512);
-  lampA.shadow.bias = -0.002;
-  lampA.shadow.normalBias = 0.8;
+  lampA.shadow.bias = -0.001;
+  lampA.shadow.normalBias = 1.2;
+  lampA.shadow.camera.near = 10;
+  lampA.shadow.camera.far = 1200;
+  lampA.userData.baseIntensity = LAMP_A_I;
   scene.add(lampA);
-  const lampB = new THREE.PointLight(0xffe8cc, 0.7, 620, 1.7);
+  const lampB = new THREE.PointLight(0xffe8cc, LAMP_B_I, 0, 2);
   lampB.castShadow = true;
   lampB.shadow.mapSize.set(512, 512);
-  lampB.shadow.bias = -0.002;
-  lampB.shadow.normalBias = 0.8;
+  lampB.shadow.bias = -0.001;
+  lampB.shadow.normalBias = 1.2;
+  lampB.shadow.camera.near = 10;
+  lampB.shadow.camera.far = 1200;
+  lampB.userData.baseIntensity = LAMP_B_I;
   scene.add(lampB);
 
   const viewer = {
@@ -591,17 +599,21 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
   };
   viewer.cameras = spec.cameras || {};
 
-  // Interiérové lampy podle světlosti místnosti (Z / V zóna)
+  // Interiérové lampy — volný prostor pod kleštinami / loftem (ne v krovu)
   const lamps = viewer.interiorLights || [];
-  const lampY = Math.max(140, Math.min(roomH - 12, roomH * 0.92));
+  const lampY = Math.min(175, Math.max(150, roomH - 40));
   const lampsOn = spec.interiorLights !== false;
   if (lamps[0]) {
-    lamps[0].position.set(clearW * 0.32, lampY, clearD * 0.48);
-    lamps[0].visible = lampsOn;
+    // obývací zóna (západ)
+    lamps[0].position.set(clearW * 0.22, lampY, clearD * 0.55);
+    lamps[0].intensity = lampsOn ? (lamps[0].userData.baseIntensity || 2200) : 0;
+    lamps[0].visible = true;
   }
   if (lamps[1]) {
-    lamps[1].position.set(clearW * 0.72, lampY, clearD * 0.52);
-    lamps[1].visible = lampsOn;
+    // východ u linky / koupelny
+    lamps[1].position.set(clearW * 0.78, lampY, clearD * 0.45);
+    lamps[1].intensity = lampsOn ? (lamps[1].userData.baseIntensity || 1600) : 0;
+    lamps[1].visible = true;
   }
 
   addBox(viewer.root, {
