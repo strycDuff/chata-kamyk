@@ -5500,6 +5500,8 @@
           name: r.name || "",
           points: pts.map((p) => ({ wall: p.wall, along: p.along, h: p.h })),
         };
+        out.status = r.status === "draft" ? "draft" : "accepted";
+        out.pointIds = idList(r.pointIds);
         if (runIsSocketTrunk(r) || r.trunkH != null || idList(r.excludePointIds).length || idList(r.includePointIds).length) {
           out.trunkH = runTrunkH(r);
           out.excludePointIds = idList(r.excludePointIds);
@@ -5623,6 +5625,7 @@
       const trunkN = Number(r.trunkH);
       const excludePointIds = idList(r.excludePointIds);
       const includePointIds = idList(r.includePointIds);
+      const pointIds = idList(r.pointIds);
       return {
         id: typeof r.id === "string" ? r.id : newElecId("er"),
         wall: points[0]?.wall || fallbackWall,
@@ -5630,6 +5633,8 @@
         circuitId,
         name: (r.name && String(r.name).trim()) || "",
         points,
+        status: r.status === "draft" ? "draft" : "accepted",
+        pointIds,
         trunkH: Number.isFinite(trunkN) ? trunkN : ELEC_TRUNK_H_DEFAULT,
         excludePointIds,
         includePointIds,
