@@ -851,6 +851,14 @@
     height: 100%;
     background: #0f1419;
   }
+  /* In-app immersive mode (not browser Fullscreen API) — swipe look cannot dismiss it. */
+  html.is-view3d-fs-lock,
+  body.is-view3d-fs-lock {
+    overflow: hidden !important;
+    overscroll-behavior: none;
+    touch-action: none;
+    height: 100%;
+  }
   .stage.is-view3d-fs-fallback {
     position: fixed;
     inset: 0;
@@ -858,12 +866,21 @@
     width: 100vw;
     height: 100dvh;
     height: 100vh;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+  .stage.is-view3d-fs .canvas-wrap {
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
   }
   .stage.is-view3d-fs .canvas-wrap.view3d-host canvas {
     min-height: 0;
+    touch-action: none;
   }
   .stage.is-view3d-fs .view3d-bar {
     background: rgba(255, 255, 255, 0.92);
+    touch-action: manipulation;
   }
   .canvas-wrap {
     min-height: 0;
@@ -1479,7 +1496,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.27.0";
+  const APP_VERSION = "3.27.1";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -7082,18 +7099,22 @@
     render();
   });
 
+  function setView3dFsLock(on) {
+    document.documentElement.classList.toggle("is-view3d-fs-lock", !!on);
+    document.body.classList.toggle("is-view3d-fs-lock", !!on);
+  }
+
   function isView3dFullscreen() {
     const stage = document.getElementById("stage");
     if (!stage) return false;
-    if (stage.classList.contains("is-view3d-fs-fallback")) return true;
-    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
-    return fsEl === stage;
+    return stage.classList.contains("is-view3d-fs-fallback");
   }
 
   function syncView3dFsButtons() {
     const on = isView3dFullscreen();
     const stage = document.getElementById("stage");
     stage?.classList.toggle("is-view3d-fs", on);
+    setView3dFsLock(on);
     const enter = document.getElementById("view3d-fs");
     if (enter) {
       enter.textContent = on ? "Ukončit FS" : "Celá obrazovka";
@@ -7113,53 +7134,46 @@
     }
   }
 
-  async function enterView3dFullscreen() {
+  function enterView3dFullscreen() {
     const stage = document.getElementById("stage");
     if (!stage || isView3dFullscreen()) {
       syncView3dFsButtons();
       return;
     }
-    const req = stage.requestFullscreen || stage.webkitRequestFullscreen;
-    try {
-      if (req) {
-        await req.call(stage);
-      } else {
-        stage.classList.add("is-view3d-fs-fallback");
-      }
-    } catch {
-      stage.classList.add("is-view3d-fs-fallback");
-    }
+    // Use in-app overlay instead of browser Fullscreen API: native FS exits on
+    // edge swipe / pull-down on tablets, which conflicts with look-down.
+    stage.classList.add("is-view3d-fs-fallback");
     syncView3dFsButtons();
-    // Let layout settle so ResizeObserver picks up the new size.
     requestAnimationFrame(() => {
       window.dispatchEvent(new Event("resize"));
     });
   }
 
-  async function exitView3dFullscreen({ silent = false } = {}) {
+  function exitView3dFullscreen({ silent = false } = {}) {
     const stage = document.getElementById("stage");
-    const hadFallback = !!stage?.classList.contains("is-view3d-fs-fallback");
+    const wasOn = !!stage?.classList.contains("is-view3d-fs-fallback");
     stage?.classList.remove("is-view3d-fs-fallback");
+    // Clear any leftover native fullscreen from older builds.
     const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
     if (fsEl) {
       const exit = document.exitFullscreen || document.webkitExitFullscreen;
       try {
-        if (exit) await exit.call(document);
+        exit?.call(document);
       } catch {
         /* ignore */
       }
     }
     syncView3dFsButtons();
-    if (!silent || hadFallback) {
+    if (!silent || wasOn) {
       requestAnimationFrame(() => {
         window.dispatchEvent(new Event("resize"));
       });
     }
   }
 
-  async function toggleView3dFullscreen() {
-    if (isView3dFullscreen()) await exitView3dFullscreen();
-    else await enterView3dFullscreen();
+  function toggleView3dFullscreen() {
+    if (isView3dFullscreen()) exitView3dFullscreen();
+    else enterView3dFullscreen();
   }
 
   function bindView3dStick(el, knob, mode) {
@@ -7262,14 +7276,7 @@
   document.getElementById("view3d-fs-exit")?.addEventListener("click", () => {
     exitView3dFullscreen();
   });
-  document.addEventListener("fullscreenchange", syncView3dFsButtons);
-  document.addEventListener("webkitfullscreenchange", syncView3dFsButtons);
-  window.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape") return;
-    if (!isView3dFullscreen()) return;
-    // Native FS usually exits on Escape; still clear CSS fallback.
-    exitView3dFullscreen({ silent: true });
-  });
+  // Fullscreen exits only via the buttons (not Escape / swipe / browser chrome).
   syncView3dFsButtons();
 
   // Variants
