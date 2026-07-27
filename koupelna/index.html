@@ -787,7 +787,8 @@
   .v3d-stick {
     pointer-events: auto;
     position: absolute;
-    bottom: max(16px, env(safe-area-inset-bottom, 0px));
+    /* Keep full pad above home indicator / browser chrome */
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
     width: 118px;
     height: 118px;
     border-radius: 50%;
@@ -796,6 +797,9 @@
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
+  }
+  .stage.is-view3d-fs .v3d-stick {
+    bottom: calc(28px + env(safe-area-inset-bottom, 0px));
   }
   .v3d-stick-move { left: max(16px, env(safe-area-inset-left, 0px)); }
   .v3d-stick-vert { right: max(16px, env(safe-area-inset-right, 0px)); }
@@ -816,7 +820,8 @@
     position: absolute;
     left: 0;
     right: 0;
-    bottom: -22px;
+    top: -20px;
+    bottom: auto;
     text-align: center;
     font-size: 0.68rem;
     font-weight: 600;
@@ -858,14 +863,17 @@
     overscroll-behavior: none;
     touch-action: none;
     height: 100%;
+    height: 100dvh;
   }
   .stage.is-view3d-fs-fallback {
     position: fixed;
     inset: 0;
     z-index: 10000;
-    width: 100vw;
+    width: 100%;
+    /* Prefer dynamic/small viewport — 100vh alone sits under mobile browser chrome */
+    height: 100%;
     height: 100dvh;
-    height: 100vh;
+    max-height: 100dvh;
     overscroll-behavior: none;
     touch-action: none;
   }
@@ -1496,7 +1504,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.27.2";
+  const APP_VERSION = "3.27.3";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
