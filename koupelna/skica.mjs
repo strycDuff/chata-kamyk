@@ -109,6 +109,35 @@ function openingAbs(op, part) {
   return { x: absX(c.x), y: absY(c.y), w: c.w, d: c.d };
 }
 
+/** Door leaf in clear coords — closed in slot, open swung 90° onto `side`. */
+function doorLeafBox(op, part) {
+  const box = LM.openingBox(op, part);
+  const leafT = 3.5;
+  const side = op.side === "neg" ? -1 : 1;
+  if (LM.isVerticalPartition(part)) {
+    if (!op.leafOpen) {
+      return { x: box.x + (box.w - leafT) / 2, y: box.y, w: leafT, d: box.d };
+    }
+    const len = box.d;
+    return {
+      x: side > 0 ? box.x + box.w : box.x - len,
+      y: box.y,
+      w: len,
+      d: leafT,
+    };
+  }
+  if (!op.leafOpen) {
+    return { x: box.x, y: box.y + (box.d - leafT) / 2, w: box.w, d: leafT };
+  }
+  const len = box.w;
+  return {
+    x: box.x,
+    y: side > 0 ? box.y + box.d : box.y - len,
+    w: leafT,
+    d: len,
+  };
+}
+
 function furnAbs(layer) {
   return { x: absX(layer.x), y: absY(layer.y), w: layer.w, d: layer.d };
 }
@@ -167,25 +196,6 @@ function buildPlanSvg(state, onPointer) {
       class: "skica-part",
     }));
   }
-  for (const op of state.openings) {
-    const part = state.partitions.find((p) => p.id === op.partitionId);
-    if (!part) continue;
-    const box = openingAbs(op, part);
-    const sel = op.id === state.openingSelectedId;
-    g.appendChild(el("rect", {
-      x: box.x, y: box.y, width: box.w, height: box.d,
-      fill: "#fff", stroke: sel ? "#b8860b" : "#d4a017",
-      "stroke-width": sel ? 2 : 1.5,
-      "data-opening": op.id,
-    }));
-    const t = el("text", {
-      x: box.x + box.w / 2, y: box.y + box.d / 2,
-      fill: "#8a6d00", "font-size": 9, "text-anchor": "middle",
-      "dominant-baseline": "middle", "pointer-events": "none",
-    });
-    t.textContent = "D";
-    g.appendChild(t);
-  }
   for (const layer of state.furnitureLayers) {
     const sel = layer.id === state.furnSelectedId;
     if (layer.kind === "sofa") {
@@ -224,8 +234,36 @@ function buildPlanSvg(state, onPointer) {
       g.appendChild(t);
     }
   }
-  // Length handles on top so ends stay draggable
-  {
+  // Openings above furniture so they stay draggable
+  for (const op of state.openings) {
+    const part = state.partitions.find((p) => p.id === op.partitionId);
+    if (!part) continue;
+    const box = openingAbs(op, part);
+    const sel = op.id === state.openingSelectedId;
+    g.appendChild(el("rect", {
+      x: box.x, y: box.y, width: box.w, height: box.d,
+      fill: "#fff", stroke: sel ? "#b8860b" : "#d4a017",
+      "stroke-width": sel ? 2.5 : 1.5,
+      "data-opening": op.id,
+      class: "skica-opening",
+    }));
+    const leaf = doorLeafBox(op, part);
+    g.appendChild(el("rect", {
+      x: absX(leaf.x), y: absY(leaf.y), width: leaf.w, height: leaf.d,
+      fill: op.leafOpen ? "rgba(225,177,44,0.55)" : "#e1b12c",
+      stroke: "#8a6d00", "stroke-width": 1,
+      "pointer-events": "none",
+    }));
+    const t = el("text", {
+      x: box.x + box.w / 2, y: box.y + box.d / 2,
+      fill: "#8a6d00", "font-size": 9, "text-anchor": "middle",
+      "dominant-baseline": "middle", "pointer-events": "none",
+    });
+    t.textContent = op.leafOpen ? "O" : "D";
+    g.appendChild(t);
+  }
+  // Length handles when editing partition (not when dragging a door)
+  if (!state.openingSelectedId) {
     const p = state.partitions.find((x) => x.id === state.partSelectedId);
     if (p) {
       const box = partAbs(p);
@@ -333,7 +371,7 @@ function build3dSpec(state) {
       for (const o of ops.map((op) => ({ op, ob: LM.openingBox(op, p) })).sort((a, b) => a.ob.y - b.ob.y)) {
         if (o.ob.y > cursor + 0.5) boxes.push({ x: box.x, y: cursor, w: box.w, d: o.ob.y - cursor, h: roomH, color: "#95a5a6", matKind: "wall" });
         boxes.push({ x: box.x, y: o.ob.y, w: box.w, d: o.ob.d, h: roomH - doorH, elev: doorH, color: "#95a5a6", matKind: "wall" });
-        boxes.push({ x: box.x + (box.w - 3.5) / 2, y: o.ob.y, w: 3.5, d: o.ob.d, h: leafH, color: "#e1b12c", matKind: "wood" });
+        boxes.push({ ...doorLeafBox(o.op, p), h: leafH, color: "#e1b12c", matKind: "wood" });
         cursor = o.ob.y + o.ob.d;
       }
       if (end > cursor + 0.5) boxes.push({ x: box.x, y: cursor, w: box.w, d: end - cursor, h: roomH, color: "#95a5a6", matKind: "wall" });
@@ -343,7 +381,7 @@ function build3dSpec(state) {
       for (const o of ops.map((op) => ({ op, ob: LM.openingBox(op, p) })).sort((a, b) => a.ob.x - b.ob.x)) {
         if (o.ob.x > cursor + 0.5) boxes.push({ x: cursor, y: box.y, w: o.ob.x - cursor, d: box.d, h: roomH, color: "#95a5a6", matKind: "wall" });
         boxes.push({ x: o.ob.x, y: box.y, w: o.ob.w, d: box.d, h: roomH - doorH, elev: doorH, color: "#95a5a6", matKind: "wall" });
-        boxes.push({ x: o.ob.x, y: box.y + (box.d - 3.5) / 2, w: o.ob.w, d: 3.5, h: leafH, color: "#e1b12c", matKind: "wood" });
+        boxes.push({ ...doorLeafBox(o.op, p), h: leafH, color: "#e1b12c", matKind: "wood" });
         cursor = o.ob.x + o.ob.w;
       }
       if (end > cursor + 0.5) boxes.push({ x: cursor, y: box.y, w: end - cursor, d: box.d, h: roomH, color: "#95a5a6", matKind: "wall" });
@@ -453,7 +491,12 @@ export function createSkica(opts) {
           <summary>Dveře na příčce</summary>
           <div class="side-block-body">
             <button type="button" class="btn" id="skica-door-add" style="width:100%;margin-bottom:8px">＋ Dveře na vybranou příčku</button>
+            <div class="row" style="margin-bottom:8px;gap:6px">
+              <button type="button" class="btn" id="skica-door-toggle" style="flex:1">Otevřít / Zavřít</button>
+              <button type="button" class="btn" id="skica-door-side" style="flex:1">Strana otevírání</button>
+            </div>
             <button type="button" class="btn" id="skica-door-del" style="width:100%;margin-bottom:8px">Smazat dveře</button>
+            <p class="hint">Vybrané dveře táhni po příčce. Tlačítko otevře/zavře křídlo (vidět na půdorysu i ve 3D).</p>
             <ul class="furn-list" id="skica-door-list"></ul>
           </div>
         </details>
@@ -527,9 +570,24 @@ export function createSkica(opts) {
         partitionId: state.partSelectedId,
         name: `Dveře ${state.openings.length + 1}`,
         offset: 40, width: 70, kind: "door", side: "pos",
+        leafOpen: false,
       });
       state.openings.push(op);
       state.openingSelectedId = op.id;
+      persist();
+      render();
+    });
+    panel.querySelector("#skica-door-toggle")?.addEventListener("click", () => {
+      const op = state.openings.find((o) => o.id === state.openingSelectedId);
+      if (!op) { alert("Nejdřív vyber dveře na půdorysu nebo v seznamu."); return; }
+      op.leafOpen = !op.leafOpen;
+      persist();
+      render();
+    });
+    panel.querySelector("#skica-door-side")?.addEventListener("click", () => {
+      const op = state.openings.find((o) => o.id === state.openingSelectedId);
+      if (!op) { alert("Nejdřív vyber dveře."); return; }
+      op.side = op.side === "neg" ? "pos" : "neg";
       persist();
       render();
     });
@@ -631,10 +689,24 @@ export function createSkica(opts) {
       for (const o of state.openings) {
         const li = document.createElement("li");
         if (o.id === state.openingSelectedId) li.classList.add("selected");
-        li.textContent = `${o.name || o.id} @ ${o.partitionId}`;
+        const part = state.partitions.find((p) => p.id === o.partitionId);
+        const partName = part?.name || o.partitionId;
+        li.textContent = `${o.name || "Dveře"} · ${partName} · ${Math.round(o.offset)}→${Math.round(o.offset + o.width)} · ${o.leafOpen ? "otevřeno" : "zavřeno"}`;
         li.onclick = () => { state.openingSelectedId = o.id; state.partSelectedId = o.partitionId; persist(); render(); };
         doorList.appendChild(li);
       }
+    }
+    const toggleBtn = panel.querySelector("#skica-door-toggle");
+    if (toggleBtn) {
+      const op = state.openings.find((o) => o.id === state.openingSelectedId);
+      toggleBtn.textContent = !op ? "Otevřít / Zavřít" : (op.leafOpen ? "Zavřít dveře" : "Otevřít dveře");
+      toggleBtn.disabled = !op;
+    }
+    const sideBtn = panel.querySelector("#skica-door-side");
+    if (sideBtn) {
+      const op = state.openings.find((o) => o.id === state.openingSelectedId);
+      sideBtn.textContent = !op ? "Strana otevírání" : (op.side === "neg" ? "Strana: −" : "Strana: +");
+      sideBtn.disabled = !op;
     }
     const furnList = panel.querySelector("#skica-furn-list");
     if (furnList) {
@@ -679,12 +751,17 @@ export function createSkica(opts) {
     if (hint && state.mode === "plan") {
       if (state.tool === "part-draw") {
         hint.textContent = "Táhni osa-aligned příčku na půdorysu…";
+      } else if (state.openingSelectedId) {
+        const op = state.openings.find((o) => o.id === state.openingSelectedId);
+        hint.textContent = op
+          ? `Dveře · táhni po příčce · ${op.leafOpen ? "otevřeno" : "zavřeno"} (tlačítko Otevřít/Zavřít)`
+          : "Vyber dveře";
       } else if (state.partSelectedId) {
         const pr = state.partitions.find((p) => p.id === state.partSelectedId);
         const len = pr ? Math.round(LM.partitionLength(pr)) : 0;
         hint.textContent = `Vybraná příčka ${len} cm · táhni tělo = posun · úchyty na koncích = délka`;
       } else {
-        hint.textContent = `${state.partitions.length} příček · ${state.openings.length} dveří · ${state.furnitureLayers.length} kusů · klikni příčku pro úpravu délky`;
+        hint.textContent = `${state.partitions.length} příček · ${state.openings.length} dveří · ${state.furnitureLayers.length} kusů · dveře táhni po příčce`;
       }
     }
   }
@@ -715,11 +792,22 @@ export function createSkica(opts) {
     }
     const open = t.closest?.("[data-opening]");
     if (open) {
-      state.openingSelectedId = open.getAttribute("data-opening");
-      state.partSelectedId = state.openings.find((o) => o.id === state.openingSelectedId)?.partitionId || null;
-      persist();
-      render();
-      return;
+      const id = open.getAttribute("data-opening");
+      const op = state.openings.find((o) => o.id === id);
+      if (op) {
+        state.openingSelectedId = id;
+        state.partSelectedId = op.partitionId;
+        state.furnSelectedId = null;
+        state.drag = {
+          type: "opening-move",
+          id,
+          start: p,
+          oOffset: op.offset,
+        };
+        evt.preventDefault();
+        render();
+        return;
+      }
     }
     const part = t.closest?.("[data-part]");
     if (part) {
@@ -783,6 +871,20 @@ export function createSkica(opts) {
         layer.x = state.drag.ox + dx;
         layer.y = state.drag.oy + dy;
         clampFurn(layer);
+      }
+      if (!raf) raf = requestAnimationFrame(() => { raf = 0; renderPlanOnly(); });
+      return;
+    }
+    if (state.drag.type === "opening-move") {
+      const op = state.openings.find((o) => o.id === state.drag.id);
+      const pr = op && state.partitions.find((x) => x.id === op.partitionId);
+      if (op && pr) {
+        const len = LM.partitionLength(pr);
+        const along = LM.isVerticalPartition(pr) ? dy : dx;
+        op.offset = Math.min(
+          Math.max(0, state.drag.oOffset + along),
+          Math.max(0, len - op.width),
+        );
       }
       if (!raf) raf = requestAnimationFrame(() => { raf = 0; renderPlanOnly(); });
       return;
