@@ -1004,9 +1004,11 @@
               <button type="button" data-v="160" class="active">160 cm</button>
               <button type="button" data-v="140">140 cm</button>
             </div>
-            <label>Offset rámu na stranu: <strong id="bed-frame-val">2.5</strong> cm</label>
-            <input type="range" id="bed-frame" min="0" max="5" value="2.5" step="0.5">
-            <p class="hint">Vnější půdorys = matrace + 2× offset (délka matrace 200 cm)</p>
+            <label>Celková šířka rámu (V–Z)</label>
+            <input type="number" id="bed-outer-w" min="120" max="220" value="165" step="1">
+            <label>Celková délka rámu (S–J)</label>
+            <input type="number" id="bed-outer-d" min="180" max="240" value="205" step="1">
+            <p class="hint">Matrace 140/160 × 200 cm zůstává ve středu rámu. Rozměry rámu zadáš ručně.</p>
             <p class="hint" id="bed-hint">—</p>
           </div>
         </details>
@@ -1168,7 +1170,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.11.1";
+  const APP_VERSION = "3.11.2";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1314,7 +1316,9 @@
     kitchenLeft: 313, // od vnitřního Z, východně od vstupních dveří
     kitchenLen: 160,
     bedVariant: 160,
-    bedFrameOffset: 2.5, // cm na každou stranu kolem matrace
+    bedOuterW: 165, // celkový rám V–Z (cm)
+    bedOuterD: 205, // celkový rám S–J (cm)
+    bedFrameOffset: 2.5, // legacy — migrace do bedOuter*
     tvVariant: 55,
     showSofa: true,
     showBed: true,
@@ -2100,13 +2104,28 @@
       north: { x: x0, y: y0, w: 160, d: 90 },
     };
   }
+  function clampBedOuter() {
+    const matW = Number(state.bedVariant) === 140 ? 140 : 160;
+    state.bedVariant = matW;
+    let w = Number(state.bedOuterW);
+    let d = Number(state.bedOuterD);
+    if (!Number.isFinite(w)) w = matW + 5;
+    if (!Number.isFinite(d)) d = BED_LEN + 5;
+    state.bedOuterW = Math.min(220, Math.max(matW, Math.round(w)));
+    state.bedOuterD = Math.min(240, Math.max(BED_LEN, Math.round(d)));
+    const wEl = document.getElementById("bed-outer-w");
+    const dEl = document.getElementById("bed-outer-d");
+    if (wEl && document.activeElement !== wEl) wEl.value = String(state.bedOuterW);
+    if (dEl && document.activeElement !== dEl) dEl.value = String(state.bedOuterD);
+  }
+
   function bedOuterSize() {
-    const f = state.bedFrameOffset;
-    return {
-      w: state.bedVariant + 2 * f,
-      d: BED_LEN + 2 * f,
-      f,
-    };
+    clampBedOuter();
+    const w = state.bedOuterW;
+    const d = state.bedOuterD;
+    const fx = Math.max(0, (w - state.bedVariant) / 2);
+    const fy = Math.max(0, (d - BED_LEN) / 2);
+    return { w, d, f: Math.min(fx, fy), fx, fy };
   }
   function bedBox() {
     // Vnější rám ve SV rohu světlosti (u východní + severní stěny)
@@ -2120,10 +2139,10 @@
   }
   function bedMattressBox() {
     const outer = bedBox();
-    const f = state.bedFrameOffset;
+    const { fx, fy } = bedOuterSize();
     return {
-      x: outer.x + f,
-      y: outer.y + f,
+      x: outer.x + fx,
+      y: outer.y + fy,
       w: state.bedVariant,
       d: BED_LEN,
     };
@@ -2511,7 +2530,6 @@
     if (state.showBed) {
       const bed = bedBox();
       const mat = bedMattressBox();
-      const { f } = bedOuterSize();
       const gap = bedGap();
       const safe = gap >= MIN_BED_PASS;
       const o = bathOuter();
@@ -2527,24 +2545,29 @@
         x: bed.x, y: bed.y, width: bed.w, height: bed.d,
         fill: "#f5cd79", stroke: "#e67e22", "stroke-width": 2, rx: 4,
       }));
-      // matrace (vnitřní obrys)
-      if (f > 0.05) {
-        g.appendChild(el("rect", {
-          x: mat.x, y: mat.y, width: mat.w, height: mat.d,
-          fill: "none", stroke: "#e67e22", "stroke-width": 1, "stroke-dasharray": "4,3", rx: 2,
-        }));
-      }
+      // matrace (vnitřní obrys) — vždy viditelná kvůli rozměru 140/160
+      g.appendChild(el("rect", {
+        x: mat.x, y: mat.y, width: mat.w, height: mat.d,
+        fill: "none", stroke: "#e67e22", "stroke-width": 1, "stroke-dasharray": "4,3", rx: 2,
+      }));
       g.appendChild(el("rect", {
         x: mat.x + 6, y: mat.y + 6, width: Math.max(8, mat.w - 12), height: 24,
         fill: "#f6e58d", stroke: "#e67e22", "stroke-width": 1, rx: 3,
       }));
       const bt = el("text", {
-        x: bed.x + bed.w / 2, y: bed.y + bed.d / 2 + 4,
+        x: bed.x + bed.w / 2, y: bed.y + bed.d / 2 - 6,
         fill: "#e67e22", "font-size": 10, "font-family": PLAN_FONT,
         "text-anchor": "middle", "dominant-baseline": "middle",
       });
       bt.textContent = "Postel";
       g.appendChild(bt);
+      const mt = el("text", {
+        x: mat.x + mat.w / 2, y: bed.y + bed.d / 2 + 10,
+        fill: "#c0392b", "font-size": 9, "font-family": PLAN_FONT,
+        "text-anchor": "middle", "dominant-baseline": "middle",
+      });
+      mt.textContent = `Matrace ${state.bedVariant}`;
+      g.appendChild(mt);
     }
   }
 
@@ -3785,7 +3808,7 @@
     const gap = bedGap();
     const outer = bedOuterSize();
     document.getElementById("bed-hint").textContent =
-      `Matrace ${state.bedVariant}×${BED_LEN} · rám ${round1(outer.w)}×${round1(outer.d)} (offset ${round1(outer.f)} cm) · mezera k příčce ${round1(gap)} cm`;
+      `Matrace ${state.bedVariant}×${BED_LEN} · rám ${round1(outer.w)}×${round1(outer.d)} · mezera k příčce ${round1(gap)} cm`;
     const fit = tvFits(state.tvVariant);
     document.getElementById("tv-hint").textContent = fit.overflow
       ? `${state.tvVariant}" = ${fit.need} cm — přesah ${round1(-fit.margin)} cm / strana`
@@ -3801,6 +3824,7 @@
   function render() {
     clampSink();
     clampKitchen();
+    clampBedOuter();
     clampDoorOffset();
     state.doorOpeningH = Math.min(state.roomClearH, state.doorOpeningH);
     state.doorLeafH = Math.min(state.doorOpeningH, state.doorLeafH);
@@ -4293,7 +4317,6 @@
       ["tv-len", "tvLen", "tv-len-val"],
       ["kitchen-left", "kitchenLeft", "kitchen-left-val"],
       ["kitchen-len", "kitchenLen", "kitchen-len-val"],
-      ["bed-frame", "bedFrameOffset", "bed-frame-val"],
       ["door-offset", "doorOffset", "door-offset-val"],
       ["sink-w", "sinkW", "sink-w-val"],
       ["sink-d", "sinkD", "sink-d-val"],
@@ -4306,10 +4329,11 @@
     for (const [id, key, lab] of map) {
       const input = document.getElementById(id);
       if (!input) continue;
-      const v = key === "bedFrameOffset" ? round1(state[key]) : Math.round(state[key]);
+      const v = Math.round(state[key]);
       input.value = String(v);
       document.getElementById(lab).textContent = String(v);
     }
+    clampBedOuter();
   }
 
   function bindSeg(id, key, mapFn = (v) => v, after) {
@@ -4354,9 +4378,7 @@
         return;
       }
       state[key] = v;
-      document.getElementById(lab).textContent = key === "bedFrameOffset"
-        ? String(round1(state[key]))
-        : String(Math.round(state[key]));
+      document.getElementById(lab).textContent = String(Math.round(state[key]));
       if (key.startsWith("sink") || key === "sinkW") clampSink();
       render();
     });
@@ -4408,13 +4430,31 @@
   bindRange("tv-len", "tvLen", "tv-len-val");
   bindRange("kitchen-left", "kitchenLeft", "kitchen-left-val");
   bindRange("kitchen-len", "kitchenLen", "kitchen-len-val");
-  bindRange("bed-frame", "bedFrameOffset", "bed-frame-val");
   document.getElementById("btn-bath-reset").addEventListener("click", () => {
     Object.assign(state, BATH_DEFAULTS);
     syncSlidersFromState();
     render();
   });
-  bindSeg("bed-variant", "bedVariant", Number);
+  bindSeg("bed-variant", "bedVariant", Number, () => {
+    // při změně matrace drž rám aspoň tak velký jako matrace
+    clampBedOuter();
+  });
+  const bedOuterWEl = document.getElementById("bed-outer-w");
+  const bedOuterDEl = document.getElementById("bed-outer-d");
+  const onBedOuterInput = () => {
+    state.bedOuterW = Number(bedOuterWEl?.value);
+    state.bedOuterD = Number(bedOuterDEl?.value);
+    clampBedOuter();
+    render();
+  };
+  bedOuterWEl?.addEventListener("change", onBedOuterInput);
+  bedOuterDEl?.addEventListener("change", onBedOuterInput);
+  bedOuterWEl?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); onBedOuterInput(); }
+  });
+  bedOuterDEl?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); onBedOuterInput(); }
+  });
   bindSeg("tv-variant", "tvVariant", Number);
 
   bindSeg("door-width", "doorWidth", Number, () => clampDoorOffset());
@@ -4817,6 +4857,14 @@
     if (state.kitchenLeft == null) state.kitchenLeft = 313;
     if (state.kitchenLen == null) state.kitchenLen = 160;
     if (state.bedFrameOffset == null) state.bedFrameOffset = 2.5;
+    const matW = Number(state.bedVariant) === 140 ? 140 : 160;
+    if (state.bedOuterW == null || !Number.isFinite(Number(state.bedOuterW))) {
+      state.bedOuterW = matW + 2 * Number(state.bedFrameOffset || 2.5);
+    }
+    if (state.bedOuterD == null || !Number.isFinite(Number(state.bedOuterD))) {
+      state.bedOuterD = BED_LEN + 2 * Number(state.bedFrameOffset || 2.5);
+    }
+    clampBedOuter();
     state.furnitureLayers = normalizeFurnitureLayers(furnitureLayers);
     state.furnSelectedId = state.furnitureLayers[0]?.id || null;
     state.furnMode = null;
