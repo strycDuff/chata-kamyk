@@ -1071,12 +1071,19 @@
         <details class="side-block">
           <summary>Koupelna · umyvadlo</summary>
           <div class="side-block-body">
-            <label>Šířka: <strong id="sink-w-val">40</strong> cm</label>
-            <input type="range" id="sink-w" min="30" max="50" value="40" step="1">
-            <label>Hloubka: <strong id="sink-d-val">30</strong> cm</label>
-            <input type="range" id="sink-d" min="25" max="40" value="30" step="1">
+            <label>Šířka skříňky / umyvadla (S–J): <strong id="sink-w-val">40</strong> cm</label>
+            <input type="range" id="sink-w" min="30" max="60" value="40" step="1">
+            <label>Hloubka od stěny (V–Z): <strong id="sink-d-val">22</strong> cm</label>
+            <input type="range" id="sink-d" min="18" max="45" value="22" step="1">
             <label>Odstup od severu: <strong id="sink-off-val">70</strong> cm</label>
             <input type="range" id="sink-offset" min="0" max="180" value="70" step="1">
+            <label>Výška skříňky: <strong id="sink-cab-h-val">57</strong> cm</label>
+            <input type="range" id="sink-cab-h" min="40" max="90" value="57" step="1">
+            <label>Výška umyvadla (nad skříňkou): <strong id="sink-basin-h-val">10</strong> cm</label>
+            <input type="range" id="sink-basin-h" min="5" max="20" value="10" step="1">
+            <label>Odstup skříňky ode země: <strong id="sink-base-val">0</strong> cm</label>
+            <input type="range" id="sink-base" min="0" max="40" value="0" step="1">
+            <p class="hint" id="sink-hint">Horní hrana = odstup + skříňka + umyvadlo. 0 cm ode země = stojící skříňka; &gt;0 = zavěšená na zeď.</p>
           </div>
         </details>
         <details class="side-block">
@@ -1361,7 +1368,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.26.0";
+  const APP_VERSION = "3.26.1";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1472,7 +1479,7 @@
     kitchen: 86,
     shower: 5,
     wc: 40,
-    sink: 85,
+    sink: 67, // rim default ≈ cab 57 + basin 10 (overridden by state)
     sofa: 80,
     partition: null, // roomClearH
   };
@@ -1566,8 +1573,11 @@
     showerClearX: 601.5, // clear cm — NW roh vaničky; null = výchozí JV roh koupelny
     showerClearY: 137.5,
     sinkW: 40,
-    sinkD: 30,
+    sinkD: 22,
     sinkOffset: 70,
+    sinkCabH: 57,
+    sinkBasinH: 10,
+    sinkBaseElev: 0, // 0 = skříňka na zemi; >0 = zavěšená
     measureMode: false,
     measureA: null,
     measureB: null,
@@ -2856,11 +2866,23 @@
     const bi = bathInner();
     const maxOff = Math.max(0, bi.d - state.sinkW);
     state.sinkOffset = Math.min(Math.max(0, state.sinkOffset), maxOff);
+    state.sinkW = Math.min(60, Math.max(30, Number(state.sinkW) || 40));
+    state.sinkD = Math.min(45, Math.max(18, Number(state.sinkD) || 22));
+    state.sinkCabH = Math.min(90, Math.max(40, Number(state.sinkCabH) || 57));
+    state.sinkBasinH = Math.min(20, Math.max(5, Number(state.sinkBasinH) || 10));
+    state.sinkBaseElev = Math.min(40, Math.max(0, Number(state.sinkBaseElev) || 0));
     const input = document.getElementById("sink-offset");
     if (input) {
       input.max = String(maxOff);
       input.value = String(state.sinkOffset);
       document.getElementById("sink-off-val").textContent = String(state.sinkOffset);
+    }
+    const hint = document.getElementById("sink-hint");
+    if (hint) {
+      const rim = state.sinkBaseElev + state.sinkCabH + state.sinkBasinH;
+      hint.textContent = state.sinkBaseElev > 0
+        ? `Zavěšená skříňka · horní hrana umyvadla ${rim} cm (odstup ${state.sinkBaseElev} + ${state.sinkCabH} + ${state.sinkBasinH}). Typicky rim ~80–85 cm.`
+        : `Stojící skříňka · horní hrana umyvadla ${rim} cm (${state.sinkCabH} + ${state.sinkBasinH}). Typicky rim ~80–85 cm — případně zvedni skříňku nebo odstup ode země.`;
     }
   }
 
@@ -5621,15 +5643,18 @@
     }
     {
       const c = absToClearBox(sinkBox());
-      // umyvadlo na stěně / desce — ne od země
-      const basinH = 16;
-      const basinElev = Math.max(70, (VIEW3D_H.sink || 85) - basinH);
-      boxes.push({ ...c, h: basinH, elev: basinElev, color: "#ecf0f1", matKind: "furniture" });
-      // tenký konzolový / nožičkový náznak
+      const cabH = Math.max(40, Number(state.sinkCabH) || 57);
+      const basinH = Math.max(5, Number(state.sinkBasinH) || 10);
+      const baseElev = Math.max(0, Number(state.sinkBaseElev) || 0);
+      // skříňka pod umyvadlo (na zemi nebo zavěšená)
       boxes.push({
-        x: c.x + c.w * 0.35, y: c.y + c.d * 0.35,
-        w: Math.max(4, c.w * 0.3), d: Math.max(4, c.d * 0.3),
-        h: basinElev, color: "#bdc3c7", matKind: "furniture",
+        ...c, h: cabH, elev: baseElev,
+        color: "#bdc3c7", matKind: "furniture",
+      });
+      // umyvadlo sedí na skříňce
+      boxes.push({
+        ...c, h: basinH, elev: baseElev + cabH,
+        color: "#ecf0f1", matKind: "furniture",
       });
     }
     if (state.showFurniture) {
@@ -6431,6 +6456,9 @@
       ["sink-w", "sinkW", "sink-w-val"],
       ["sink-d", "sinkD", "sink-d-val"],
       ["sink-offset", "sinkOffset", "sink-off-val"],
+      ["sink-cab-h", "sinkCabH", "sink-cab-h-val"],
+      ["sink-basin-h", "sinkBasinH", "sink-basin-h-val"],
+      ["sink-base", "sinkBaseElev", "sink-base-val"],
       ["room-h", "roomClearH", "room-h-val"],
       ["sill-h", "windowSillH", "sill-h-val"],
       ["door-open-h", "doorOpeningH", "door-open-h-val"],
@@ -6468,6 +6496,7 @@
     syncRoofHint();
     clampBedOuter();
     clampSofaSize();
+    clampSink();
   }
 
   function bindSeg(id, key, mapFn = (v) => v, after) {
@@ -6661,6 +6690,9 @@
   bindRange("sink-w", "sinkW", "sink-w-val");
   bindRange("sink-d", "sinkD", "sink-d-val");
   bindRange("sink-offset", "sinkOffset", "sink-off-val");
+  bindRange("sink-cab-h", "sinkCabH", "sink-cab-h-val");
+  bindRange("sink-basin-h", "sinkBasinH", "sink-basin-h-val");
+  bindRange("sink-base", "sinkBaseElev", "sink-base-val");
   bindRange("room-h", "roomClearH", "room-h-val");
   bindRange("sill-h", "windowSillH", "sill-h-val");
   bindRange("door-open-h", "doorOpeningH", "door-open-h-val");
@@ -7179,6 +7211,10 @@
     if (state.sofaArmW == null || !Number.isFinite(Number(state.sofaArmW))) state.sofaArmW = 95;
     if (state.sofaArmD == null || !Number.isFinite(Number(state.sofaArmD))) state.sofaArmD = 90;
     clampSofaSize();
+    if (state.sinkCabH == null || !Number.isFinite(Number(state.sinkCabH))) state.sinkCabH = 57;
+    if (state.sinkBasinH == null || !Number.isFinite(Number(state.sinkBasinH))) state.sinkBasinH = 10;
+    if (state.sinkBaseElev == null || !Number.isFinite(Number(state.sinkBaseElev))) state.sinkBaseElev = 0;
+    if (state.sinkD == null || !Number.isFinite(Number(state.sinkD))) state.sinkD = 22;
     // sprcha: migrace z presetu / výchozí pozice
     if (state.showerW == null || !Number.isFinite(Number(state.showerW))) {
       if (state.showerPreset === "full") {

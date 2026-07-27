@@ -13,7 +13,7 @@ export const FURN_KINDS = {
   kitchen: { label: "Kuchyňská linka", defaultH: 86 },
   wc: { label: "WC", defaultH: 40 },
   shower: { label: "Sprcha", defaultH: 5 },
-  sink: { label: "Umyvadlo", defaultH: 85 },
+  sink: { label: "Umyvadlo", defaultH: 57 },
   tv: { label: "TV", defaultH: 70 },
 };
 
@@ -42,8 +42,10 @@ export const FURN_PRESETS = {
   ],
   wc: [{ id: "std", label: "37×63", w: 37, d: 63 }],
   sink: [
-    { id: "40x30", label: "40×30", w: 40, d: 30 },
-    { id: "50x35", label: "50×35", w: 50, d: 35 },
+    { id: "40x22", label: "Skříň 40×22", w: 22, d: 40, cabH: 57, basinH: 10 },
+    { id: "vedea40", label: "Vedea 40", w: 23, d: 41, cabH: 57, basinH: 10 },
+    { id: "40x30", label: "40×30", w: 30, d: 40, cabH: 57, basinH: 10 },
+    { id: "50x35", label: "50×35", w: 35, d: 50, cabH: 60, basinH: 12 },
   ],
   tv: [
     { id: "55", label: '55"', w: 8, d: 123 },
@@ -138,7 +140,9 @@ export function applyFurnPreset(layer, presetId) {
   if (preset.matW != null) layer.matW = preset.matW;
   if (preset.armW != null) layer.armW = preset.armW;
   if (preset.armD != null) layer.armD = preset.armD;
-  if (FURN_KINDS[kind]?.defaultH) layer.h = FURN_KINDS[kind].defaultH;
+  if (preset.cabH != null) layer.h = preset.cabH;
+  if (preset.basinH != null) layer.basinH = preset.basinH;
+  if (FURN_KINDS[kind]?.defaultH && preset.cabH == null) layer.h = FURN_KINDS[kind].defaultH;
   return layer;
 }
 
@@ -286,6 +290,11 @@ export function normalizeFurnitureLayer(raw, i = 0) {
     layer.armW = Math.max(40, Number(raw.armW) || SOFA_DEFAULTS.armW);
     layer.armD = Math.max(40, Number(raw.armD) || SOFA_DEFAULTS.armD);
   }
+  if (kind === "sink") {
+    layer.basinH = Math.min(20, Math.max(5, Number(raw.basinH) || 10));
+    layer.baseElev = Math.min(40, Math.max(0, Number(raw.baseElev) || 0));
+    if (!Number.isFinite(Number(raw.h))) layer.h = FURN_KINDS.sink.defaultH;
+  }
   if (kind === "bed" && layer.matW == null) {
     layer.matW = Number(raw.preset) === 140 ? 140 : 160;
   }
@@ -398,8 +407,11 @@ export function seedFromParametric(p = {}) {
   }
 
   const sinkW = Number(p.sinkW) || 40;
-  const sinkD = Number(p.sinkD) || 30;
+  const sinkD = Number(p.sinkD) || 22;
   const sinkOffset = Number(p.sinkOffset) || 70;
+  const sinkCabH = Number(p.sinkCabH) || FURN_KINDS.sink.defaultH;
+  const sinkBasinH = Number(p.sinkBasinH) || 10;
+  const sinkBaseElev = Number(p.sinkBaseElev) || 0;
   const sinkX = bathLeft + bathW - thick - sinkD;
   const sinkY = sinkOffset;
 
@@ -460,11 +472,13 @@ export function seedFromParametric(p = {}) {
       id: "furn-sink",
       name: "Umyvadlo",
       kind: "sink",
-      rot: 90, // depth into room from east wall → w=depth along X after rot handling in seed
-      preset: "40x30",
+      rot: 0,
+      preset: "40x22",
       x: sinkX, y: sinkY,
       w: sinkD, d: sinkW,
-      h: FURN_KINDS.sink.defaultH,
+      h: sinkCabH,
+      basinH: sinkBasinH,
+      baseElev: sinkBaseElev,
     },
     {
       id: "furn-tv",

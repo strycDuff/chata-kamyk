@@ -51,8 +51,11 @@ export const DEFAULT_LAYOUT = {
   "showerClearX": 601.5,
   "showerClearY": 137.5,
   "sinkW": 40,
-  "sinkD": 30,
+  "sinkD": 22,
   "sinkOffset": 70,
+  "sinkCabH": 57,
+  "sinkBasinH": 10,
+  "sinkBaseElev": 0,
   "furnitureLayers": [
     {
       "id": "fms31mqt0_1",

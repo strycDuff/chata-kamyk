@@ -108,7 +108,8 @@ function saveState(state) {
 function furnMinSize(layer) {
   // TV is a thin panel (~8 cm); WC/sink can also be under 40 cm.
   if (layer.kind === "tv") return { w: 4, d: 4 };
-  if (layer.kind === "wc" || layer.kind === "sink") return { w: 15, d: 15 };
+  if (layer.kind === "sink") return { w: 18, d: 18 };
+  if (layer.kind === "wc") return { w: 15, d: 15 };
   return { w: 20, d: 20 };
 }
 
@@ -457,7 +458,17 @@ function build3dSpec(state) {
     } else if (layer.kind === "wc") {
       boxes.push({ x: layer.x, y: layer.y, w: layer.w, d: layer.d, h: 40, color: "#ecf0f1", matKind: "furniture" });
     } else if (layer.kind === "sink") {
-      boxes.push({ x: layer.x, y: layer.y, w: layer.w, d: layer.d, h: 16, elev: 70, color: "#ecf0f1", matKind: "furniture" });
+      const cabH = layer.h || 57;
+      const basinH = layer.basinH || 10;
+      const baseElev = layer.baseElev || 0;
+      boxes.push({
+        x: layer.x, y: layer.y, w: layer.w, d: layer.d,
+        h: cabH, elev: baseElev, color: "#bdc3c7", matKind: "furniture",
+      });
+      boxes.push({
+        x: layer.x, y: layer.y, w: layer.w, d: layer.d,
+        h: basinH, elev: baseElev + cabH, color: "#ecf0f1", matKind: "furniture",
+      });
     } else if (layer.kind === "tv") {
       boxes.push({ x: layer.x, y: layer.y, w: layer.w, d: layer.d, h: layer.h || 70, elev: 100, color: "#111", matKind: "furniture" });
     } else {
@@ -648,7 +659,14 @@ export function createSkica(opts) {
               <div id="skica-furn-h-wrap" hidden style="margin-top:6px">
                 <label>Výška H (do 3D)</label>
                 <input type="number" id="skica-furn-h" min="10" max="280" step="1" style="width:100%;margin-top:4px">
-                <p class="hint" style="margin-top:4px">Např. vysoká skříň 180–210 cm.</p>
+                <p class="hint" style="margin-top:4px">Např. vysoká skříň 180–210 cm · u umyvadla = výška skříňky.</p>
+              </div>
+              <div id="skica-sink-extra" hidden style="margin-top:6px">
+                <label>Umyvadlo (nad skříňkou) / odstup ode země</label>
+                <div class="row" style="gap:6px;margin-top:4px">
+                  <input type="number" id="skica-sink-basinh" min="5" max="20" step="1" style="flex:1" title="Výška umyvadla">
+                  <input type="number" id="skica-sink-base" min="0" max="40" step="1" style="flex:1" title="Odstup skříňky ode země">
+                </div>
               </div>
               <div id="skica-sofa-arms" hidden style="margin-top:6px">
                 <label>Hloubka ramen (Z / S)</label>
@@ -847,6 +865,12 @@ export function createSkica(opts) {
         const raw = Number(hEl.value);
         if (Number.isFinite(raw)) layer.h = Math.min(280, Math.max(10, raw));
       }
+      if (layer.kind === "sink") {
+        const bh = panel.querySelector("#skica-sink-basinh");
+        const be = panel.querySelector("#skica-sink-base");
+        if (bh && Number.isFinite(Number(bh.value))) layer.basinH = Math.min(20, Math.max(5, Number(bh.value)));
+        if (be && Number.isFinite(Number(be.value))) layer.baseElev = Math.min(40, Math.max(0, Number(be.value)));
+      }
       if (layer.kind === "sofa") {
         if (awEl) layer.armW = Math.min(layer.w, Math.max(40, Number(awEl.value) || layer.armW || 95));
         if (adEl) layer.armD = Math.min(layer.d, Math.max(40, Number(adEl.value) || layer.armD || 90));
@@ -855,7 +879,7 @@ export function createSkica(opts) {
       persist();
       render();
     };
-    for (const id of ["skica-furn-w", "skica-furn-d", "skica-furn-h", "skica-sofa-armw", "skica-sofa-armd"]) {
+    for (const id of ["skica-furn-w", "skica-furn-d", "skica-furn-h", "skica-sink-basinh", "skica-sink-base", "skica-sofa-armw", "skica-sofa-armd"]) {
       const eln = panel.querySelector(`#${id}`);
       eln?.addEventListener("change", onFurnSize);
       eln?.addEventListener("keydown", (e) => {
@@ -1040,12 +1064,22 @@ export function createSkica(opts) {
             ? "Tloušťka (V–Z) / šířka panelu (S–J)"
             : "Šířka (V–Z) / Délka (S–J)";
         }
-        const showH = layer.kind === "generic" || layer.kind === "kitchen" || layer.kind === "tv";
+        const showH = layer.kind === "generic" || layer.kind === "kitchen" || layer.kind === "tv" || layer.kind === "sink";
         if (hWrap) {
           hWrap.hidden = !showH;
           if (showH) {
             const hEl = panel.querySelector("#skica-furn-h");
             if (hEl && document.activeElement !== hEl) hEl.value = String(Math.round(layer.h || 75));
+          }
+        }
+        const sinkExtra = panel.querySelector("#skica-sink-extra");
+        if (sinkExtra) {
+          sinkExtra.hidden = layer.kind !== "sink";
+          if (layer.kind === "sink") {
+            const bh = panel.querySelector("#skica-sink-basinh");
+            const be = panel.querySelector("#skica-sink-base");
+            if (bh && document.activeElement !== bh) bh.value = String(Math.round(layer.basinH || 10));
+            if (be && document.activeElement !== be) be.value = String(Math.round(layer.baseElev || 0));
           }
         }
         if (armsWrap) {
