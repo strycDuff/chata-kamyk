@@ -375,6 +375,84 @@
     border-radius: 3px;
     background: #fff;
   }
+  .elec-run-detail {
+    margin-top: 8px;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #f7fafc;
+    font-size: 0.78rem;
+  }
+  .elec-run-detail[hidden] { display: none !important; }
+  .elec-run-detail .rd-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .elec-run-detail .rd-head .rd-label { flex: 1; min-width: 0; }
+  .elec-run-detail .rd-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0;
+  }
+  .elec-run-detail .rd-row label { color: var(--muted); white-space: nowrap; }
+  .elec-run-detail .rd-row input[type="number"] {
+    width: 64px;
+    font: inherit;
+    font-size: 0.78rem;
+    padding: 3px 5px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+  }
+  .elec-run-detail .rd-sockets {
+    list-style: none;
+    margin: 4px 0 0;
+    padding: 0;
+    max-height: 140px;
+    overflow: auto;
+  }
+  .elec-run-detail .rd-sockets li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    border-bottom: 1px solid #e8eef3;
+  }
+  .elec-run-detail .rd-sockets li:last-child { border-bottom: 0; }
+  .elec-run-detail .rd-sockets .muted { color: var(--muted); font-size: 0.72rem; }
+  .elec-run-detail .pt-edit-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+  }
+  .elec-run-detail .pt-edit-row input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-size: 0.78rem;
+    padding: 3px 5px;
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+  }
+  .elec-run-detail .icon-tiny {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    font-size: 0.85rem;
+    line-height: 1;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 3px;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  .elec-run-detail .icon-tiny.ok { color: #1a7f4e; }
+  .elec-run-detail .icon-tiny.cancel { color: #a33; }
   .elec-points-panel .icon-tiny {
     width: 26px;
     height: 26px;
@@ -952,7 +1030,7 @@
           </div>
 
           <div id="elec-elev-tools" hidden>
-            <p class="hint" id="elec-elev-circuit-hint">Nové trasy → do <strong>aktivního okruhu</strong> (strom výše). Na stěně jsou všechny body; aktivní okruh je výraznější.</p>
+            <p class="hint" id="elec-elev-circuit-hint">Nové trasy → do <strong>aktivního okruhu</strong>. U zásuvek kreslíš páteř; odbočky k napojeným zásuvkám se dopočítají. Trasu pojmenuj v panelu pod seznamem.</p>
             <label>Stěny v pásu</label>
             <div class="elev-wall-toggles" id="elev-wall">
               <label class="chk"><input type="checkbox" data-wall="north" checked> <span class="elec-ico">↑</span> Sever</label>
@@ -979,6 +1057,7 @@
             </div>
             <p class="hint" id="elec-elev-hint"></p>
             <ul class="elec-list" id="elec-elev-list"></ul>
+            <div class="elec-run-detail" id="elec-run-detail" hidden></div>
             <details class="side-block" style="margin-top:10px">
               <summary>Výšky místnosti / otvorů</summary>
               <div class="side-block-body">
@@ -1042,7 +1121,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.10.0";
+  const APP_VERSION = "3.11.0";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1598,8 +1677,11 @@
     return null;
   }
 
-  /** Délka trasy ve světlých cm (approx, včetně přes roh). */
-  function elevRunLengthCm(run) {
+  const ELEC_TRUNK_H_DEFAULT = 15;
+  const ELEC_STUB_ALONG_TOL = 5;
+
+  /** Délka páteře ve světlých cm (approx, včetně přes roh). */
+  function elevRunTrunkLengthCm(run) {
     const pts = runPointsNorm(run);
     let len = 0;
     for (let i = 1; i < pts.length; i++) {
@@ -1617,6 +1699,10 @@
     return len;
   }
 
+  function elevRunLengthCm(run) {
+    return elevRunTrunkLengthCm(run) + elevRunStubsLengthCm(run);
+  }
+
   function formatRunMeters(cm) {
     const m = cm / 100;
     if (m < 0.05) return "~0 m";
@@ -1628,6 +1714,116 @@
     return state.elecElevRuns
       .filter((r) => r.circuitId === circuitId)
       .reduce((n, r) => n + elevRunLengthCm(r), 0);
+  }
+
+  function runIsSocketTrunk(run) {
+    const circ = findElecCircuit(run?.circuitId);
+    return !!circ && circ.kind === "sockets";
+  }
+
+  function runTrunkH(run) {
+    const n = Number(run?.trunkH);
+    if (Number.isFinite(n) && n >= 0 && n <= 300) return n;
+    return ELEC_TRUNK_H_DEFAULT;
+  }
+
+  function idList(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((id) => typeof id === "string");
+  }
+
+  function wallAlongSpan(run, wall) {
+    const alongs = runPointsNorm(run).filter((p) => p.wall === wall).map((p) => p.along);
+    if (!alongs.length) return null;
+    return { min: Math.min(...alongs), max: Math.max(...alongs) };
+  }
+
+  function socketWallPlacement(pt) {
+    for (const wall of ELEV_WALL_ORDER) {
+      const on = elecPointOnWall(pt, wall);
+      if (on) return { wall, along: on.along, h: on.h ?? pt.h };
+    }
+    return null;
+  }
+
+  function autoSocketCandidates(run) {
+    if (!runIsSocketTrunk(run)) return [];
+    const circId = run.circuitId;
+    const out = [];
+    for (const pt of state.elecPoints) {
+      if (pt.type !== "socket" || pt.circuitId !== circId) continue;
+      const place = socketWallPlacement(pt);
+      if (!place) continue;
+      const span = wallAlongSpan(run, place.wall);
+      if (!span) continue;
+      if (place.along < span.min - ELEC_STUB_ALONG_TOL || place.along > span.max + ELEC_STUB_ALONG_TOL) continue;
+      out.push(pt);
+    }
+    return out;
+  }
+
+  function attachedSockets(run) {
+    if (!runIsSocketTrunk(run)) return [];
+    const exclude = new Set(idList(run.excludePointIds));
+    const include = new Set(idList(run.includePointIds));
+    const auto = autoSocketCandidates(run);
+    const autoIds = new Set(auto.map((p) => p.id));
+    const attached = auto.filter((p) => !exclude.has(p.id));
+    for (const id of include) {
+      if (autoIds.has(id)) continue;
+      const pt = findElecPoint(id);
+      if (pt && pt.type === "socket" && pt.circuitId === run.circuitId) attached.push(pt);
+    }
+    return attached;
+  }
+
+  function elevRunStubsLengthCm(run) {
+    if (!runIsSocketTrunk(run)) return 0;
+    const th = runTrunkH(run);
+    return attachedSockets(run).reduce((n, pt) => n + Math.abs((Number(pt.h) || 0) - th), 0);
+  }
+
+  function elevRunStubSegs(run) {
+    if (!runIsSocketTrunk(run)) return [];
+    const th = runTrunkH(run);
+    const segs = [];
+    for (const pt of attachedSockets(run)) {
+      const place = socketWallPlacement(pt);
+      if (!place) continue;
+      segs.push({
+        pointId: pt.id,
+        wall: place.wall,
+        along: place.along,
+        h0: th,
+        h1: Number(pt.h) || th,
+      });
+    }
+    return segs;
+  }
+
+  function elevRunDisplayName(run) {
+    if (run?.name && String(run.name).trim()) return String(run.name).trim();
+    return "";
+  }
+
+  function ensureSocketTrunkFields(run) {
+    if (!run || !runIsSocketTrunk(run)) return run;
+    run.trunkH = runTrunkH(run);
+    if (!Array.isArray(run.excludePointIds)) run.excludePointIds = [];
+    if (!Array.isArray(run.includePointIds)) run.includePointIds = [];
+    return run;
+  }
+
+  function setRunSocketAttached(run, pointId, attached) {
+    ensureSocketTrunkFields(run);
+    const autoIds = new Set(autoSocketCandidates(run).map((p) => p.id));
+    run.excludePointIds = idList(run.excludePointIds).filter((id) => id !== pointId);
+    run.includePointIds = idList(run.includePointIds).filter((id) => id !== pointId);
+    if (autoIds.has(pointId)) {
+      if (!attached) run.excludePointIds.push(pointId);
+    } else if (attached) {
+      run.includePointIds.push(pointId);
+    }
   }
 
   function socketWays(pt) {
@@ -1731,6 +1927,8 @@
         h: Math.min(state.roomClearH, Math.max(0, p.h)),
       };
     });
+    const hs = points.map((p) => p.h).sort((a, b) => a - b);
+    const medianH = hs.length ? hs[Math.floor(hs.length / 2)] : ELEC_TRUNK_H_DEFAULT;
     const run = {
       id: newElecId("er"),
       wall: points[0].wall, // legacy hint
@@ -1738,7 +1936,11 @@
       circuitId: circ.id,
       name: "",
       points,
+      trunkH: circ.kind === "sockets" ? medianH : undefined,
+      excludePointIds: [],
+      includePointIds: [],
     };
+    if (circ.kind === "sockets") ensureSocketTrunkFields(run);
     state.elecElevRuns.push(run);
     state.elecSelectedId = run.id;
     state.elecSelectedKind = "elev-run";
@@ -3126,7 +3328,12 @@
         const lab = document.createElement("span");
         const kindIco = circ ? (ELEC_KIND_ICONS[circ.kind] || CABLE_ICONS[run.cableType] || "") : (CABLE_ICONS[run.cableType] || "");
         const meters = formatRunMeters(elevRunLengthCm(run));
-        lab.textContent = `${kindIco} ${CABLE_LABELS[run.cableType] || run.cableType} · ${circ ? circ.name : "?"} · ${wallSet.join("+")} · ${meters}`.trim();
+        const runName = elevRunDisplayName(run);
+        const stubsN = runIsSocketTrunk(run) ? attachedSockets(run).length : 0;
+        const stubBit = stubsN ? ` · ${stubsN} odboč.` : "";
+        lab.textContent = runName
+          ? `${kindIco} ${runName} · ${meters}${stubBit}`.trim()
+          : `${kindIco} ${CABLE_LABELS[run.cableType] || run.cableType} · ${circ ? circ.name : "?"} · ${wallSet.join("+")} · ${meters}${stubBit}`.trim();
         const del = document.createElement("button");
         del.type = "button";
         del.className = "btn";
@@ -3134,6 +3341,10 @@
         del.addEventListener("click", (e) => {
           e.stopPropagation();
           state.elecElevRuns = state.elecElevRuns.filter((r) => r.id !== run.id);
+          if (state.elecSelectedId === run.id) {
+            state.elecSelectedId = null;
+            state.elecSelectedKind = null;
+          }
           render();
         });
         row.append(lab, del);
@@ -3146,6 +3357,153 @@
         });
         ul.appendChild(li);
       });
+    renderElecRunDetail();
+  }
+
+  function renderElecRunDetail() {
+    const box = document.getElementById("elec-run-detail");
+    if (!box) return;
+    box.innerHTML = "";
+    const run = state.elecSelectedKind === "elev-run" ? findElecElevRun(state.elecSelectedId) : null;
+    if (!run) {
+      box.hidden = true;
+      return;
+    }
+    box.hidden = false;
+    ensureSocketTrunkFields(run);
+    const circ = findElecCircuit(run.circuitId);
+
+    const head = document.createElement("div");
+    head.className = "rd-head";
+    const labWrap = document.createElement("span");
+    labWrap.className = "rd-label";
+    const lab = document.createElement("span");
+    lab.textContent = elevRunDisplayName(run) || (circ ? circ.name : "Trasa");
+    labWrap.appendChild(lab);
+    const btnEdit = document.createElement("button");
+    btnEdit.type = "button";
+    btnEdit.className = "icon-tiny";
+    btnEdit.title = "Přejmenovat trasu";
+    btnEdit.textContent = "✎";
+    btnEdit.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (labWrap.querySelector("input")) return;
+      lab.hidden = true;
+      btnEdit.hidden = true;
+      const row = document.createElement("span");
+      row.className = "pt-edit-row";
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.value = run.name || "";
+      inp.placeholder = "název trasy (např. outlier)";
+      const ok = document.createElement("button");
+      ok.type = "button";
+      ok.className = "icon-tiny ok";
+      ok.title = "Uložit";
+      ok.textContent = "✓";
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "icon-tiny cancel";
+      cancel.title = "Zrušit";
+      cancel.textContent = "✗";
+      const finish = (save) => {
+        if (save) run.name = inp.value.trim();
+        render();
+      };
+      ok.addEventListener("click", (ev) => { ev.stopPropagation(); finish(true); });
+      cancel.addEventListener("click", (ev) => { ev.stopPropagation(); finish(false); });
+      inp.addEventListener("click", (ev) => ev.stopPropagation());
+      inp.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") { ev.preventDefault(); finish(true); }
+        if (ev.key === "Escape") { ev.preventDefault(); finish(false); }
+      });
+      row.append(inp, ok, cancel);
+      labWrap.appendChild(row);
+      queueMicrotask(() => { inp.focus(); inp.select(); });
+    });
+    head.append(labWrap, btnEdit);
+    box.appendChild(head);
+
+    const meta = document.createElement("div");
+    meta.className = "muted";
+    meta.style.marginBottom = "6px";
+    const stubN = runIsSocketTrunk(run) ? attachedSockets(run).length : 0;
+    meta.textContent =
+      `${CABLE_LABELS[run.cableType] || run.cableType}` +
+      (circ ? ` · ${circ.name}` : "") +
+      ` · ${formatRunMeters(elevRunLengthCm(run))}` +
+      (stubN ? ` (páteř ${formatRunMeters(elevRunTrunkLengthCm(run))} + ${stubN} odboč.)` : "");
+    box.appendChild(meta);
+
+    if (runIsSocketTrunk(run)) {
+      const hRow = document.createElement("div");
+      hRow.className = "rd-row";
+      const hLab = document.createElement("label");
+      hLab.textContent = "Páteř h:";
+      const hInp = document.createElement("input");
+      hInp.type = "number";
+      hInp.min = "0";
+      hInp.max = String(state.roomClearH || 220);
+      hInp.step = "1";
+      hInp.value = String(Math.round(runTrunkH(run)));
+      hInp.title = "Výška páteře (cm) — typicky 10–20";
+      hInp.addEventListener("change", () => {
+        const v = Number(hInp.value);
+        run.trunkH = Number.isFinite(v) ? Math.min(state.roomClearH, Math.max(0, v)) : ELEC_TRUNK_H_DEFAULT;
+        render();
+      });
+      const hUnit = document.createElement("span");
+      hUnit.className = "muted";
+      hUnit.textContent = "cm";
+      hRow.append(hLab, hInp, hUnit);
+      box.appendChild(hRow);
+
+      const sockTitle = document.createElement("div");
+      sockTitle.style.marginTop = "6px";
+      sockTitle.style.fontWeight = "600";
+      sockTitle.textContent = "Napojené zásuvky";
+      box.appendChild(sockTitle);
+
+      const auto = autoSocketCandidates(run);
+      const autoIds = new Set(auto.map((p) => p.id));
+      const attachedIds = new Set(attachedSockets(run).map((p) => p.id));
+      const circuitSockets = state.elecPoints.filter(
+        (p) => p.type === "socket" && p.circuitId === run.circuitId
+      );
+      const ul = document.createElement("ul");
+      ul.className = "rd-sockets";
+      if (!circuitSockets.length) {
+        const empty = document.createElement("li");
+        empty.innerHTML = `<span class="muted">Žádné zásuvky v okruhu</span>`;
+        ul.appendChild(empty);
+      } else {
+        circuitSockets.forEach((pt) => {
+          const place = socketWallPlacement(pt);
+          const li = document.createElement("li");
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.checked = attachedIds.has(pt.id);
+          cb.addEventListener("change", () => {
+            setRunSocketAttached(run, pt.id, cb.checked);
+            render();
+          });
+          const name = document.createElement("span");
+          name.style.flex = "1";
+          name.textContent = pt.name
+            ? `${pt.name} · ${Math.round(pt.h)} cm`
+            : `${ELEC_LABELS.socket} · ${Math.round(pt.h)} cm`;
+          const tag = document.createElement("span");
+          tag.className = "muted";
+          if (!place) tag.textContent = "mimo stěnu";
+          else if (autoIds.has(pt.id)) tag.textContent = "auto";
+          else if (attachedIds.has(pt.id)) tag.textContent = "ručně";
+          else tag.textContent = place ? (ELEV_WALL_LABELS[place.wall] || place.wall) : "";
+          li.append(cb, name, tag);
+          ul.appendChild(li);
+        });
+      }
+      box.appendChild(ul);
+    }
   }
 
   function elevRunStroke(cableType, selected) {
@@ -3204,6 +3562,34 @@
         ...elevRunStroke(run.cableType, sel),
         "pointer-events": editable ? "stroke" : "none",
       }));
+      // odvozené odbočky k zásuvkám (páteř + stub)
+      for (const stub of elevRunStubSegs(run)) {
+        if (!wallSet.has(stub.wall)) continue;
+        const a = toStrip({ wall: stub.wall, along: stub.along, h: stub.h0 });
+        const b = toStrip({ wall: stub.wall, along: stub.along, h: stub.h1 });
+        if (!a || !b) continue;
+        const sd = `M${a.x},${a.y} L${b.x},${b.y}`;
+        rg.appendChild(el("path", {
+          d: sd, fill: "none",
+          stroke: "#ffffff",
+          "stroke-width": sel ? 1.8 : 1.3,
+          "stroke-linecap": "round",
+          "pointer-events": "none",
+          opacity: 0.75,
+        }));
+        rg.appendChild(el("path", {
+          class: "elec-run-stub",
+          "data-elec": run.id,
+          "data-elec-kind": "elev-run",
+          "data-stub-point": stub.pointId,
+          d: sd, fill: "none",
+          stroke: color,
+          "stroke-width": sel ? 0.95 : 0.55,
+          "stroke-linecap": "round",
+          "pointer-events": "none",
+          opacity: inActive ? 0.95 : 0.35,
+        }));
+      }
       const mid = mapped[Math.floor(mapped.length / 2)];
       const t = el("text", {
         x: mid.x + 4, y: mid.y - 4,
@@ -3212,7 +3598,9 @@
         "font-weight": "600",
       });
       const circName = circ ? circ.name : "";
-      t.textContent = `${CABLE_LABELS[run.cableType]}${circName ? ` · ${circName}` : ""}`;
+      const runName = elevRunDisplayName(run);
+      t.textContent = runName
+        || `${CABLE_LABELS[run.cableType]}${circName ? ` · ${circName}` : ""}`;
       rg.appendChild(t);
       g.appendChild(rg);
     }
@@ -4219,7 +4607,7 @@
       elevWalls: normalizeElevWalls(state.elevWalls),
       elecElevRuns: state.elecElevRuns.map((r) => {
         const pts = runPointsNorm(r);
-        return {
+        const out = {
           id: r.id,
           wall: pts[0]?.wall || r.wall || "north",
           cableType: r.cableType,
@@ -4227,6 +4615,12 @@
           name: r.name || "",
           points: pts.map((p) => ({ wall: p.wall, along: p.along, h: p.h })),
         };
+        if (runIsSocketTrunk(r) || r.trunkH != null || idList(r.excludePointIds).length || idList(r.includePointIds).length) {
+          out.trunkH = runTrunkH(r);
+          out.excludePointIds = idList(r.excludePointIds);
+          out.includePointIds = idList(r.includePointIds);
+        }
+        return out;
       }),
       elecFilter: { ...state.elecFilter },
       appVersion: APP_VERSION,
@@ -4340,6 +4734,9 @@
           h: Number(p.h) || 0,
         }))
         : [];
+      const trunkN = Number(r.trunkH);
+      const excludePointIds = idList(r.excludePointIds);
+      const includePointIds = idList(r.includePointIds);
       return {
         id: typeof r.id === "string" ? r.id : newElecId("er"),
         wall: points[0]?.wall || fallbackWall,
@@ -4347,6 +4744,9 @@
         circuitId,
         name: (r.name && String(r.name).trim()) || "",
         points,
+        trunkH: Number.isFinite(trunkN) ? trunkN : ELEC_TRUNK_H_DEFAULT,
+        excludePointIds,
+        includePointIds,
       };
     }).filter((r) => r.points.length >= 2);
   }
