@@ -262,6 +262,8 @@ export function proposeRoute({ kind, walls, panel, points, occupiedSlots }) {
   const trunkH = pickTrunkSlot(kind, occupiedSlots);
   const graph = buildWallGraph(walls);
   const panelPos = projectPointToWalls(panel, walls);
+  const panelH = Number(panel?.h);
+  const riserH = Number.isFinite(panelH) && panelH > 0 ? panelH : trunkH;
   const targets = points.map((p) => ({
     id: p.id,
     pos: projectPointToWalls(p, walls),
@@ -269,10 +271,14 @@ export function proposeRoute({ kind, walls, panel, points, occupiedSlots }) {
   }));
 
   if (targets.length === 0) {
+    const pts = [{ wall: panelPos.wall, along: panelPos.along, h: trunkH }];
+    if (Math.abs(riserH - trunkH) > 0.5) {
+      pts.unshift({ wall: panelPos.wall, along: panelPos.along, h: riserH });
+    }
     return {
       cableType,
       trunkH,
-      points: [{ wall: panelPos.wall, along: panelPos.along, h: trunkH }],
+      points: pts,
       pointIds: [],
       status: "draft",
     };
@@ -325,7 +331,13 @@ export function proposeRoute({ kind, walls, panel, points, occupiedSlots }) {
   }
 
   polyline = dedupeConsecutive(polyline);
+  /** @type {{ wall: string, along: number, h: number }[]} */
   const routePoints = polyline.map((p) => ({ wall: p.wall, along: p.along, h: trunkH }));
+  // Vertical riser at the panel: corridor trunk → panel height (not left at floor slot).
+  if (routePoints.length && Math.abs(riserH - trunkH) > 0.5) {
+    const start = routePoints[0];
+    routePoints.unshift({ wall: start.wall, along: start.along, h: riserH });
+  }
 
   return {
     cableType,

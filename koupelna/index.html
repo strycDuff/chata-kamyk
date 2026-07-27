@@ -971,7 +971,7 @@
           <div class="spacer"></div>
           <button type="button" class="btn" id="elev-fit-strip" title="Výška stěny na celý canvas · posun vlevo">Fit pás</button>
           <button type="button" class="btn" id="elev-fit-wall" title="Přiblížit na vybranou (nebo první) stěnu">Fit stěna</button>
-          <span class="hint" style="margin:0">Kolečko = zoom · prostředním tlačítkem nebo mezerníkem + tažením posun</span>
+          <span class="hint" style="margin:0">Táhni = posun pásu · kolečko = zoom · body/trasy = klik</span>
         </div>
         <div class="view3d-bar" id="view3d-bar" hidden>
           <span class="elev-wall-bar-label">Pohled zevnitř</span>
@@ -1306,7 +1306,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.17.2";
+  const APP_VERSION = "3.17.3";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -2184,8 +2184,19 @@
     return attached;
   }
 
-  function elevRunStubsLengthCm(run) {
-    return elevRunStubSegs(run).reduce((n, s) => n + Math.abs(s.h1 - s.h0), 0);
+  function elevRunDisplayName(run) {
+    if (run?.name && String(run.name).trim()) return String(run.name).trim();
+    return "";
+  }
+
+  function elevRunHoverLabel(run) {
+    const circ = findElecCircuit(run?.circuitId);
+    const name = elevRunDisplayName(run) || (circ ? circ.name : "");
+    const kind = circ ? (ELEC_KIND_LABELS[circ.kind] || circ.kind) : "";
+    const cable = CABLE_LABELS[run?.cableType] || run?.cableType || "";
+    const slot = `${Math.round(runTrunkH(run))} cm`;
+    const bits = [name, kind && name !== kind ? kind : null, cable, `páteř ${slot}`].filter(Boolean);
+    return bits.join(" · ") || "Trasa";
   }
 
   /**
@@ -2194,13 +2205,15 @@
    *   point onto the current wall set (outer + partitions) and stub from there.
    * - Legacy manually-drawn socket trunks keep the old proximity-based
    *   auto-attach behavior (attachedSockets).
+   * - Always include a riser to the distribution panel when missing from the
+   *   trunk polyline (older routes ended at corridor height / „u země“).
    */
   function elevRunStubSegs(run) {
     const th = runTrunkH(run);
     const ids = idList(run.pointIds);
+    const walls = buildElecWallSegs();
+    const segs = [];
     if (ids.length) {
-      const walls = buildElecWallSegs();
-      const segs = [];
       for (const id of ids) {
         const pt = findElecPoint(id);
         if (!pt) continue;
@@ -2214,10 +2227,31 @@
           h1: Number(pt.h) || th,
         });
       }
+      const panel = state.elecPoints.find((p) => p.type === "panel");
+      if (panel) {
+        const place = projectElecPointToWall({ x: panel.x, y: panel.y }, walls);
+        if (place) {
+          const ph = Number(panel.h) || th;
+          const pts = runPointsNorm(run);
+          const hasRiser = pts.length >= 2
+            && pts[0].wall === place.wall
+            && Math.abs(pts[0].along - place.along) < 2
+            && Math.abs((Number(pts[0].h) || 0) - ph) < 2
+            && Math.abs((Number(pts[1].h) || 0) - th) < 2;
+          if (!hasRiser && Math.abs(ph - th) > 0.5) {
+            segs.push({
+              pointId: panel.id,
+              wall: place.wall,
+              along: place.along,
+              h0: th,
+              h1: ph,
+            });
+          }
+        }
+      }
       return segs;
     }
     if (!runIsSocketTrunk(run)) return [];
-    const segs = [];
     for (const pt of attachedSockets(run)) {
       const place = socketWallPlacement(pt);
       if (!place) continue;
@@ -2232,9 +2266,8 @@
     return segs;
   }
 
-  function elevRunDisplayName(run) {
-    if (run?.name && String(run.name).trim()) return String(run.name).trim();
-    return "";
+  function elevRunStubsLengthCm(run) {
+    return elevRunStubSegs(run).reduce((n, s) => n + Math.abs(s.h1 - s.h0), 0);
   }
 
   function ensureSocketTrunkFields(run) {
@@ -3512,7 +3545,7 @@
       class: "elev-svg",
       preserveAspectRatio: "xMidYMid meet",
     });
-    if (spacePanning) svg.classList.add("elev-space-pan");
+    if (spacePanning || (elevViewActive() && !state.elecMode)) svg.classList.add("elev-space-pan");
     if (state.drag && state.drag.type === "elev-pan") svg.classList.add("elev-panning");
     const g = el("g", { id: "plan-root" });
 
@@ -3605,6 +3638,21 @@
         "pointer-events": "none",
         opacity: 0.9,
       }));
+      const planHit = el("path", {
+        d, fill: "none",
+        stroke: "transparent",
+        "stroke-width": 10,
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+        "pointer-events": "stroke",
+        class: "elec-run-hit",
+        "data-elec": run.id,
+        "data-elec-kind": "elev-run",
+      });
+      const planTip = el("title");
+      planTip.textContent = elevRunHoverLabel(run);
+      planHit.appendChild(planTip);
+      rg.appendChild(planHit);
       rg.appendChild(el("path", {
         class: "elec-run" + (isDraft ? " elec-run-draft" : ""),
         "data-elec": run.id,
@@ -3615,7 +3663,7 @@
         "stroke-linecap": "round",
         "stroke-linejoin": "round",
         "stroke-dasharray": isDraft ? "5,3" : (run.cableType === "slaboproud" ? "2,2.5" : null),
-        "pointer-events": editable ? "stroke" : "none",
+        "pointer-events": "none",
       }));
       // Slot label at midpoint of longest same-wall span
       let best = null;
@@ -4319,13 +4367,28 @@
         "pointer-events": "none",
         opacity: 0.85,
       }));
+      const elevHit = el("path", {
+        d, fill: "none",
+        stroke: "transparent",
+        "stroke-width": 8,
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+        "pointer-events": "stroke",
+        class: "elec-run-hit",
+        "data-elec": run.id,
+        "data-elec-kind": "elev-run",
+      });
+      const elevTip = el("title");
+      elevTip.textContent = elevRunHoverLabel(run);
+      elevHit.appendChild(elevTip);
+      rg.appendChild(elevHit);
       rg.appendChild(el("path", {
         class: "elec-run" + (isDraft ? " elec-run-draft" : ""),
         "data-elec": run.id,
         "data-elec-kind": "elev-run",
         d, fill: "none",
         ...elevRunStroke(run.cableType, sel, isDraft),
-        "pointer-events": editable ? "stroke" : "none",
+        "pointer-events": "none",
       }));
       // odvozené odbočky k zásuvkám (páteř + stub)
       for (const stub of elevRunStubSegs(run)) {
@@ -4620,7 +4683,7 @@
     const draft = mod.proposeRoute({
       kind: circ.kind,
       walls,
-      panel: { x: panel.x, y: panel.y },
+      panel: { x: panel.x, y: panel.y, h: panel.h },
       points: pts.map((p) => ({ id: p.id, x: p.x, y: p.y, h: p.h })),
       occupiedSlots: occupiedPowerSlots(circuitRoomKey(circ)),
     });
@@ -5721,11 +5784,16 @@
     const svg = currentSvg();
     if (!svg) return;
 
-    if (elevViewActive() && (evt.button === 1 || (evt.button === 0 && spacePanning))) {
-      state.drag = { type: "elev-pan", lastX: evt.clientX, lastY: evt.clientY };
-      evt.preventDefault();
-      render();
-      return;
+    const elecHit = evt.target.closest("[data-elec]");
+    // Elev pan: middle-drag, Space+drag, or plain left-drag when idle (not placing points/routes).
+    if (elevViewActive()) {
+      const idlePan = evt.button === 0 && !state.elecMode && !state.measureMode && !elecHit;
+      if (evt.button === 1 || (evt.button === 0 && spacePanning) || idlePan) {
+        state.drag = { type: "elev-pan", lastX: evt.clientX, lastY: evt.clientY };
+        evt.preventDefault();
+        render();
+        return;
+      }
     }
 
     const p = svgPoint(svg, evt);

@@ -149,4 +149,20 @@ describe("proposeRoute", () => {
     const wallsSeq = [...new Set(route.points.map((p) => p.wall))];
     assert.deepEqual(wallsSeq, ["north", "east", "south"]);
   });
+
+  it("starts with a vertical riser up to the panel height", () => {
+    const route = proposeRoute({
+      kind: "sockets",
+      walls,
+      panel: { x: 548, y: 2, h: 150 },
+      points: [{ id: "p1", x: 700, y: 5, h: 30 }],
+      occupiedSlots: [],
+    });
+    assert.ok(route.points.length >= 3);
+    assert.equal(route.points[0].wall, "north");
+    assert.ok(Math.abs(route.points[0].along - 548) < 1);
+    assert.equal(route.points[0].h, 150);
+    assert.equal(route.points[1].h, 12);
+    assert.ok(route.points.every((p, i) => i < 2 || p.h === 12));
+  });
 });
