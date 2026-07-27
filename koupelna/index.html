@@ -1236,7 +1236,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.13.2";
+  const APP_VERSION = "3.13.3";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -4131,6 +4131,67 @@
     });
   }
 
+  function pushBathPartitions3d(boxes, roomH) {
+    const o = bathOuter();
+    const op = doorOpeningBox();
+    const doorH = Math.min(state.doorOpeningH || 200, roomH);
+    const leafH = Math.min(state.doorLeafH || 190, doorH);
+    const col = "#95a5a6";
+
+    // Východní + jižní příčka — plné
+    boxes.push({
+      ...absToClearBox({ x: o.x + o.w - PART, y: o.y, w: PART, d: o.d }),
+      h: roomH, color: col,
+    });
+    boxes.push({
+      ...absToClearBox({
+        x: o.x + PART, y: o.y + o.d - PART,
+        w: Math.max(0, o.w - 2 * PART), d: PART,
+      }),
+      h: roomH, color: col,
+    });
+
+    // Západní příčka — výřez pro dveře
+    const northD = op.y - o.y;
+    if (northD > 0.5) {
+      boxes.push({
+        ...absToClearBox({ x: o.x, y: o.y, w: PART, d: northD }),
+        h: roomH, color: col,
+      });
+    }
+    const southY = op.y + op.d;
+    const southD = o.y + o.d - southY;
+    if (southD > 0.5) {
+      boxes.push({
+        ...absToClearBox({ x: o.x, y: southY, w: PART, d: southD }),
+        h: roomH, color: col,
+      });
+    }
+    const lintelH = Math.max(0, roomH - doorH);
+    if (lintelH > 0.5) {
+      boxes.push({
+        ...absToClearBox({ x: o.x, y: op.y, w: PART, d: op.d }),
+        h: lintelH, color: col, elev: doorH,
+      });
+    }
+
+    // Křídlo ve otvoru (zavřeno) — tenký panel
+    const leafW = Math.max(3, PART - 4);
+    boxes.push({
+      ...absToClearBox({ x: op.x + (PART - leafW) / 2, y: op.y, w: leafW, d: op.d }),
+      h: leafH, color: "#e1b12c",
+    });
+    // Dráha / pouzdro (náznak)
+    const travel = doorTravelBox();
+    boxes.push({
+      ...absToClearBox(travel),
+      h: Math.min(8, leafH * 0.05 + 4),
+      color: "#d35400",
+      opacity: 0.45,
+      elev: Math.max(0, leafH * 0.45),
+    });
+  }
+
   function buildView3dSpec() {
     const roomH = state.roomClearH || 210;
     const boxes = [];
@@ -4141,11 +4202,8 @@
     pushWallSegments(boxes, WEST_SEGS, "west", roomH);
     pushWallSegments(boxes, EAST_SEGS, "east", roomH);
 
-    // Bath partitions
-    for (const p of bathPartitionBoxes()) {
-      const c = absToClearBox(p);
-      boxes.push({ ...c, h: roomH, color: "#95a5a6" });
-    }
+    // Bath partitions (+ otvor a křídlo dveří na západní příčce)
+    pushBathPartitions3d(boxes, roomH);
     // TV
     {
       const c = absToClearBox(tvBox());
