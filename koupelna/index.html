@@ -940,7 +940,7 @@
             <button type="button" data-v="fridge">Od lednice</button>
           </div>
           <label class="chk" style="margin:0"><input type="checkbox" id="view3d-door-open"> Dveře koupelny otevřené</label>
-          <span class="hint" style="margin:0">Táhni = rozhlížet se · scroll = krok</span>
+          <span class="hint" style="margin:0">Táhni = rozhled · šipky / scroll = pohyb</span>
         </div>
         <div class="canvas-wrap" id="canvas-wrap"></div>
       </div>
@@ -1238,7 +1238,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.14.2";
+  const APP_VERSION = "3.14.3";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -4179,13 +4179,18 @@
       });
     }
 
-    // Křídlo — zavřeno v otvoru / otevřeno v dráze (posuv)
-    const leafW = Math.max(3, PART - 4);
+    // Křídlo — tenké (~3,5 cm), ať v pouzdře nebliká s příčkou
+    const leafW = 3.5;
+    const travel = doorTravelBox();
+    const travelC = absToClearBox(travel);
     if (state.view3dDoorOpen) {
-      const travel = doorTravelBox();
       boxes.push({
-        ...absToClearBox(travel),
-        h: leafH, color: "#e1b12c",
+        x: travelC.x + (travelC.w - leafW) / 2,
+        y: travelC.y,
+        w: leafW,
+        d: travelC.d,
+        h: leafH,
+        color: "#e1b12c",
       });
     } else {
       boxes.push({
@@ -4193,14 +4198,16 @@
         h: leafH, color: "#e1b12c",
       });
     }
-    // Dráha / pouzdro (náznak)
-    const travel = doorTravelBox();
+    // Dráha — jen tenká linka, mimo tloušťku křídla
     boxes.push({
-      ...absToClearBox(travel),
-      h: Math.min(6, leafH * 0.04 + 3),
+      x: travelC.x + travelC.w * 0.5 - 0.6,
+      y: travelC.y,
+      w: 1.2,
+      d: travelC.d,
+      h: Math.min(5, leafH * 0.04 + 2),
       color: "#d35400",
-      opacity: 0.35,
-      elev: Math.max(0, leafH * 0.4),
+      opacity: 0.4,
+      elev: Math.max(0, leafH * 0.42),
     });
   }
 
@@ -4367,7 +4374,16 @@
     }
     {
       const c = absToClearBox(sinkBox());
-      boxes.push({ ...c, h: VIEW3D_H.sink, color: "#ecf0f1" });
+      // umyvadlo na stěně / desce — ne od země
+      const basinH = 16;
+      const basinElev = Math.max(70, (VIEW3D_H.sink || 85) - basinH);
+      boxes.push({ ...c, h: basinH, elev: basinElev, color: "#ecf0f1" });
+      // tenký konzolový / nožičkový náznak
+      boxes.push({
+        x: c.x + c.w * 0.35, y: c.y + c.d * 0.35,
+        w: Math.max(4, c.w * 0.3), d: Math.max(4, c.d * 0.3),
+        h: basinElev, color: "#bdc3c7",
+      });
     }
     if (state.showFurniture) {
       for (const layer of state.furnitureLayers) {

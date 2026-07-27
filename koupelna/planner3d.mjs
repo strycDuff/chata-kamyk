@@ -95,9 +95,29 @@ export function createViewer(container) {
     cameras: {},
     room: { w: 906, d: 333, h: 210 },
     look: { yaw: 0, pitch: 0 },
+    keys: new Set(),
     raf: 0,
     _ro: null,
     _drag: null,
+  };
+
+  const eyeY = () => viewer.cameras?.[viewer.preset]?.eye?.y || 180;
+
+  const moveBy = (forward, strafe) => {
+    if (!forward && !strafe) return;
+    const forwardV = new THREE.Vector3();
+    camera.getWorldDirection(forwardV);
+    forwardV.y = 0;
+    if (forwardV.lengthSq() < 1e-6) forwardV.set(0, 0, -1);
+    forwardV.normalize();
+    const rightV = new THREE.Vector3().crossVectors(forwardV, new THREE.Vector3(0, 1, 0)).normalize();
+    camera.position.addScaledVector(forwardV, forward);
+    camera.position.addScaledVector(rightV, strafe);
+    camera.position.y = eyeY();
+    // drž ve světlosti místnosti
+    const m = 15;
+    camera.position.x = Math.min(viewer.room.w - m, Math.max(m, camera.position.x));
+    camera.position.z = Math.min(viewer.room.d - m, Math.max(m, camera.position.z));
   };
 
   const onDown = (e) => {
@@ -124,14 +144,19 @@ export function createViewer(container) {
   };
   const onWheel = (e) => {
     e.preventDefault();
-    const dirV = new THREE.Vector3();
-    camera.getWorldDirection(dirV);
-    // scroll = krok vpřed/vzad ve směru pohledu (zůstat zhruba ve výšce očí)
-    const step = -e.deltaY * 0.12;
-    camera.position.addScaledVector(dirV, step);
-    // drž výšku očí
-    const eyeY = viewer.cameras?.[viewer.preset]?.eye?.y || 180;
-    camera.position.y = eyeY;
+    moveBy(-e.deltaY * 0.12, 0);
+  };
+  const isTypingTarget = (t) =>
+    t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+  const onKeyDown = (e) => {
+    if (isTypingTarget(e.target)) return;
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+      e.preventDefault();
+      viewer.keys.add(e.key);
+    }
+  };
+  const onKeyUp = (e) => {
+    viewer.keys.delete(e.key);
   };
 
   canvas.addEventListener("pointerdown", onDown);
@@ -139,16 +164,28 @@ export function createViewer(container) {
   canvas.addEventListener("pointercancel", onUp);
   canvas.addEventListener("pointermove", onMove);
   canvas.addEventListener("wheel", onWheel, { passive: false });
+  window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup", onKeyUp);
   viewer._disposeInput = () => {
     canvas.removeEventListener("pointerdown", onDown);
     canvas.removeEventListener("pointerup", onUp);
     canvas.removeEventListener("pointercancel", onUp);
     canvas.removeEventListener("pointermove", onMove);
     canvas.removeEventListener("wheel", onWheel);
+    window.removeEventListener("keydown", onKeyDown);
+    window.removeEventListener("keyup", onKeyUp);
   };
 
   const tick = () => {
     viewer.raf = requestAnimationFrame(tick);
+    const speed = 4.2; // cm / frame @60fps ≈ 2.5 m/s
+    let fwd = 0;
+    let strafe = 0;
+    if (viewer.keys.has("ArrowUp")) fwd += speed;
+    if (viewer.keys.has("ArrowDown")) fwd -= speed;
+    if (viewer.keys.has("ArrowLeft")) strafe -= speed;
+    if (viewer.keys.has("ArrowRight")) strafe += speed;
+    if (fwd || strafe) moveBy(fwd, strafe);
     renderer.render(scene, camera);
   };
   tick();
