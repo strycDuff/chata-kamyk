@@ -974,7 +974,7 @@
           <span class="hint" style="margin:0">Táhni = posun pásu · kolečko = zoom · body/trasy = klik</span>
         </div>
         <div class="view3d-bar" id="view3d-bar" hidden>
-          <span class="elev-wall-bar-label">Pohled zevnitř</span>
+          <span class="elev-wall-bar-label">Pohled</span>
           <div class="row seg" id="view3d-preset">
             <button type="button" data-v="sofa" class="active">Z gauče</button>
             <button type="button" data-v="door">Ze vchodu</button>
@@ -982,7 +982,6 @@
             <button type="button" data-v="roof">Ke krovu</button>
             <button type="button" data-v="loft">Z loftu</button>
           </div>
-          <label class="chk" style="margin:0"><input type="checkbox" id="view3d-door-open"> Dveře koupelny otevřené</label>
           <span class="hint" style="margin:0">Táhni = rozhled · WASD / šipky = pohyb · Space = nahoru · LCtrl = dolů</span>
         </div>
         <div class="canvas-wrap" id="canvas-wrap"></div>
@@ -1241,21 +1240,34 @@
 
         <div id="panel-view3d" hidden>
           <p class="hint">Jen prohlížení. Upravuj půdorys / nábytek v jiných tabech — 3D se přestaví samo.</p>
-          <label>Pohled zevnitř</label>
-          <div class="row seg" id="view3d-preset-side">
-            <button type="button" data-v="sofa" class="active">Z gauče</button>
-            <button type="button" data-v="door">Ze vchodu</button>
-            <button type="button" data-v="fridge">Od lednice</button>
-            <button type="button" data-v="roof">Ke krovu</button>
-            <button type="button" data-v="loft">Z loftu</button>
-          </div>
-          <label class="chk" style="margin-top:10px"><input type="checkbox" id="view3d-door-open-side"> Dveře koupelny otevřené</label>
 
-          <details class="side-block" open style="margin-top:12px">
+          <details class="side-block" open>
+            <summary>Pohledy</summary>
+            <div class="side-block-body">
+              <div class="row seg" id="view3d-preset-side">
+                <button type="button" data-v="sofa" class="active">Z gauče</button>
+                <button type="button" data-v="door">Ze vchodu</button>
+                <button type="button" data-v="fridge">Od lednice</button>
+                <button type="button" data-v="roof">Ke krovu</button>
+                <button type="button" data-v="loft">Z loftu</button>
+              </div>
+              <p class="hint">Volný pohyb kolem celé chaty (WASD). Horní lišta má stejné presetové pohledy.</p>
+            </div>
+          </details>
+
+          <details class="side-block" open>
+            <summary>Interiér</summary>
+            <div class="side-block-body">
+              <label class="chk"><input type="checkbox" id="view3d-door-open-side"> Dveře koupelny otevřené</label>
+            </div>
+          </details>
+
+          <details class="side-block" open>
             <summary>Krov · kleštiny</summary>
             <div class="side-block-body">
-              <label class="chk"><input type="checkbox" id="roof-show"> Zobrazit krov (sedlová střecha)</label>
-              <label class="chk"><input type="checkbox" id="roof-covering"> Krytina (plech, tmavě hnědočervená)</label>
+              <label class="chk"><input type="checkbox" id="roof-show"> Zobrazit krov</label>
+              <label class="chk"><input type="checkbox" id="roof-covering"> Krytina (plech)</label>
+              <label class="chk"><input type="checkbox" id="roof-sheathe"> Zaklopit (skrýt krokve · jen kleštiny)</label>
               <label class="chk"><input type="checkbox" id="roof-loft-deck"> Podlaha loftu nad obývákem</label>
               <p class="hint">Fixní: sklon 30° · osová vzdálenost krokví 90 cm</p>
               <p class="hint">Kleština obývák — spodní líc: <strong>229</strong> cm (neposuvné)</p>
@@ -1306,7 +1318,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.17.3";
+  const APP_VERSION = "3.18.0";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1479,6 +1491,7 @@
     view3dDoorOpen: false,
     showRoof: true,
     showRoofCovering: false,
+    showRoofSheathing: false, // zaklopit = skrýt krokve, nechat kleštiny
     showLoftDeck: true,
     roofPitchDeg: 30, // fixní
     roofRafterSpacing: 90, // fixní osová vzdálenost
@@ -4775,6 +4788,27 @@
     });
   }
 
+  /** Spodní líc krokví / střešní roviny nad clear Z (cm od podlahy). */
+  function roofUndersideAtZ(z, r = roofParams()) {
+    const along = z <= r.halfSpan ? z : Math.max(0, CLEAR.h - z);
+    const h = r.plateH + (along / Math.max(1, r.halfSpan)) * r.rise;
+    return h - r.rafterTh * 0.55;
+  }
+
+  /** Min. výška ke střeše přes clear box (pro příčky jdoucí až pod krov). */
+  function heightToRoofForBox(clearBox, roomH) {
+    const r = roofParams();
+    let minRoof = r.ridgeH;
+    const z0 = clearBox.y;
+    const z1 = clearBox.y + clearBox.d;
+    const steps = Math.max(4, Math.ceil((z1 - z0) / 16));
+    for (let i = 0; i <= steps; i++) {
+      const z = z0 + ((z1 - z0) * i) / steps;
+      minRoof = Math.min(minRoof, roofUndersideAtZ(z, r));
+    }
+    return Math.max(roomH, Math.round(minRoof));
+  }
+
   function pushBathPartitions3d(boxes, roomH) {
     const o = bathOuter();
     const op = doorOpeningBox();
@@ -4782,25 +4816,28 @@
     const leafH = Math.min(state.doorLeafH || 190, doorH);
     const col = "#95a5a6";
 
-    // Východní + jižní příčka — plné
-    boxes.push({
-      ...absToClearBox({ x: o.x + o.w - PART, y: o.y, w: PART, d: o.d }),
-      h: roomH, color: col,
+    const eastC = absToClearBox({ x: o.x + o.w - PART, y: o.y, w: PART, d: o.d });
+    const southC = absToClearBox({
+      x: o.x + PART, y: o.y + o.d - PART,
+      w: Math.max(0, o.w - 2 * PART), d: PART,
     });
-    boxes.push({
-      ...absToClearBox({
-        x: o.x + PART, y: o.y + o.d - PART,
-        w: Math.max(0, o.w - 2 * PART), d: PART,
-      }),
-      h: roomH, color: col,
-    });
+    const westSpanC = absToClearBox({ x: o.x, y: o.y, w: PART, d: o.d });
+    const partH = Math.max(
+      heightToRoofForBox(eastC, roomH),
+      heightToRoofForBox(southC, roomH),
+      heightToRoofForBox(westSpanC, roomH)
+    );
 
-    // Západní příčka — výřez pro dveře
+    // Východní + jižní příčka — až pod střešní rovinu
+    boxes.push({ ...eastC, h: partH, color: col });
+    boxes.push({ ...southC, h: partH, color: col });
+
+    // Západní příčka — výřez pro dveře, zbytek až ke střeše
     const northD = op.y - o.y;
     if (northD > 0.5) {
       boxes.push({
         ...absToClearBox({ x: o.x, y: o.y, w: PART, d: northD }),
-        h: roomH, color: col,
+        h: partH, color: col,
       });
     }
     const southY = op.y + op.d;
@@ -4808,10 +4845,10 @@
     if (southD > 0.5) {
       boxes.push({
         ...absToClearBox({ x: o.x, y: southY, w: PART, d: southD }),
-        h: roomH, color: col,
+        h: partH, color: col,
       });
     }
-    const lintelH = Math.max(0, roomH - doorH);
+    const lintelH = Math.max(0, partH - doorH);
     if (lintelH > 0.5) {
       boxes.push({
         ...absToClearBox({ x: o.x, y: op.y, w: PART, d: op.d }),
@@ -4911,16 +4948,7 @@
     if (loftReachesTv) {
       partH = r.livingBottom + r.collarH + (state.showLoftDeck ? 4 : 0);
     } else {
-      // spodní líc krokví / krytiny nad rozsahem příčky (S–J)
-      let minRoof = r.ridgeH;
-      const z0 = tv.y;
-      const z1 = tv.y + tv.d;
-      for (let z = z0; z <= z1 + 0.1; z += Math.max(8, (z1 - z0) / 6)) {
-        const along = z <= r.halfSpan ? z : CLEAR.h - z;
-        const h = r.plateH + (along / r.halfSpan) * r.rise;
-        minRoof = Math.min(minRoof, h);
-      }
-      partH = Math.max(roomH, minRoof - r.rafterTh * 0.55);
+      partH = heightToRoofForBox(tv, roomH);
     }
     partH = Math.max(roomH, Math.round(partH));
     // nosná příčka
@@ -5116,22 +5144,23 @@
     const movableSet = new Set(movableXs);
 
     for (const x of xs) {
-      // Severní krokve: z = 0 → ridge, stoupá s +Z
-      boxes.push({
-        oriented: true,
-        cx: x, cy: r.plateH + r.rise / 2, cz: r.halfSpan / 2,
-        w: r.rafterW, h: r.rafterTh, d: r.rafterLen,
-        rotX: -r.pitch,
-        color: wood,
-      });
-      // Jižní krokve: z = ridge → CLEAR.h, klesá s +Z
-      boxes.push({
-        oriented: true,
-        cx: x, cy: r.plateH + r.rise / 2, cz: r.halfSpan + r.halfSpan / 2,
-        w: r.rafterW, h: r.rafterTh, d: r.rafterLen,
-        rotX: r.pitch,
-        color: wood,
-      });
+      // Krokve — skryté při „Zaklopit“ (vidět jen kleštiny / krytina)
+      if (!state.showRoofSheathing) {
+        boxes.push({
+          oriented: true,
+          cx: x, cy: r.plateH + r.rise / 2, cz: r.halfSpan / 2,
+          w: r.rafterW, h: r.rafterTh, d: r.rafterLen,
+          rotX: -r.pitch,
+          color: wood,
+        });
+        boxes.push({
+          oriented: true,
+          cx: x, cy: r.plateH + r.rise / 2, cz: r.halfSpan + r.halfSpan / 2,
+          w: r.rafterW, h: r.rafterTh, d: r.rafterLen,
+          rotX: r.pitch,
+          color: wood,
+        });
+      }
 
       // Kleština mezi párem krokví — pohyblivé jen vybraný počet od západu
       const movable = movableSet.has(x);
@@ -5373,15 +5402,13 @@
 
     if (state.showRoof) pushRoofStructure3d(boxes);
 
-    // před chatou — širší venkovní plocha (volnější pohyb kolem vchodu)
-    const entry = southDoorClear();
-    const outDepth = 420;
-    const outSidePad = 180;
+    // Terén kolem celé chaty — volný pohyb dokola (ne jen před vchodem)
+    const yardPad = 320;
     boxes.push({
-      x: -outSidePad,
-      y: CLEAR.h + WALL * 0.15,
-      w: CLEAR.w + outSidePad * 2,
-      d: outDepth,
+      x: -yardPad,
+      y: -yardPad,
+      w: CLEAR.w + yardPad * 2,
+      d: CLEAR.h + yardPad * 2,
       h: 1.5,
       color: "#cfd8dc",
       opacity: 0.95,
@@ -5391,9 +5418,11 @@
       roomH, clearW: CLEAR.w, clearH: CLEAR.h, boxes,
       cameras: buildView3dCameras(),
       walk: {
-        door: { x0: entry.x0, x1: entry.x1 },
-        outsideDepth: outDepth,
-        outsidePadX: outSidePad,
+        door: { x0: southDoorClear().x0, x1: southDoorClear().x1 },
+        outsidePad: yardPad,
+        // legacy fields kept for older viewer builds
+        outsideDepth: yardPad,
+        outsidePadX: yardPad,
       },
     };
   }
@@ -5450,7 +5479,7 @@
   }
 
   function syncView3dDoorToggle() {
-    for (const id of ["view3d-door-open", "view3d-door-open-side"]) {
+    for (const id of ["view3d-door-open-side"]) {
       const el = document.getElementById(id);
       if (el) el.checked = !!state.view3dDoorOpen;
     }
@@ -6111,6 +6140,8 @@
     if (roofShow) roofShow.checked = !!state.showRoof;
     const roofCover = document.getElementById("roof-covering");
     if (roofCover) roofCover.checked = !!state.showRoofCovering;
+    const roofSheathe = document.getElementById("roof-sheathe");
+    if (roofSheathe) roofSheathe.checked = !!state.showRoofSheathing;
     const loftDeck = document.getElementById("roof-loft-deck");
     if (loftDeck) loftDeck.checked = !!state.showLoftDeck;
     clampRoofControls();
@@ -6307,6 +6338,10 @@
   });
   document.getElementById("roof-covering")?.addEventListener("change", (e) => {
     state.showRoofCovering = e.target.checked;
+    render();
+  });
+  document.getElementById("roof-sheathe")?.addEventListener("change", (e) => {
+    state.showRoofSheathing = e.target.checked;
     render();
   });
   document.getElementById("roof-loft-deck")?.addEventListener("change", (e) => {
@@ -6524,7 +6559,7 @@
   }
   bindView3dPresetRoot("view3d-preset");
   bindView3dPresetRoot("view3d-preset-side");
-  for (const id of ["view3d-door-open", "view3d-door-open-side"]) {
+  for (const id of ["view3d-door-open-side"]) {
     document.getElementById(id)?.addEventListener("change", (e) => {
       setView3dDoorOpen(e.target.checked);
     });
@@ -6824,6 +6859,7 @@
     if (state.doorLeafH == null) state.doorLeafH = 190;
     if (state.showRoof == null) state.showRoof = true;
     if (state.showRoofCovering == null) state.showRoofCovering = false;
+    if (state.showRoofSheathing == null) state.showRoofSheathing = false;
     if (state.showLoftDeck == null) state.showLoftDeck = true;
     state.roofPitchDeg = 30;
     state.roofRafterSpacing = 90;

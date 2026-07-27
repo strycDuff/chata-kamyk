@@ -128,11 +128,21 @@ export function createViewer(container) {
 
   const clampHoriz = () => {
     const m = 15;
+    const pad = Math.max(0, Number(viewer.room.outsidePad) || 0);
+    let x = camera.position.x;
+    let z = camera.position.z;
+    if (pad > 0) {
+      // Volný pohyb kolem celé chaty (včetně dvorku na S/J/Z/V).
+      x = Math.min(viewer.room.w + pad - m, Math.max(-pad + m, x));
+      z = Math.min(viewer.room.d + pad - m, Math.max(-pad + m, z));
+      camera.position.x = x;
+      camera.position.z = z;
+      return;
+    }
+    // Legacy: jen před jižním vchodem
     const door = viewer.room.door;
     const outD = Math.max(0, Number(viewer.room.outsideDepth) || 0);
     const outPadX = Math.max(80, Number(viewer.room.outsidePadX) || 180);
-    let x = camera.position.x;
-    let z = camera.position.z;
     const doorPad = 35;
     const southInside = viewer.room.d - m;
     const inDoorX = door
@@ -155,7 +165,7 @@ export function createViewer(container) {
 
   const clampFlyY = () => {
     const yMin = 40;
-    const yMax = Math.max(220, (viewer.room.h || 210) + 180);
+    const yMax = Math.max(220, (viewer.room.h || 210) + 320);
     viewer.flyY = Math.min(yMax, Math.max(yMin, viewer.flyY));
     camera.position.y = viewer.flyY;
   };
@@ -308,6 +318,7 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
     d: clearD,
     h: roomH,
     door: walk.door || null,
+    outsidePad: walk.outsidePad || 0,
     outsideDepth: walk.outsideDepth || 0,
     outsidePadX: walk.outsidePadX || 0,
   };
