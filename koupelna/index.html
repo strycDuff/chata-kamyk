@@ -129,6 +129,7 @@
     color: var(--muted);
   }
   .canvas-wrap .furn-move { cursor: move; }
+  .canvas-wrap .shower-move { cursor: move; }
   .canvas-wrap .furn-se { cursor: nwse-resize; }
   .canvas-wrap .elec-point { cursor: move; }
   .canvas-wrap .elec-run { cursor: pointer; }
@@ -956,6 +957,7 @@
         <details class="side-block">
           <summary>Koupelna · sprcha</summary>
           <div class="side-block-body">
+            <label>Rychlé rozměry</label>
             <div class="row seg" id="shower-preset">
               <button type="button" data-v="80x80" class="active">80×80</button>
               <button type="button" data-v="90x90">90×90</button>
@@ -963,7 +965,7 @@
               <button type="button" data-v="120x80">120×80</button>
               <button type="button" data-v="full">Plná šířka</button>
             </div>
-            <label><input type="checkbox" id="shower-rotate"> Otočit 90°</label>
+            <label><input type="checkbox" id="shower-rotate"> Otočit 90° (prohodit Š×H)</label>
             <div id="full-depth-wrap" hidden>
               <label>Hloubka plné šířky</label>
               <div class="row seg" id="shower-full-depth">
@@ -972,6 +974,12 @@
                 <button type="button" data-v="90">90</button>
               </div>
             </div>
+            <label>Šířka vaničky (V–Z)</label>
+            <input type="number" id="shower-w" min="40" max="200" value="80" step="1">
+            <label>Hloubka vaničky (S–J)</label>
+            <input type="number" id="shower-d" min="40" max="200" value="80" step="1">
+            <p class="hint">Táhni vaničku na půdorysu (snap k příčkám). Přesah do příčky = červeně.</p>
+            <p class="hint" id="shower-hint">—</p>
           </div>
         </details>
         <details class="side-block">
@@ -1170,7 +1178,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.11.2";
+  const APP_VERSION = "3.12.0";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1332,6 +1340,10 @@
     showerPreset: "80x80",
     showerRotate: false,
     showerFullDepth: 80,
+    showerW: 80,
+    showerD: 80,
+    showerClearX: null, // clear cm — NW roh vaničky; null = výchozí JV roh koupelny
+    showerClearY: null,
     sinkW: 40,
     sinkD: 30,
     sinkOffset: 70,
@@ -2223,21 +2235,149 @@
         : `Typ A: min ${min} cm · max ${max} cm`;
     }
   }
-  function showerSize() {
-    if (state.showerPreset === "full") return { w: bathInner().w, d: state.showerFullDepth };
-    const [a, b] = state.showerPreset.split("x").map(Number);
-    return state.showerRotate ? { w: b, d: a } : { w: a, d: b };
+  const SHOWER_SNAP = 6;
+
+  function clampShowerSize() {
+    let w = Number(state.showerW);
+    let d = Number(state.showerD);
+    if (!Number.isFinite(w)) w = 80;
+    if (!Number.isFinite(d)) d = 80;
+    state.showerW = Math.min(200, Math.max(40, Math.round(w)));
+    state.showerD = Math.min(200, Math.max(40, Math.round(d)));
+    const wEl = document.getElementById("shower-w");
+    const dEl = document.getElementById("shower-d");
+    if (wEl && document.activeElement !== wEl) wEl.value = String(state.showerW);
+    if (dEl && document.activeElement !== dEl) dEl.value = String(state.showerD);
   }
-  function showerBox() {
+
+  function applyShowerPreset(preset) {
+    state.showerPreset = preset;
+    if (preset === "full") {
+      const bi = bathInner();
+      state.showerW = Math.round(bi.w);
+      state.showerD = Number(state.showerFullDepth) || 80;
+      state.showerClearX = bi.x - INNER.x;
+      state.showerClearY = bi.y + bi.d - state.showerD - INNER.y;
+    } else {
+      const [a, b] = String(preset).split("x").map(Number);
+      const w0 = Number.isFinite(a) ? a : 80;
+      const d0 = Number.isFinite(b) ? b : 80;
+      if (state.showerRotate) {
+        state.showerW = d0;
+        state.showerD = w0;
+      } else {
+        state.showerW = w0;
+        state.showerD = d0;
+      }
+    }
+    clampShowerSize();
+    ensureShowerPlacement({ resetCorner: preset === "full" });
+  }
+
+  function ensureShowerPlacement({ resetCorner = false } = {}) {
+    clampShowerSize();
     const bi = bathInner();
-    const { w, d } = showerSize();
-    const x = state.showerPreset === "full" ? bi.x : bi.x + bi.w - w;
-    return { x, y: bi.y + bi.d - d, w, d };
+    const need =
+      resetCorner ||
+      state.showerClearX == null || !Number.isFinite(Number(state.showerClearX)) ||
+      state.showerClearY == null || !Number.isFinite(Number(state.showerClearY));
+    if (need) {
+      state.showerClearX = bi.x + bi.w - state.showerW - INNER.x;
+      state.showerClearY = bi.y + bi.d - state.showerD - INNER.y;
+    }
+    // drž ve světlosti místnosti (jako nábytek)
+    state.showerClearX = Math.min(CLEAR.w - state.showerW, Math.max(0, Number(state.showerClearX)));
+    state.showerClearY = Math.min(CLEAR.h - state.showerD, Math.max(0, Number(state.showerClearY)));
   }
+
+  function showerSize() {
+    clampShowerSize();
+    return { w: state.showerW, d: state.showerD };
+  }
+
+  function showerBox() {
+    ensureShowerPlacement();
+    return {
+      x: INNER.x + state.showerClearX,
+      y: INNER.y + state.showerClearY,
+      w: state.showerW,
+      d: state.showerD,
+    };
+  }
+
   function showerClearanceBox() {
     const s = showerBox();
     return { x: s.x, y: s.y - 10, w: s.w, d: 10 };
   }
+
+  function bathPartitionBoxes() {
+    const o = bathOuter();
+    return [
+      { x: o.x, y: o.y, w: PART, d: o.d }, // Z
+      { x: o.x + o.w - PART, y: o.y, w: PART, d: o.d }, // V
+      { x: o.x + PART, y: o.y + o.d - PART, w: Math.max(0, o.w - 2 * PART), d: PART }, // J
+    ];
+  }
+
+  function showerHitsPartitions() {
+    const s = showerBox();
+    for (const part of bathPartitionBoxes()) {
+      if (aabbOverlap(s, part)) return true;
+    }
+    const tv = tvBox();
+    if (tv && aabbOverlap(s, tv)) return true;
+    return false;
+  }
+
+  function showerSnapAxes() {
+    const xs = [0, CLEAR.w];
+    const ys = [0, CLEAR.h];
+    const bi = bathInner();
+    const o = bathOuter();
+    const toC = (abs) => abs - INNER.x;
+    const toCy = (abs) => abs - INNER.y;
+    // vnitřní + vnější líce koupelnových příček
+    xs.push(toC(bi.x), toC(bi.x + bi.w), toC(o.x), toC(o.x + o.w));
+    ys.push(toCy(bi.y), toCy(bi.y + bi.d), toCy(o.y), toCy(o.y + o.d));
+    const tv = tvBox();
+    if (tv) {
+      xs.push(toC(tv.x), toC(tv.x + tv.w));
+      ys.push(toCy(tv.y), toCy(tv.y + tv.d));
+    }
+    return { xs, ys };
+  }
+
+  function snapShowerClear(x, y) {
+    const { w, d } = showerSize();
+    const { xs, ys } = showerSnapAxes();
+    let sx = x;
+    let sy = y;
+    let bestL = SHOWER_SNAP;
+    let bestR = SHOWER_SNAP;
+    let bestT = SHOWER_SNAP;
+    let bestB = SHOWER_SNAP;
+    for (const v of xs) {
+      const dl = Math.abs(x - v);
+      if (dl <= bestL) { bestL = dl; sx = v; }
+      const dr = Math.abs(x + w - v);
+      if (dr <= bestR) { bestR = dr; sx = v - w; }
+    }
+    for (const v of ys) {
+      const dt = Math.abs(y - v);
+      if (dt <= bestT) { bestT = dt; sy = v; }
+      const db = Math.abs(y + d - v);
+      if (db <= bestB) { bestB = db; sy = v - d; }
+    }
+    return {
+      x: Math.min(CLEAR.w - w, Math.max(0, sx)),
+      y: Math.min(CLEAR.h - d, Math.max(0, sy)),
+    };
+  }
+
+  function showerFits() {
+    return !showerHitsPartitions();
+  }
+
   function sinkBox() {
     const bi = bathInner();
     return {
@@ -2280,7 +2420,7 @@
     if (!aabbOverlap(wc, bi)) {
       issues.push({ level: "bad", msg: "Fixní WC je mimo světlý prostor koupelny (posuň příčky)." });
     }
-    if (!showerFits()) issues.push({ level: "bad", msg: "Sprcha se nevejde do světlého prostoru." });
+    if (!showerFits()) issues.push({ level: "bad", msg: "Sprcha zasahuje do příčky." });
     if (aabbOverlap(openingPassage, wcPassage) || aabbOverlap(openingPassage, wc)) {
       issues.push({ level: "bad", msg: "Průchod dveří koliduje s prostorem WC." });
     }
@@ -2586,7 +2726,7 @@
       aabbOverlap(openingPassage, sh) ||
       aabbOverlap(openingPassage, shClear)
     );
-    const badShower = detail && !showerFits();
+    const badShower = detail && showerHitsPartitions();
 
     g.appendChild(el("rect", {
       x: op.x - 0.5, y: op.y, width: PART + 1, height: op.d, fill: "#ffffff",
@@ -2610,17 +2750,39 @@
     g.appendChild(el("rect", {
       x: shClear.x, y: shClear.y, width: shClear.w, height: shClear.d,
       fill: "rgba(39,174,96,0.08)", stroke: "#27ae60", "stroke-dasharray": "4,4",
+      "pointer-events": "none",
     }));
+    const shFill = badShower ? "rgba(192,57,43,0.28)" : "rgba(0,168,255,0.14)";
+    const shStroke = badShower ? "#c0392b" : "#2980b9";
     g.appendChild(el("rect", {
+      class: state.tab === "cabin" ? "shower-move" : null,
+      "data-shower": state.tab === "cabin" ? "move" : null,
       x: sh.x, y: sh.y, width: sh.w, height: sh.d,
-      fill: badShower ? "rgba(192,57,43,0.2)" : "rgba(0,168,255,0.12)",
-      stroke: badShower ? "var(--bad)" : "#2980b9", "stroke-width": 1.5, rx: 2,
+      fill: shFill,
+      stroke: shStroke, "stroke-width": 1.6, rx: 2,
     }));
     // odtok sprchy
     g.appendChild(el("circle", {
       cx: sh.x + sh.w / 2, cy: sh.y + sh.d / 2, r: 4,
-      fill: "none", stroke: "#2980b9", "stroke-width": 1,
+      fill: "none", stroke: shStroke, "stroke-width": 1,
+      "pointer-events": "none",
     }));
+    const shLab = el("text", {
+      x: sh.x + sh.w / 2, y: sh.y + sh.d / 2 - 8,
+      fill: badShower ? "#c0392b" : "#1a5276",
+      "font-size": 9, "font-family": PLAN_FONT,
+      "text-anchor": "middle", "pointer-events": "none",
+    });
+    shLab.textContent = "Sprcha";
+    g.appendChild(shLab);
+    const shDim = el("text", {
+      x: sh.x + sh.w / 2, y: sh.y + sh.d / 2 + 6,
+      fill: badShower ? "#c0392b" : "#2980b9",
+      "font-size": 9, "font-family": PLAN_FONT,
+      "text-anchor": "middle", "pointer-events": "none",
+    });
+    shDim.textContent = `${Math.round(sh.w)}×${Math.round(sh.d)}`;
+    g.appendChild(shDim);
 
     g.appendChild(el("rect", {
       x: wc.x, y: wc.y, width: wc.w, height: wc.d,
@@ -3809,6 +3971,14 @@
     const outer = bedOuterSize();
     document.getElementById("bed-hint").textContent =
       `Matrace ${state.bedVariant}×${BED_LEN} · rám ${round1(outer.w)}×${round1(outer.d)} · mezera k příčce ${round1(gap)} cm`;
+    const sh = showerBox();
+    const shHit = showerHitsPartitions();
+    const showerHint = document.getElementById("shower-hint");
+    if (showerHint) {
+      showerHint.textContent = shHit
+        ? `Vanička ${Math.round(sh.w)}×${Math.round(sh.d)} cm — zasahuje do příčky`
+        : `Vanička ${Math.round(sh.w)}×${Math.round(sh.d)} cm · táhni na půdorysu`;
+    }
     const fit = tvFits(state.tvVariant);
     document.getElementById("tv-hint").textContent = fit.overflow
       ? `${state.tvVariant}" = ${fit.need} cm — přesah ${round1(-fit.margin)} cm / strana`
@@ -3825,6 +3995,8 @@
     clampSink();
     clampKitchen();
     clampBedOuter();
+    clampShowerSize();
+    ensureShowerPlacement();
     clampDoorOffset();
     state.doorOpeningH = Math.min(state.roomClearH, state.doorOpeningH);
     state.doorLeafH = Math.min(state.doorOpeningH, state.doorLeafH);
@@ -3997,6 +4169,13 @@
         x1: Math.min(INNER.x + INNER.w, Math.max(INNER.x, p.x)),
         y1: Math.min(INNER.y + INNER.h, Math.max(INNER.y, p.y)),
       };
+      render();
+      return;
+    }
+    if (d.type === "shower-move") {
+      const snapped = snapShowerClear(d.origX + dx, d.origY + dy);
+      state.showerClearX = snapped.x;
+      state.showerClearY = snapped.y;
       render();
       return;
     }
@@ -4193,6 +4372,18 @@
     }
 
     const target = evt.target.closest("[data-drag]");
+    const showerEl = evt.target.closest("[data-shower]");
+    if (showerEl && state.tab === "cabin" && !state.measureMode) {
+      ensureShowerPlacement();
+      state.drag = {
+        type: "shower-move",
+        start: p,
+        origX: state.showerClearX,
+        origY: state.showerClearY,
+      };
+      evt.preventDefault();
+      return;
+    }
     if (target && state.tab === "cabin" && !state.measureMode) {
       state.drag = {
         type: target.getAttribute("data-drag"),
@@ -4463,10 +4654,36 @@
   bindSeg("pocket-dir", "pocketDir");
   bindSeg("shower-preset", "showerPreset", (v) => v, () => {
     document.getElementById("full-depth-wrap").hidden = state.showerPreset !== "full";
+    applyShowerPreset(state.showerPreset);
   });
-  bindSeg("shower-full-depth", "showerFullDepth", Number);
+  bindSeg("shower-full-depth", "showerFullDepth", Number, () => {
+    if (state.showerPreset === "full") applyShowerPreset("full");
+  });
   document.getElementById("shower-rotate").addEventListener("change", (e) => {
-    state.showerRotate = e.target.checked; render();
+    state.showerRotate = e.target.checked;
+    const w = state.showerW;
+    state.showerW = state.showerD;
+    state.showerD = w;
+    clampShowerSize();
+    ensureShowerPlacement();
+    render();
+  });
+  const showerWEl = document.getElementById("shower-w");
+  const showerDEl = document.getElementById("shower-d");
+  const onShowerSizeInput = () => {
+    state.showerW = Number(showerWEl?.value);
+    state.showerD = Number(showerDEl?.value);
+    clampShowerSize();
+    ensureShowerPlacement();
+    render();
+  };
+  showerWEl?.addEventListener("change", onShowerSizeInput);
+  showerDEl?.addEventListener("change", onShowerSizeInput);
+  showerWEl?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); onShowerSizeInput(); }
+  });
+  showerDEl?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); onShowerSizeInput(); }
   });
   bindRange("sink-w", "sinkW", "sink-w-val");
   bindRange("sink-d", "sinkD", "sink-d-val");
@@ -4865,6 +5082,21 @@
       state.bedOuterD = BED_LEN + 2 * Number(state.bedFrameOffset || 2.5);
     }
     clampBedOuter();
+    // sprcha: migrace z presetu / výchozí pozice
+    if (state.showerW == null || !Number.isFinite(Number(state.showerW))) {
+      if (state.showerPreset === "full") {
+        state.showerW = Math.round(bathInner().w);
+        state.showerD = Number(state.showerFullDepth) || 80;
+      } else {
+        const [a, b] = String(state.showerPreset || "80x80").split("x").map(Number);
+        const w0 = Number.isFinite(a) ? a : 80;
+        const d0 = Number.isFinite(b) ? b : 80;
+        state.showerW = state.showerRotate ? d0 : w0;
+        state.showerD = state.showerRotate ? w0 : d0;
+      }
+    }
+    clampShowerSize();
+    ensureShowerPlacement();
     state.furnitureLayers = normalizeFurnitureLayers(furnitureLayers);
     state.furnSelectedId = state.furnitureLayers[0]?.id || null;
     state.furnMode = null;
