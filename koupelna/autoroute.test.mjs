@@ -1,6 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { projectPointToWalls, buildWallGraph, shortestPath } from "./autoroute.mjs";
+import {
+  projectPointToWalls,
+  buildWallGraph,
+  shortestPath,
+  pickTrunkSlot,
+  proposeRoute,
+} from "./autoroute.mjs";
 
 const CLEAR = { w: 906, h: 333 };
 const walls = [
@@ -25,5 +31,31 @@ describe("shortestPath", () => {
     assert.ok(path.length >= 2);
     assert.equal(path[0].wall, "north");
     assert.equal(path[path.length - 1].wall, "east");
+  });
+});
+
+describe("pickTrunkSlot", () => {
+  it("picks first free power slot", () => {
+    assert.equal(pickTrunkSlot("sockets", [12, 16]), 20);
+  });
+  it("uses ~200 for data", () => {
+    assert.equal(pickTrunkSlot("data", [200]), 200);
+  });
+});
+
+describe("proposeRoute", () => {
+  it("builds trunk from panel to one socket with stub height", () => {
+    const route = proposeRoute({
+      kind: "sockets",
+      walls,
+      panel: { x: 548, y: 2 },
+      points: [{ id: "p1", x: 200, y: 5, h: 30 }],
+      occupiedSlots: [],
+    });
+    assert.equal(route.trunkH, 12);
+    assert.equal(route.cableType, "cyky25");
+    assert.ok(route.points.length >= 2);
+    assert.deepEqual(route.pointIds, ["p1"]);
+    assert.equal(route.status, "draft");
   });
 });

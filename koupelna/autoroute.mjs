@@ -145,3 +145,102 @@ export function shortestPath(graph, from, to) {
     return { wall: n.wall, along: n.along };
   });
 }
+
+export const POWER_SLOTS = [12, 16, 20, 24];
+export const DATA_TRUNK_H = 200;
+export const KIND_CABLE = { sockets: "cyky25", lights: "cyky15", data: "slaboproud" };
+
+/** @param {"sockets"|"lights"|"data"} kind @param {number[]} [occupiedPowerSlots] */
+export function pickTrunkSlot(kind, occupiedPowerSlots = [], occupiedData = false) {
+  if (kind === "data") return DATA_TRUNK_H;
+  for (const s of POWER_SLOTS) {
+    if (!occupiedPowerSlots.includes(s)) return s;
+  }
+  return POWER_SLOTS[POWER_SLOTS.length - 1];
+}
+
+/** @param {WallPos[]} points */
+function dedupeConsecutive(points) {
+  if (points.length === 0) return [];
+  /** @type {WallPos[]} */
+  const out = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    const prev = out[out.length - 1];
+    const cur = points[i];
+    if (prev.wall !== cur.wall || prev.along !== cur.along) out.push(cur);
+  }
+  return out;
+}
+
+/**
+ * @param {{
+ *   kind: string,
+ *   walls: WallSeg[],
+ *   panel: { x: number, y: number },
+ *   points: { id: string, x: number, y: number, h: number }[],
+ *   occupiedSlots: number[],
+ * }} opts
+ */
+export function proposeRoute({ kind, walls, panel, points, occupiedSlots }) {
+  const cableType = KIND_CABLE[kind] || "cyky25";
+  const trunkH = pickTrunkSlot(kind, occupiedSlots);
+  const graph = buildWallGraph(walls);
+  const panelPos = projectPointToWalls(panel, walls);
+  const targets = points.map((p) => ({
+    id: p.id,
+    pos: projectPointToWalls(p, walls),
+    h: p.h,
+  }));
+
+  if (targets.length === 0) {
+    return {
+      cableType,
+      trunkH,
+      points: [{ wall: panelPos.wall, along: panelPos.along, h: trunkH }],
+      pointIds: [],
+      status: "draft",
+    };
+  }
+
+  const sorted = [...targets].sort((a, b) => {
+    const pa = shortestPath(graph, panelPos, a.pos);
+    const pb = shortestPath(graph, panelPos, b.pos);
+    return pa.length - pb.length;
+  });
+
+  /** @type {WallPos[]} */
+  let polyline = shortestPath(graph, panelPos, sorted[0].pos);
+
+  for (let i = 1; i < sorted.length; i++) {
+    const target = sorted[i];
+    /** @type {WallPos[] | null} */
+    let bestPath = null;
+    let bestLen = Infinity;
+
+    for (const node of polyline) {
+      const path = shortestPath(graph, node, target.pos);
+      if (path.length < bestLen) {
+        bestLen = path.length;
+        bestPath = path;
+      }
+    }
+
+    if (bestPath) {
+      const last = polyline[polyline.length - 1];
+      const startIdx =
+        last.wall === bestPath[0].wall && last.along === bestPath[0].along ? 1 : 0;
+      polyline = polyline.concat(bestPath.slice(startIdx));
+    }
+  }
+
+  polyline = dedupeConsecutive(polyline);
+  const routePoints = polyline.map((p) => ({ wall: p.wall, along: p.along, h: trunkH }));
+
+  return {
+    cableType,
+    trunkH,
+    points: routePoints,
+    pointIds: points.map((p) => p.id),
+    status: "draft",
+  };
+}
