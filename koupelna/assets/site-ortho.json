@@ -1,0 +1,11 @@
+{
+  "lat": 50.558394,
+  "lon": 14.080436,
+  "zoom": 19,
+  "halfExtentM": 100,
+  "metersPerPixel": 0.18968668931962993,
+  "imageSizePx": 1054,
+  "northWallBearingDeg": 343,
+  "source": "Esri World Imagery tiles",
+  "attribution": "Esri, Maxar, Earthstar Geographics, and the GIS User Community"
+}

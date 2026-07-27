@@ -197,6 +197,56 @@ function applyUvRepeat(map, kind, sx, sy) {
   return mx;
 }
 
+const ORTHO_URL = new URL("./assets/site-ortho.jpg", import.meta.url).href;
+let orthoTexPromise = null;
+
+function loadOrthoTexture() {
+  if (!orthoTexPromise) {
+    orthoTexPromise = new Promise((resolve, reject) => {
+      const loader = new THREE.TextureLoader();
+      loader.load(
+        ORTHO_URL,
+        (tex) => {
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.anisotropy = 4;
+          tex.wrapS = THREE.ClampToEdgeWrapping;
+          tex.wrapT = THREE.ClampToEdgeWrapping;
+          tex.userData.cached = true;
+          resolve(tex);
+        },
+        undefined,
+        reject
+      );
+    });
+  }
+  return orthoTexPromise;
+}
+
+/**
+ * Ortofoto pod chatou. Textura je north-up; local −Z = „severní“ stěna plánu.
+ * northWallBearingDeg = zeměpisný azimut vnější normály severní stěny.
+ */
+function addSiteOrtho(group, { clearW, clearD, halfExtentM = 100, northWallBearingDeg = 343, map }) {
+  const halfCm = halfExtentM * 100;
+  const size = halfCm * 2;
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(size, size),
+    new THREE.MeshStandardMaterial({
+      map,
+      roughness: 1,
+      metalness: 0,
+      color: "#ffffff",
+    })
+  );
+  mesh.rotation.x = -Math.PI / 2;
+  // North-up textura: +V → −Z po rotaci. Local −Z má mířit na bearing; true N = 0°.
+  // Otočení scény podkladu: +(360 - bearing) ° → true N není v −Z, ale −Z = bearing.
+  mesh.rotation.y = THREE.MathUtils.degToRad(360 - northWallBearingDeg);
+  mesh.position.set(clearW / 2, -1.5, clearD / 2);
+  mesh.receiveShadow = true;
+  group.add(mesh);
+}
+
 function mat(color, opts = {}) {
   const m = new THREE.MeshStandardMaterial({
     color,
@@ -586,7 +636,7 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
     floor: !!spec.textures?.floor,
     furniture: !!spec.textures?.furniture,
     covering: !!spec.textures?.covering,
-    yard: !!spec.textures?.floor, // yard uses floor toggle
+    yard: !!spec.textures?.floor,
   };
   viewer.room = {
     w: clearW,
@@ -604,16 +654,25 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
   const lampY = Math.min(175, Math.max(150, roomH - 40));
   const lampsOn = spec.interiorLights !== false;
   if (lamps[0]) {
-    // obývací zóna (západ)
     lamps[0].position.set(clearW * 0.22, lampY, clearD * 0.55);
     lamps[0].intensity = lampsOn ? (lamps[0].userData.baseIntensity || 2200) : 0;
     lamps[0].visible = true;
   }
   if (lamps[1]) {
-    // východ u linky / koupelny
     lamps[1].position.set(clearW * 0.78, lampY, clearD * 0.45);
     lamps[1].intensity = lampsOn ? (lamps[1].userData.baseIntensity || 1600) : 0;
     lamps[1].visible = true;
+  }
+
+  const ortho = spec.siteOrtho;
+  if (ortho?.enabled && ortho.map) {
+    addSiteOrtho(viewer.root, {
+      clearW,
+      clearD,
+      halfExtentM: ortho.halfExtentM,
+      northWallBearingDeg: ortho.northWallBearingDeg,
+      map: ortho.map,
+    });
   }
 
   addBox(viewer.root, {
@@ -631,6 +690,21 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
   }
 
   if (applyCamera) setCameraView(viewer, viewer.preset || "sofa");
+}
+
+export function loadSiteOrthoTexture() {
+  return loadOrthoTexture();
+}
+
+/** Ensure ortho texture is loaded when enabled; returns texture or null. */
+export async function ensureSiteOrtho(spec) {
+  if (!spec?.siteOrtho?.enabled) return null;
+  try {
+    return await loadOrthoTexture();
+  } catch (err) {
+    console.warn("site ortho load failed", err);
+    return null;
+  }
 }
 
 export function dispose(viewer) {

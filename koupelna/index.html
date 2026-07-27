@@ -1260,6 +1260,8 @@
             <div class="side-block-body">
               <label class="chk"><input type="checkbox" id="view3d-door-open-side"> Dveře koupelny otevřené</label>
               <label class="chk"><input type="checkbox" id="view3d-lamps" checked> Interiérové lampy</label>
+              <label class="chk"><input type="checkbox" id="view3d-ortho"> Podklad mapa (satelit)</label>
+              <p class="hint">Esri World Imagery · střed chaty · severní stěna ≈ 343°. Attribution: Esri/Maxar.</p>
             </div>
           </details>
 
@@ -1335,7 +1337,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.20.1";
+  const APP_VERSION = "3.21.0";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1507,6 +1509,7 @@
     showDims: true,
     view3dDoorOpen: false,
     showInteriorLights: true,
+    showSiteOrtho: false,
     showRoof: true,
     showRoofCovering: false,
     showRoofSheathing: false, // zaklopit = bílá deska na spodním líci krokví
@@ -5564,18 +5567,20 @@
 
     if (state.showRoof) pushRoofStructure3d(boxes);
 
-    // Terén kolem celé chaty — volný pohyb dokola (ne jen před vchodem)
-    const yardPad = 320;
-    boxes.push({
-      x: -yardPad,
-      y: -yardPad,
-      w: CLEAR.w + yardPad * 2,
-      d: CLEAR.h + yardPad * 2,
-      h: 1.5,
-      color: "#cfd8dc",
-      opacity: 0.95,
-      matKind: "yard",
-    });
+    // Terén — šedý pad jen bez satelitního podkladu
+    const yardPad = state.showSiteOrtho ? 10000 : 320; // ortho half 100 m
+    if (!state.showSiteOrtho) {
+      boxes.push({
+        x: -yardPad,
+        y: -yardPad,
+        w: CLEAR.w + yardPad * 2,
+        d: CLEAR.h + yardPad * 2,
+        h: 1.5,
+        color: "#cfd8dc",
+        opacity: 0.95,
+        matKind: "yard",
+      });
+    }
 
     return {
       roomH, clearW: CLEAR.w, clearH: CLEAR.h, boxes,
@@ -5588,6 +5593,15 @@
         covering: !!state.texCovering,
       },
       interiorLights: !!state.showInteriorLights,
+      siteOrtho: state.showSiteOrtho
+        ? {
+            enabled: true,
+            halfExtentM: 100,
+            northWallBearingDeg: 343,
+            lat: 50.558394,
+            lon: 14.080436,
+          }
+        : { enabled: false },
       walk: {
         door: { x0: southDoorClear().x0, x1: southDoorClear().x1 },
         outsidePad: yardPad,
@@ -5617,7 +5631,12 @@
       wrap.appendChild(view3dViewer.renderer.domElement);
     }
     view3dViewer.preset = view3dPreset;
-    mod.rebuild(view3dViewer, buildView3dSpec(), { applyCamera: first || !view3dMountedOnce });
+    const spec = buildView3dSpec();
+    if (spec.siteOrtho?.enabled) {
+      const map = await mod.ensureSiteOrtho(spec);
+      if (map) spec.siteOrtho.map = map;
+    }
+    mod.rebuild(view3dViewer, spec, { applyCamera: first || !view3dMountedOnce });
     view3dMountedOnce = true;
     syncView3dPresetButtons();
     syncView3dDoorToggle();
@@ -5656,6 +5675,8 @@
     }
     const lamps = document.getElementById("view3d-lamps");
     if (lamps) lamps.checked = state.showInteriorLights !== false;
+    const ortho = document.getElementById("view3d-ortho");
+    if (ortho) ortho.checked = !!state.showSiteOrtho;
   }
 
   function setView3dDoorOpen(open) {
@@ -6783,6 +6804,10 @@
     state.showInteriorLights = e.target.checked;
     render();
   });
+  document.getElementById("view3d-ortho")?.addEventListener("change", (e) => {
+    state.showSiteOrtho = e.target.checked;
+    render();
+  });
 
   // Variants
   function loadVariants() {
@@ -7086,6 +7111,7 @@
     if (state.texFurniture == null) state.texFurniture = false;
     if (state.texCovering == null) state.texCovering = false;
     if (state.showInteriorLights == null) state.showInteriorLights = true;
+    if (state.showSiteOrtho == null) state.showSiteOrtho = false;
     state.roofPitchDeg = 30;
     state.roofRafterSpacing = 90;
     if (state.livingCollarBottom == null || state.livingCollarBottom > 228) {
