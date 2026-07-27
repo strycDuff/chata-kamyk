@@ -707,6 +707,32 @@
     border-color: var(--accent);
     background: #e8eef3;
   }
+  .view3d-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 8px 12px;
+    background: #fff;
+    border-bottom: 1px solid var(--line);
+    flex: 0 0 auto;
+    z-index: 2;
+  }
+  .view3d-bar[hidden] { display: none !important; }
+  .view3d-bar .seg { margin: 0; }
+  .canvas-wrap.view3d-host {
+    padding: 0;
+    display: flex;
+  }
+  .canvas-wrap.view3d-host canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: none;
+    border: 0;
+    flex: 1;
+    min-height: calc(100vh - 160px);
+  }
   .canvas-wrap {
     min-height: 0;
     flex: 1;
@@ -878,6 +904,7 @@
         <button type="button" data-tab="cabin" class="active">1 · Půdorys</button>
         <button type="button" data-tab="furniture">2 · Nábytek</button>
         <button type="button" data-tab="electro">3 · Elektro</button>
+        <button type="button" data-tab="view3d">4 · 3D</button>
       </div>
       <button type="button" class="icon-btn" id="btn-measure" title="Měřit vzdálenost" aria-label="Měřit vzdálenost">📏</button>
       <button type="button" class="icon-btn" id="btn-measure-reset" title="Reset měření" aria-label="Reset měření">↺</button>
@@ -904,6 +931,15 @@
             <label class="chk"><input type="checkbox" data-wall="south"> <span class="elec-ico">↓</span> Jih</label>
             <label class="chk"><input type="checkbox" data-wall="west"> <span class="elec-ico">←</span> Západ</label>
           </div>
+        </div>
+        <div class="view3d-bar" id="view3d-bar" hidden>
+          <span class="elev-wall-bar-label">3D pohled</span>
+          <div class="row seg" id="view3d-preset">
+            <button type="button" data-v="iso" class="active">Izometrie</button>
+            <button type="button" data-v="sv">SV</button>
+            <button type="button" data-v="jv">JV</button>
+          </div>
+          <span class="hint" style="margin:0">Orbit myší · scroll zoom · bez editace</span>
         </div>
         <div class="canvas-wrap" id="canvas-wrap"></div>
       </div>
@@ -1133,7 +1169,7 @@
         </div>
 
         <div id="panel-furniture" hidden>
-          <p class="hint">Obdélníky jen ve světlosti. V seznamu upravíš název i Š×H. Kolize = červená (povolené). Zobrazit/skrýt: checkbox „Ostatní nábytek“.</p>
+          <p class="hint">Obdélníky jen ve světlosti. Š×Hl = půdorys, <strong>V</strong> = výška do 3D (default 75 cm). Kolize = červená.</p>
           <button type="button" class="btn" id="btn-furn-add" style="width:100%;margin-bottom:8px">+ Nová vrstva</button>
           <div class="row" style="margin-bottom:8px">
             <button type="button" class="btn" id="btn-furn-draw">Kreslit tahem</button>
@@ -1146,10 +1182,23 @@
             <input type="number" id="furn-form-w" min="20" max="900" value="60" step="1">
             <label>Hloubka S–J (cm)</label>
             <input type="number" id="furn-form-d" min="20" max="300" value="120" step="1">
+            <label>Výška (cm)</label>
+            <input type="number" id="furn-form-h" min="10" max="280" value="75" step="1">
             <button type="button" class="btn" id="btn-furn-create" style="width:100%;margin-top:8px">Vytvořit a umístit</button>
           </div>
           <p class="hint" id="furn-mode-hint"></p>
           <ul class="furn-list" id="furn-list"></ul>
+        </div>
+
+        <div id="panel-view3d" hidden>
+          <p class="hint">Jen prohlížení. Upravuj půdorys / nábytek v jiných tabech — 3D se přestaví samo.</p>
+          <p class="hint">Výšky vestavěných kusů jsou defaulty (postel 45, linka 86…). U „Ostatní nábytek“ nastav <strong>V</strong> ve tabu Nábytek.</p>
+          <label>Kamera</label>
+          <div class="row seg" id="view3d-preset-side">
+            <button type="button" data-v="iso" class="active">Izometrie</button>
+            <button type="button" data-v="sv">SV</button>
+            <button type="button" data-v="jv">JV</button>
+          </div>
         </div>
       </aside>
     </div>
@@ -1178,7 +1227,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.12.1";
+  const APP_VERSION = "3.13.0";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1279,6 +1328,17 @@
 
   const STORAGE_KEY = "chata-kamyk-planner-variants-v9";
   const FURN_MIN = 20;
+  const FURN_DEFAULT_H = 75;
+  const VIEW3D_H = {
+    bed: 45,
+    mattress: 20,
+    kitchen: 86,
+    shower: 5,
+    wc: 40,
+    sink: 85,
+    sofa: 80,
+    partition: null, // roomClearH
+  };
   const ELEC_TYPES = ["socket", "switch", "light", "panel"];
   const ELEC_LABELS = { socket: "Zásuvka", switch: "Vypínač", light: "Světlo", panel: "Rozvaděč" };
   const ELEC_DEFAULT_H = { socket: 30, switch: 120, light: 210, panel: 150 };
@@ -1415,6 +1475,9 @@
     layer.d = Math.min(CLEAR.h, Math.max(FURN_MIN, layer.d));
     layer.x = Math.min(CLEAR.w - layer.w, Math.max(0, layer.x));
     layer.y = Math.min(CLEAR.h - layer.d, Math.max(0, layer.y));
+    let h = Number(layer.h);
+    if (!Number.isFinite(h)) h = FURN_DEFAULT_H;
+    layer.h = Math.min(state.roomClearH || 280, Math.max(10, Math.round(h)));
     return layer;
   }
 
@@ -1457,7 +1520,7 @@
     if (cb) cb.checked = true;
   }
 
-  function addFurnitureLayer({ name, x, y, w, d }) {
+  function addFurnitureLayer({ name, x, y, w, d, h }) {
     ensureFurnitureVisible();
     const layer = clampFurnLayer({
       id: newFurnId(),
@@ -1466,6 +1529,7 @@
       y: y ?? 40,
       w: w ?? 60,
       d: d ?? 120,
+      h: h ?? FURN_DEFAULT_H,
     });
     state.furnitureLayers.push(layer);
     state.furnSelectedId = layer.id;
@@ -2899,18 +2963,18 @@
       name.addEventListener("click", (e) => e.stopPropagation());
       const dims = document.createElement("div");
       dims.className = "furn-dims";
-      const mkNum = (labelText, key, max) => {
+      const mkNum = (labelText, key, max, minV) => {
         const lab = document.createElement("label");
         lab.append(document.createTextNode(labelText));
         const inp = document.createElement("input");
         inp.type = "number";
-        inp.min = String(FURN_MIN);
+        inp.min = String(minV ?? FURN_MIN);
         inp.max = String(max);
         inp.step = "1";
         inp.value = String(Math.round(layer[key]));
         inp.addEventListener("click", (e) => e.stopPropagation());
         inp.addEventListener("change", () => {
-          layer[key] = Number(inp.value) || FURN_MIN;
+          layer[key] = Number(inp.value) || (minV ?? FURN_MIN);
           clampFurnLayer(layer);
           render();
         });
@@ -2918,7 +2982,8 @@
         return lab;
       };
       dims.appendChild(mkNum("Š", "w", CLEAR.w));
-      dims.appendChild(mkNum("H", "d", CLEAR.h));
+      dims.appendChild(mkNum("Hl", "d", CLEAR.h));
+      dims.appendChild(mkNum("V", "h", state.roomClearH || 280, 10));
       if (furnCollides(layer)) {
         const hit = document.createElement("span");
         hit.textContent = "kolize";
@@ -3993,6 +4058,179 @@
       `PR linky → JL koupelny: ${round1(pass.len)} cm (${band}; >${PASS_COMFORT} / ${PASS_TIGHT}–${PASS_COMFORT} / <${PASS_TIGHT})`;
   }
 
+  let view3dMod = null;
+  let view3dViewer = null;
+  let view3dPreset = "iso";
+
+  function absToClearBox(box) {
+    return {
+      x: box.x - INNER.x,
+      y: box.y - INNER.y,
+      w: box.w,
+      d: box.d,
+    };
+  }
+
+  function pushWallSegments(boxes, segs, wall, roomH) {
+    const sill = state.windowSillH || 90;
+    const doorH = state.doorOpeningH || 200;
+    let along = 0;
+    for (const s of segs) {
+      const len = s.l;
+      if (s.t === "wall") {
+        pushPerimeterSlab(boxes, wall, along, len, 0, roomH, "#b0bec5");
+      } else if (s.t === "win") {
+        const openH = s.kitchen ? WIN_KITCHEN_OPEN_H : WIN_OPEN_H;
+        const winSill = s.kitchen ? Math.max(sill, 111) : sill;
+        pushPerimeterSlab(boxes, wall, along, len, 0, winSill, "#b0bec5");
+        pushPerimeterSlab(boxes, wall, along, len, winSill + openH, roomH - (winSill + openH), "#b0bec5");
+        // sklo / otvor — tenký panel
+        pushPerimeterSlab(boxes, wall, along, len, winSill, openH, "#7fdbff", 0.35, true);
+      } else if (s.t === "door") {
+        pushPerimeterSlab(boxes, wall, along, len, doorH, Math.max(0, roomH - doorH), "#b0bec5");
+      }
+      along += len;
+    }
+  }
+
+  function pushPerimeterSlab(boxes, wall, along, len, y0, h, color, opacity, inset) {
+    if (h <= 0.5 || len <= 0) return;
+    const t = WALL;
+    const insetN = inset ? 1.5 : 0;
+    let box;
+    if (wall === "north") {
+      box = { x: along, y: -t + insetN, w: len, d: t - insetN, h, color, opacity, yOff: y0 };
+    } else if (wall === "south") {
+      box = { x: along, y: CLEAR.h + insetN, w: len, d: t - insetN, h, color, opacity, yOff: y0 };
+    } else if (wall === "west") {
+      box = { x: -t + insetN, y: along, w: t - insetN, d: len, h, color, opacity, yOff: y0 };
+    } else {
+      box = { x: CLEAR.w + insetN, y: along, w: t - insetN, d: len, h, color, opacity, yOff: y0 };
+    }
+    // yOff means bottom at yOff — encode by shifting into a custom field; viewer uses h from floor.
+    // Approximate: stack by creating box with bottom offset via raising center — viewer only supports floor-based.
+    // Workaround: use full-height only for solid; for upper slabs, we need elevated boxes.
+    boxes.push({
+      x: box.x,
+      y: box.y,
+      w: box.w,
+      d: box.d,
+      h: box.h,
+      color: box.color,
+      opacity: box.opacity,
+      elev: y0,
+    });
+  }
+
+  function buildView3dSpec() {
+    const roomH = state.roomClearH || 210;
+    const boxes = [];
+
+    // Perimeter with openings
+    pushWallSegments(boxes, NORTH_SEGS, "north", roomH);
+    pushWallSegments(boxes, SOUTH_SEGS, "south", roomH);
+    pushWallSegments(boxes, WEST_SEGS, "west", roomH);
+    pushWallSegments(boxes, EAST_SEGS, "east", roomH);
+
+    // Bath partitions
+    for (const p of bathPartitionBoxes()) {
+      const c = absToClearBox(p);
+      boxes.push({ ...c, h: roomH, color: "#95a5a6" });
+    }
+    // TV
+    {
+      const c = absToClearBox(tvBox());
+      boxes.push({ ...c, h: roomH, color: "#7f8c8d" });
+    }
+    // Kitchen
+    {
+      const c = absToClearBox(kitchenBox());
+      boxes.push({ ...c, h: VIEW3D_H.kitchen, color: "#27ae60" });
+    }
+    if (state.showBed) {
+      const bed = absToClearBox(bedBox());
+      boxes.push({ ...bed, h: VIEW3D_H.bed, color: "#e67e22" });
+      const mat = absToClearBox(bedMattressBox());
+      boxes.push({ ...mat, h: VIEW3D_H.mattress, color: "#f5cd79", elev: VIEW3D_H.bed - VIEW3D_H.mattress });
+    }
+    if (state.showSofa) {
+      const s = sofaPolylines();
+      for (const part of [s.west, s.north]) {
+        const c = absToClearBox(part);
+        boxes.push({ ...c, h: VIEW3D_H.sofa, color: "#95a5a6" });
+      }
+    }
+    {
+      const c = absToClearBox(showerBox());
+      boxes.push({ ...c, h: VIEW3D_H.shower, color: "#3498db" });
+    }
+    {
+      const c = absToClearBox(wcBox());
+      boxes.push({ ...c, h: VIEW3D_H.wc, color: "#ecf0f1" });
+    }
+    {
+      const c = absToClearBox(sinkBox());
+      boxes.push({ ...c, h: VIEW3D_H.sink, color: "#ecf0f1" });
+    }
+    if (state.showFurniture) {
+      for (const layer of state.furnitureLayers) {
+        clampFurnLayer(layer);
+        boxes.push({
+          x: layer.x, y: layer.y, w: layer.w, d: layer.d,
+          h: layer.h, color: furnCollides(layer) ? "#c0392b" : "#2980b9",
+        });
+      }
+    }
+
+    return { roomH, clearW: CLEAR.w, clearH: CLEAR.h, boxes };
+  }
+
+  async function ensureView3d() {
+    if (!view3dMod) {
+      view3dMod = await import("./planner3d.mjs");
+    }
+    return view3dMod;
+  }
+
+  async function mountView3d(wrap) {
+    const mod = await ensureView3d();
+    wrap.classList.add("view3d-host");
+    if (!view3dViewer) {
+      wrap.innerHTML = "";
+      view3dViewer = mod.createViewer(wrap);
+    } else if (!wrap.contains(view3dViewer.renderer.domElement)) {
+      wrap.innerHTML = "";
+      wrap.appendChild(view3dViewer.renderer.domElement);
+    }
+    view3dViewer.preset = view3dPreset;
+    mod.rebuild(view3dViewer, buildView3dSpec());
+    syncView3dPresetButtons();
+  }
+
+  function disposeView3d() {
+    if (!view3dViewer || !view3dMod) return;
+    view3dMod.dispose(view3dViewer);
+    view3dViewer = null;
+  }
+
+  function applyView3dPreset(name) {
+    view3dPreset = name === "sv" || name === "jv" ? name : "iso";
+    syncView3dPresetButtons();
+    if (view3dViewer && view3dMod) {
+      view3dMod.setPreset(view3dViewer, view3dPreset);
+    }
+  }
+
+  function syncView3dPresetButtons() {
+    for (const rootId of ["view3d-preset", "view3d-preset-side"]) {
+      const root = document.getElementById(rootId);
+      if (!root) continue;
+      root.querySelectorAll("button[data-v]").forEach((b) => {
+        b.classList.toggle("active", b.dataset.v === view3dPreset);
+      });
+    }
+  }
+
   let hoverRaf = 0;
 
   function render() {
@@ -4006,11 +4244,31 @@
     state.doorLeafH = Math.min(state.doorOpeningH, state.doorLeafH);
     syncAppMeta();
     const wrap = document.getElementById("canvas-wrap");
-    wrap.innerHTML = "";
     const showElev = state.tab === "electro" && state.elecStep === "elev";
+    const show3d = state.tab === "view3d";
     const elevBar = document.getElementById("elev-wall-bar");
+    const view3dBar = document.getElementById("view3d-bar");
     if (elevBar) elevBar.hidden = !showElev;
-    wrap.appendChild(showElev ? renderElevationView() : renderCabinView());
+    if (view3dBar) view3dBar.hidden = !show3d;
+
+    if (show3d) {
+      // keep viewer; async mount
+      mountView3d(wrap).catch((err) => {
+        wrap.classList.remove("view3d-host");
+        wrap.innerHTML = "";
+        const p = document.createElement("p");
+        p.className = "hint";
+        p.style.padding = "24px";
+        p.textContent = `3D se nepodařilo načíst: ${err.message || err}`;
+        wrap.appendChild(p);
+      });
+    } else {
+      if (view3dViewer) disposeView3d();
+      wrap.classList.remove("view3d-host");
+      wrap.innerHTML = "";
+      wrap.appendChild(showElev ? renderElevationView() : renderCabinView());
+    }
+
     const showCabinMeta = state.tab === "cabin";
     const legend = document.getElementById("legend");
     const statusEl = document.getElementById("status");
@@ -4034,16 +4292,19 @@
     document.getElementById("panel-cabin").hidden = state.tab !== "cabin";
     document.getElementById("panel-furniture").hidden = state.tab !== "furniture";
     document.getElementById("panel-electro").hidden = state.tab !== "electro";
+    const panel3d = document.getElementById("panel-view3d");
+    if (panel3d) panel3d.hidden = state.tab !== "view3d";
     const planTools = document.getElementById("elec-plan-tools");
     const elevTools = document.getElementById("elec-elev-tools");
     if (planTools) planTools.hidden = state.elecStep !== "plan";
     if (elevTools) elevTools.hidden = state.elecStep !== "elev";
     const titles = {
       cabin: ["Půdorys", "Táhni příčky · sekce v menu rozbal dle potřeby"],
-      furniture: ["Nábytek", "Vrstvy obdélníků ve světlosti · kolize = červená"],
+      furniture: ["Nábytek", "Vrstvy obdélníků ve světlosti · V = výška do 3D"],
       electro: state.elecStep === "elev"
         ? ["Elektro · pohledy", "Trasy do aktivního okruhu · strom výše"]
         : ["Elektro · půdorys", "Místnost → typ okruhu → body"],
+      view3d: ["3D", "Prohlížení · orbit · bez editace"],
     };
     const [t, sub] = titles[state.tab] || titles.cabin;
     document.getElementById("side-title").textContent = t;
@@ -4874,11 +5135,22 @@
     const name = document.getElementById("furn-form-name").value;
     const w = Number(document.getElementById("furn-form-w").value) || 60;
     const d = Number(document.getElementById("furn-form-d").value) || 120;
-    addFurnitureLayer({ name, w, d, x: 40, y: 40 });
+    const h = Number(document.getElementById("furn-form-h").value) || FURN_DEFAULT_H;
+    addFurnitureLayer({ name, w, d, h, x: 40, y: 40 });
     state.furnMode = "place";
     document.getElementById("furn-form").hidden = true;
     render();
   });
+
+  function bindView3dPresetRoot(id) {
+    document.getElementById(id)?.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-v]");
+      if (!btn) return;
+      applyView3dPreset(btn.dataset.v);
+    });
+  }
+  bindView3dPresetRoot("view3d-preset");
+  bindView3dPresetRoot("view3d-preset-side");
 
   // Variants
   function loadVariants() {
@@ -4898,7 +5170,7 @@
     return {
       ...rest,
       furnitureLayers: state.furnitureLayers.map((l) => ({
-        id: l.id, name: l.name, x: l.x, y: l.y, w: l.w, d: l.d,
+        id: l.id, name: l.name, x: l.x, y: l.y, w: l.w, d: l.d, h: l.h ?? FURN_DEFAULT_H,
       })),
       elecCircuits: state.elecCircuits.map((c) => ({
         id: c.id, kind: c.kind, name: c.name || "", room: c.room || "",
@@ -4952,6 +5224,7 @@
       y: Number(l.y) || 0,
       w: Number(l.w) || 60,
       d: Number(l.d) || 120,
+      h: Number(l.h) || FURN_DEFAULT_H,
     }));
   }
   function normalizeElecCircuits(raw) {
