@@ -4079,14 +4079,28 @@
     for (const run of state.elecElevRuns) {
       const circ = findElecCircuit(run.circuitId);
       if (circ && !kindVisible(circ.kind)) continue;
-      const pts = runPointsNorm(run).filter((p) => wallSet.has(p.wall));
-      if (pts.length < 2) continue;
-      const mapped = pts.map(toStrip).filter(Boolean);
+      const allPts = runPointsNorm(run);
+      const mapped = [];
+      for (let i = 0; i < allPts.length; i++) {
+        const p = allPts[i];
+        if (!wallSet.has(p.wall)) continue;
+        const m = toStrip(p);
+        if (!m) continue;
+        mapped.push({ ...m, origIdx: i });
+      }
       if (mapped.length < 2) continue;
       const sel = state.elecSelectedKind === "elev-run" && run.id === state.elecSelectedId;
       const isDraft = run.status === "draft";
       const color = isDraft ? ELEC_DRAFT_COLOR : (CABLE_COLORS[run.cableType] || "#e67e22");
-      const d = mapped.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" ");
+      // Only connect consecutive original waypoints — if partition points
+      // were dropped in between, start a new subpath (no false diagonal).
+      let d = "";
+      for (let i = 0; i < mapped.length; i++) {
+        const p = mapped[i];
+        const prev = mapped[i - 1];
+        const cont = prev && p.origIdx === prev.origIdx + 1;
+        d += `${cont ? "L" : "M"}${p.x},${p.y}`;
+      }
       const inActive = !state.elecActiveCircuitId || run.circuitId === state.elecActiveCircuitId;
       const rg = el("g", { opacity: inActive ? 1 : 0.22 });
       // tenký bílý podklad kvůli čitelnosti přes příčky
