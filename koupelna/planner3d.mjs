@@ -1,6 +1,7 @@
 /**
  * Planner 3D viewer — Three.js first-person POV (look around standing point).
  * Spec boxes use clear-floor cm: x→X, y→Z, h→Y (up).
+ * Optional rotX/rotY/rotZ (radians) rotate around box center after placement.
  */
 import * as THREE from "three";
 
@@ -15,7 +16,7 @@ function mat(color, opts = {}) {
   });
 }
 
-function addBox(group, { x, y, w, d, h, color, opacity, elev }) {
+function addBox(group, { x, y, w, d, h, color, opacity, elev, rotX, rotY, rotZ }) {
   if (w <= 0 || d <= 0 || h <= 0) return;
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
@@ -23,6 +24,29 @@ function addBox(group, { x, y, w, d, h, color, opacity, elev }) {
   );
   const y0 = Number(elev) || 0;
   mesh.position.set(x + w / 2, y0 + h / 2, y + d / 2);
+  if (rotX) mesh.rotation.x = rotX;
+  if (rotY) mesh.rotation.y = rotY;
+  if (rotZ) mesh.rotation.z = rotZ;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+}
+
+/**
+ * Oriented timber: center at (cx, cy, cz), local size w×h×d along local axes,
+ * then Euler YXZ rotation (radians).
+ */
+function addOrientedBox(group, { cx, cy, cz, w, h, d, color, opacity, rotX, rotY, rotZ }) {
+  if (w <= 0 || d <= 0 || h <= 0) return;
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    mat(color || "#94a3b8", { opacity })
+  );
+  mesh.position.set(cx, cy, cz);
+  mesh.rotation.order = "YXZ";
+  if (rotY) mesh.rotation.y = rotY;
+  if (rotX) mesh.rotation.x = rotX;
+  if (rotZ) mesh.rotation.z = rotZ;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   group.add(mesh);
@@ -54,7 +78,7 @@ function lookAtFromEye(viewer, eye, target) {
   // Three.js default forward is -Z; yaw/pitch in YXZ order
   viewer.look.yaw = Math.atan2(-dx, -dz);
   viewer.look.pitch = Math.atan2(dy, Math.hypot(dx, dz));
-  const lim = Math.PI * 0.45;
+  const lim = Math.PI * 0.48;
   viewer.look.pitch = Math.max(-lim, Math.min(lim, viewer.look.pitch));
   applyLook(viewer);
 }
@@ -63,7 +87,7 @@ export function createViewer(container) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#e8eef3");
 
-  const camera = new THREE.PerspectiveCamera(68, 1, 1, 5000);
+  const camera = new THREE.PerspectiveCamera(68, 1, 1, 8000);
   camera.rotation.order = "YXZ";
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -77,10 +101,10 @@ export function createViewer(container) {
   const root = new THREE.Group();
   scene.add(root);
 
-  const hemi = new THREE.HemisphereLight(0xf0f4f8, 0x8a9aaa, 0.9);
+  const hemi = new THREE.HemisphereLight(0xf0f4f8, 0x8a9aaa, 0.95);
   scene.add(hemi);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.7);
-  dir.position.set(400, 600, 200);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.75);
+  dir.position.set(400, 800, 200);
   dir.castShadow = true;
   dir.shadow.mapSize.set(1024, 1024);
   scene.add(dir);
@@ -96,28 +120,63 @@ export function createViewer(container) {
     room: { w: 906, d: 333, h: 210 },
     look: { yaw: 0, pitch: 0 },
     keys: new Set(),
+    flyY: 180,
     raf: 0,
     _ro: null,
     _drag: null,
   };
 
-  const eyeY = () => viewer.cameras?.[viewer.preset]?.eye?.y || 180;
-
-  const moveBy = (forward, strafe) => {
-    if (!forward && !strafe) return;
-    const forwardV = new THREE.Vector3();
-    camera.getWorldDirection(forwardV);
-    forwardV.y = 0;
-    if (forwardV.lengthSq() < 1e-6) forwardV.set(0, 0, -1);
-    forwardV.normalize();
-    const rightV = new THREE.Vector3().crossVectors(forwardV, new THREE.Vector3(0, 1, 0)).normalize();
-    camera.position.addScaledVector(forwardV, forward);
-    camera.position.addScaledVector(rightV, strafe);
-    camera.position.y = eyeY();
-    // drž ve světlosti místnosti
+  const clampHoriz = () => {
     const m = 15;
-    camera.position.x = Math.min(viewer.room.w - m, Math.max(m, camera.position.x));
-    camera.position.z = Math.min(viewer.room.d - m, Math.max(m, camera.position.z));
+    const door = viewer.room.door;
+    const outD = Math.max(0, Number(viewer.room.outsideDepth) || 0);
+    const outPadX = Math.max(80, Number(viewer.room.outsidePadX) || 180);
+    let x = camera.position.x;
+    let z = camera.position.z;
+    const doorPad = 35;
+    const southInside = viewer.room.d - m;
+    const inDoorX = door
+      && x >= door.x0 - doorPad
+      && x <= door.x1 + doorPad;
+    const beyondSides = x < m || x > viewer.room.w - m;
+    const isOutside = z > southInside || beyondSides;
+    if (isOutside && outD > 0) {
+      x = Math.min(viewer.room.w + outPadX - m, Math.max(-outPadX + m, x));
+      const zMin = inDoorX ? m : southInside;
+      z = Math.min(viewer.room.d + outD, Math.max(zMin, z));
+    } else {
+      x = Math.min(viewer.room.w - m, Math.max(m, x));
+      const zMax = (inDoorX && outD > 0) ? viewer.room.d + outD : southInside;
+      z = Math.min(zMax, Math.max(m, z));
+    }
+    camera.position.x = x;
+    camera.position.z = z;
+  };
+
+  const clampFlyY = () => {
+    const yMin = 40;
+    const yMax = Math.max(220, (viewer.room.h || 210) + 180);
+    viewer.flyY = Math.min(yMax, Math.max(yMin, viewer.flyY));
+    camera.position.y = viewer.flyY;
+  };
+
+  const moveBy = (forward, strafe, vertical = 0) => {
+    if (!forward && !strafe && !vertical) return;
+    if (forward || strafe) {
+      const forwardV = new THREE.Vector3();
+      camera.getWorldDirection(forwardV);
+      forwardV.y = 0;
+      if (forwardV.lengthSq() < 1e-6) forwardV.set(0, 0, -1);
+      forwardV.normalize();
+      const rightV = new THREE.Vector3().crossVectors(forwardV, new THREE.Vector3(0, 1, 0)).normalize();
+      camera.position.addScaledVector(forwardV, forward);
+      camera.position.addScaledVector(rightV, strafe);
+      clampHoriz();
+    }
+    if (vertical) {
+      viewer.flyY += vertical;
+    }
+    clampFlyY();
   };
 
   const onDown = (e) => {
@@ -138,25 +197,40 @@ export function createViewer(container) {
     const sens = 0.0045;
     viewer.look.yaw -= dx * sens;
     viewer.look.pitch -= dy * sens;
-    const lim = Math.PI * 0.45;
+    const lim = Math.PI * 0.48;
     viewer.look.pitch = Math.max(-lim, Math.min(lim, viewer.look.pitch));
     applyLook(viewer);
   };
   const onWheel = (e) => {
     e.preventDefault();
-    moveBy(-e.deltaY * 0.12, 0);
+    moveBy(-e.deltaY * 0.12, 0, 0);
   };
   const isTypingTarget = (t) =>
     t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+
+  const MOVE_KEYS = new Set([
+    "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+    "w", "W", "a", "A", "s", "S", "d", "D",
+    " ", "Control",
+  ]);
+
   const onKeyDown = (e) => {
     if (isTypingTarget(e.target)) return;
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+    // LCtrl = e.code ControlLeft; Space = " "
+    if (e.code === "ControlLeft" || e.code === "Space" || MOVE_KEYS.has(e.key)) {
       e.preventDefault();
-      viewer.keys.add(e.key);
+      if (e.code === "ControlLeft") viewer.keys.add("ControlLeft");
+      else if (e.code === "Space") viewer.keys.add("Space");
+      else viewer.keys.add(e.key.length === 1 ? e.key.toLowerCase() : e.key);
     }
   };
   const onKeyUp = (e) => {
-    viewer.keys.delete(e.key);
+    if (e.code === "ControlLeft") viewer.keys.delete("ControlLeft");
+    else if (e.code === "Space") viewer.keys.delete("Space");
+    else {
+      viewer.keys.delete(e.key);
+      if (e.key.length === 1) viewer.keys.delete(e.key.toLowerCase());
+    }
   };
 
   canvas.addEventListener("pointerdown", onDown);
@@ -179,13 +253,17 @@ export function createViewer(container) {
   const tick = () => {
     viewer.raf = requestAnimationFrame(tick);
     const speed = 4.2; // cm / frame @60fps ≈ 2.5 m/s
+    const vSpeed = 3.2;
     let fwd = 0;
     let strafe = 0;
-    if (viewer.keys.has("ArrowUp")) fwd += speed;
-    if (viewer.keys.has("ArrowDown")) fwd -= speed;
-    if (viewer.keys.has("ArrowLeft")) strafe -= speed;
-    if (viewer.keys.has("ArrowRight")) strafe += speed;
-    if (fwd || strafe) moveBy(fwd, strafe);
+    let vert = 0;
+    if (viewer.keys.has("ArrowUp") || viewer.keys.has("w")) fwd += speed;
+    if (viewer.keys.has("ArrowDown") || viewer.keys.has("s")) fwd -= speed;
+    if (viewer.keys.has("ArrowLeft") || viewer.keys.has("a")) strafe -= speed;
+    if (viewer.keys.has("ArrowRight") || viewer.keys.has("d")) strafe += speed;
+    if (viewer.keys.has("Space")) vert += vSpeed;
+    if (viewer.keys.has("ControlLeft")) vert -= vSpeed;
+    if (fwd || strafe || vert) moveBy(fwd, strafe, vert);
     renderer.render(scene, camera);
   };
   tick();
@@ -211,6 +289,7 @@ export function setCameraView(viewer, name) {
   viewer.preset = name;
   const { eye, target } = cam;
   viewer.camera.position.set(eye.x, eye.y, eye.z);
+  viewer.flyY = eye.y;
   if (cam.fov) {
     viewer.camera.fov = cam.fov;
     viewer.camera.updateProjectionMatrix();
@@ -223,7 +302,15 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
   const roomH = spec.roomH || 210;
   const clearW = spec.clearW || 906;
   const clearD = spec.clearH || 333;
-  viewer.room = { w: clearW, d: clearD, h: roomH };
+  const walk = spec.walk || {};
+  viewer.room = {
+    w: clearW,
+    d: clearD,
+    h: roomH,
+    door: walk.door || null,
+    outsideDepth: walk.outsideDepth || 0,
+    outsidePadX: walk.outsidePadX || 0,
+  };
   viewer.cameras = spec.cameras || {};
 
   addBox(viewer.root, {
@@ -232,7 +319,11 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
   });
 
   for (const b of spec.boxes || []) {
-    addBox(viewer.root, b);
+    if (b.oriented) {
+      addOrientedBox(viewer.root, b);
+    } else {
+      addBox(viewer.root, b);
+    }
   }
 
   if (applyCamera) setCameraView(viewer, viewer.preset || "sofa");
