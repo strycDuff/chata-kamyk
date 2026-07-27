@@ -73,8 +73,8 @@ export function buildWallGraph(walls) {
   };
 }
 
-/** @param {ReturnType<typeof buildWallGraph>} graph @param {WallPos} from @param {WallPos} to @returns {WallPos[]} */
-export function shortestPath(graph, from, to) {
+/** @param {ReturnType<typeof buildWallGraph>} graph @param {WallPos} from @param {WallPos} to @param {Set<string>} [forbidden] @returns {{ path: WallPos[], cost: number }} */
+function findShortestPath(graph, from, to, forbidden = new Set()) {
   const nodes = new Map(graph.nodes);
   /** @type {Map<string, { id: string, cost: number }[]>} */
   const adj = new Map();
@@ -119,6 +119,7 @@ export function shortestPath(graph, from, to) {
     if (u === endId) break;
 
     for (const { id: v, cost } of adj.get(u) ?? []) {
+      if (forbidden.has(v) && v !== endId) continue;
       const alt = (dist.get(u) ?? Infinity) + cost;
       if (alt < (dist.get(v) ?? Infinity)) {
         dist.set(v, alt);
@@ -137,13 +138,27 @@ export function shortestPath(graph, from, to) {
   }
 
   if (pathIds.length === 0 || pathIds[0] !== startId) {
-    return [{ wall: from.wall, along: from.along }, { wall: to.wall, along: to.along }];
+    const fallback = [{ wall: from.wall, along: from.along }, { wall: to.wall, along: to.along }];
+    const fallbackCost = Math.abs(from.along - to.along) || Infinity;
+    return { path: fallback, cost: fallbackCost };
   }
 
-  return pathIds.map((id) => {
-    const n = nodes.get(id);
-    return { wall: n.wall, along: n.along };
-  });
+  return {
+    path: pathIds.map((id) => {
+      const n = nodes.get(id);
+      return { wall: n.wall, along: n.along };
+    }),
+    cost: dist.get(endId) ?? Infinity,
+  };
+}
+
+/** @param {ReturnType<typeof buildWallGraph>} graph @param {WallPos} from @param {WallPos} to @returns {WallPos[]} */
+export function shortestPath(graph, from, to) {
+  return findShortestPath(graph, from, to).path;
+}
+
+function wallPosKey(p) {
+  return nodeId(p.wall, p.along);
 }
 
 export const POWER_SLOTS = [12, 16, 20, 24];
@@ -203,33 +218,48 @@ export function proposeRoute({ kind, walls, panel, points, occupiedSlots }) {
   }
 
   const sorted = [...targets].sort((a, b) => {
-    const pa = shortestPath(graph, panelPos, a.pos);
-    const pb = shortestPath(graph, panelPos, b.pos);
-    return pa.length - pb.length;
+    const ca = findShortestPath(graph, panelPos, a.pos).cost;
+    const cb = findShortestPath(graph, panelPos, b.pos).cost;
+    return ca - cb;
   });
 
   /** @type {WallPos[]} */
-  let polyline = shortestPath(graph, panelPos, sorted[0].pos);
+  let polyline = findShortestPath(graph, panelPos, sorted[0].pos).path;
 
   for (let i = 1; i < sorted.length; i++) {
     const target = sorted[i];
+    const servedKeys = new Set(sorted.slice(0, i).map((t) => wallPosKey(t.pos)));
+    let bestAttachIdx = -1;
     /** @type {WallPos[] | null} */
     let bestPath = null;
-    let bestLen = Infinity;
+    let bestCost = Infinity;
 
-    for (const node of polyline) {
-      const path = shortestPath(graph, node, target.pos);
-      if (path.length < bestLen) {
-        bestLen = path.length;
+    for (let attachIdx = 0; attachIdx < polyline.length; attachIdx++) {
+      const removed = polyline.slice(attachIdx + 1);
+      if (removed.some((p) => servedKeys.has(wallPosKey(p)))) continue;
+
+      const forbidden = new Set(polyline.map(wallPosKey));
+      forbidden.delete(wallPosKey(polyline[attachIdx]));
+
+      const { path, cost } = findShortestPath(
+        graph,
+        polyline[attachIdx],
+        target.pos,
+        forbidden
+      );
+      const merged = polyline.slice(0, attachIdx + 1).concat(path.slice(1));
+      if (merged.some((p, idx) => merged.findIndex((q) => wallPosKey(q) === wallPosKey(p)) !== idx)) {
+        continue;
+      }
+      if (cost < bestCost) {
+        bestCost = cost;
+        bestAttachIdx = attachIdx;
         bestPath = path;
       }
     }
 
-    if (bestPath) {
-      const last = polyline[polyline.length - 1];
-      const startIdx =
-        last.wall === bestPath[0].wall && last.along === bestPath[0].along ? 1 : 0;
-      polyline = polyline.concat(bestPath.slice(startIdx));
+    if (bestPath && bestAttachIdx >= 0) {
+      polyline = polyline.slice(0, bestAttachIdx + 1).concat(bestPath.slice(1));
     }
   }
 

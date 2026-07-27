@@ -43,6 +43,20 @@ describe("pickTrunkSlot", () => {
   });
 });
 
+function wallKey(p) {
+  return `${p.wall}:${Math.round(p.along * 100) / 100}`;
+}
+
+/** Each (wall, along) may appear at most once — no backtracking. */
+function assertNoBacktrack(points) {
+  const seen = new Set();
+  for (const p of points) {
+    const k = wallKey(p);
+    assert.ok(!seen.has(k), `backtrack at ${k}`);
+    seen.add(k);
+  }
+}
+
 describe("proposeRoute", () => {
   it("builds trunk from panel to one socket with stub height", () => {
     const route = proposeRoute({
@@ -57,5 +71,37 @@ describe("proposeRoute", () => {
     assert.ok(route.points.length >= 2);
     assert.deepEqual(route.pointIds, ["p1"]);
     assert.equal(route.status, "draft");
+  });
+
+  it("does not backtrack when merging two points on the same wall", () => {
+    const route = proposeRoute({
+      kind: "sockets",
+      walls,
+      panel: { x: 548, y: 2 },
+      points: [
+        { id: "p1", x: 850, y: 5, h: 30 },
+        { id: "p2", x: 100, y: 5, h: 30 },
+      ],
+      occupiedSlots: [],
+    });
+    assert.ok(route.points.length >= 2);
+    assert.deepEqual(route.pointIds, ["p1", "p2"]);
+    assertNoBacktrack(route.points);
+  });
+
+  it("does not backtrack when merging two points on different walls", () => {
+    const route = proposeRoute({
+      kind: "sockets",
+      walls,
+      panel: { x: 548, y: 2 },
+      points: [
+        { id: "p1", x: 850, y: 5, h: 30 },
+        { id: "p2", x: 900, y: 50, h: 30 },
+      ],
+      occupiedSlots: [],
+    });
+    assert.ok(route.points.length >= 2);
+    assert.deepEqual(route.pointIds, ["p1", "p2"]);
+    assertNoBacktrack(route.points);
   });
 });
