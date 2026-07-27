@@ -1238,7 +1238,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.14.0";
+  const APP_VERSION = "3.14.1";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -4213,56 +4213,115 @@
     const backT = 18;
     const seat = "#8e9eab";
     const back = "#5d6d7e";
-    // sedák L — bez překryvu rohů (z-fighting)
-    boxes.push({ ...west, h: seatH, color: seat });
+    // sedák jen před opěradly — žádný overlap s backs
+    boxes.push({
+      x: west.x + backT, y: west.y,
+      w: Math.max(1, west.w - backT), d: west.d,
+      h: seatH, color: seat,
+    });
     const northSeatW = Math.max(0, north.w - west.w);
     if (northSeatW > 1) {
       boxes.push({
-        x: west.x + west.w, y: north.y,
-        w: northSeatW, d: north.d,
+        x: west.x + west.w, y: north.y + backT,
+        w: northSeatW, d: Math.max(1, north.d - backT),
         h: seatH, color: seat,
       });
     }
-    // opěradla u stěn
+    // opěradla bez společného rohu (Z pak N)
+    const westBackD = Math.max(1, west.d - backT);
     boxes.push({
-      x: west.x, y: west.y, w: backT, d: west.d,
+      x: west.x, y: north.y + backT,
+      w: backT, d: westBackD,
       h: backH, color: back,
     });
     boxes.push({
-      x: north.x, y: north.y, w: north.w, d: backT,
+      x: north.x, y: north.y,
+      w: north.w, d: backT,
       h: backH, color: back,
     });
-    // krátká područka na konci severního ramene
+    // područka — jen nad sedákem severního ramene
     const armW = 16;
+    if (northSeatW > armW + 2) {
+      boxes.push({
+        x: north.x + north.w - armW, y: north.y + backT,
+        w: armW, d: Math.max(8, north.d - backT),
+        h: 58, color: back,
+      });
+    }
+  }
+
+  function pushTvPartition3d(boxes, roomH) {
+    const tv = absToClearBox(tvBox());
+    const struct = "#7f8c8d";
+    // nosná příčka
+    boxes.push({ ...tv, h: roomH, color: struct });
+    // obklad prkny na obývací (západní) straně: 60 cm → strop
+    const cladT = 2.2;
+    const cladFrom = 60;
+    const plank = 11;
+    const gap = 0.8;
+    let elev = cladFrom;
+    let i = 0;
+    while (elev < roomH - 0.5) {
+      const h = Math.min(plank, roomH - elev);
+      boxes.push({
+        x: tv.x - cladT, y: tv.y, w: cladT, d: tv.d,
+        h, elev,
+        color: i % 2 === 0 ? "#c4a574" : "#b08968",
+      });
+      elev += plank + gap;
+      i += 1;
+    }
+    // TV panel na obkladu (16:9), střed přibližně ve výšce očí
+    const screenAlong = Math.min(TV_WIDTHS[state.tvVariant] || 123, tv.d - 4);
+    const screenH = screenAlong * (9 / 16);
+    const screenT = 4;
+    const screenElev = Math.min(roomH - screenH - 8, Math.max(cladFrom + 8, 180 - screenH / 2));
+    const along0 = tv.y + (tv.d - screenAlong) / 2;
     boxes.push({
-      x: north.x + north.w - armW, y: north.y + backT,
-      w: armW, d: Math.max(8, north.d - backT),
-      h: 58, color: back,
+      x: tv.x - cladT - screenT, y: along0,
+      w: screenT, d: screenAlong,
+      h: screenH, elev: screenElev,
+      color: "#111111",
+    });
+    // tenký rámeček / odraz
+    boxes.push({
+      x: tv.x - cladT - screenT - 0.6, y: along0 + 2,
+      w: 0.6, d: Math.max(4, screenAlong - 4),
+      h: Math.max(4, screenH - 4), elev: screenElev + 2,
+      color: "#2c3e50", opacity: 0.85,
     });
   }
 
   function buildView3dCameras() {
+    const EYE = 180;
+    const lookY = 120;
     const s = sofaPolylines();
     const west = absToClearBox(s.west);
     const k = absToClearBox(kitchenBox());
     const op = absToClearBox(doorOpeningBox());
-    // z gauče (sedící) — výhled do místnosti / k lince
+    const tv = absToClearBox(tvBox());
+    // z gauče — stojící POV u sedací zóny, výhled k TV / středu
     const sofa = {
-      eye: { x: west.x + Math.min(70, west.w * 0.55), y: 118, z: west.y + west.d * 0.42 },
-      target: { x: CLEAR.w * 0.42, y: 95, z: CLEAR.h * 0.72 },
-      fov: 58,
+      eye: {
+        x: west.x + Math.min(85, west.w * 0.7),
+        y: EYE,
+        z: west.y + west.d * 0.45,
+      },
+      target: { x: tv.x - 30, y: lookY, z: tv.y + tv.d * 0.5 },
+      fov: 65,
     };
-    // ze dveří koupelny — ven do obýváku (mimo koupelnu, před otvorem)
+    // ze dveří koupelny — ven do obýváku
     const door = {
-      eye: { x: op.x - 55, y: 155, z: op.y + op.d * 0.5 },
-      target: { x: CLEAR.w * 0.28, y: 110, z: CLEAR.h * 0.45 },
-      fov: 60,
+      eye: { x: op.x - 50, y: EYE, z: op.y + op.d * 0.5 },
+      target: { x: CLEAR.w * 0.22, y: lookY, z: CLEAR.h * 0.4 },
+      fov: 68,
     };
-    // od lednice (u linky) — do místnosti
+    // od lednice (u linky) — do místnosti / k gauči
     const fridge = {
-      eye: { x: k.x + k.w * 0.82, y: 155, z: Math.max(20, k.y - 35) },
-      target: { x: CLEAR.w * 0.28, y: 100, z: CLEAR.h * 0.32 },
-      fov: 58,
+      eye: { x: k.x + k.w * 0.85, y: EYE, z: Math.max(25, k.y - 40) },
+      target: { x: west.x + 60, y: lookY, z: west.y + 80 },
+      fov: 65,
     };
     return { sofa, door, fridge };
   }
@@ -4279,11 +4338,8 @@
 
     // Bath partitions (+ otvor a křídlo dveří na západní příčce)
     pushBathPartitions3d(boxes, roomH);
-    // TV
-    {
-      const c = absToClearBox(tvBox());
-      boxes.push({ ...c, h: roomH, color: "#7f8c8d" });
-    }
+    // TV příčka + obklad + televize
+    pushTvPartition3d(boxes, roomH);
     // Kitchen
     {
       const c = absToClearBox(kitchenBox());
