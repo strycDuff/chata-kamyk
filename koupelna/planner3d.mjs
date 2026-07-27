@@ -2,8 +2,8 @@
  * Planner 3D viewer — Three.js + OrbitControls (CDN ESM).
  * Spec boxes use clear-floor cm: x→X, y→Z, h→Y (up).
  */
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js";
-import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/controls/OrbitControls.js";
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 function mat(color, opts = {}) {
   return new THREE.MeshStandardMaterial({
