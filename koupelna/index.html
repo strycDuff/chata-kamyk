@@ -1210,12 +1210,13 @@
             <div class="side-block-body">
               <label class="chk"><input type="checkbox" id="roof-show"> Zobrazit krov (sedlová střecha)</label>
               <label class="chk"><input type="checkbox" id="roof-loft-deck"> Podlaha loftu nad obývákem</label>
-              <label>Sklon střechy: <strong id="roof-pitch-val">35</strong>°</label>
-              <input type="range" id="roof-pitch" min="25" max="45" value="35" step="1">
-              <label>Osová vzdálenost krokví: <strong id="roof-spacing-val">90</strong> cm</label>
-              <input type="range" id="roof-spacing" min="70" max="120" value="90" step="5">
-              <label>Kleština obývák — spodní líc: <strong id="roof-living-collar-val">210</strong> cm</label>
+              <p class="hint">Fixní: sklon 30° · osová vzdálenost krokví 90 cm</p>
+              <label>Kleština — spodní líc: <strong id="roof-living-collar-val">210</strong> cm</label>
               <input type="range" id="roof-living-collar" min="190" max="260" value="210" step="1">
+              <label>Počet pohyblivých kleštin: <strong id="roof-collar-count-val">4</strong></label>
+              <input type="range" id="roof-collar-count" min="1" max="8" value="4" step="1">
+              <label>Délka loftu: <strong id="roof-loft-len-val">360</strong> cm</label>
+              <input type="range" id="roof-loft-len" min="90" max="450" value="360" step="10">
               <p class="hint" id="roof-hint">Hřeben po delší straně · krokve S–J · kleštiny jinde v polovině krokoví · nad obývákem snížené.</p>
             </div>
           </details>
@@ -1257,7 +1258,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.15.0";
+  const APP_VERSION = "3.16.0";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -1426,9 +1427,11 @@
     view3dDoorOpen: false,
     showRoof: true,
     showLoftDeck: true,
-    roofPitchDeg: 35,
-    roofRafterSpacing: 90,
-    livingCollarBottom: 210, // spodní líc kleštin nad obývákem (cm)
+    roofPitchDeg: 30, // fixní
+    roofRafterSpacing: 90, // fixní osová vzdálenost
+    livingCollarBottom: 210, // spodní líc pohyblivých kleštin (cm)
+    livingCollarCount: 4, // kolik kleštin (od Z) se posouvá výškou
+    loftLengthCm: 360, // délka loftu V–Z; default = počet × 90 cm
     doorWidth: 70,
     doorOffset: 90,
     doorType: "A",
@@ -4327,13 +4330,13 @@
   /** Parametry sedlové střechy: hřeben po delší straně (E–Z), krokve S–J. */
   function roofParams() {
     const plateH = state.roomClearH || 210;
-    const pitchDeg = Math.min(45, Math.max(20, Number(state.roofPitchDeg) || 35));
+    const pitchDeg = 30; // fixní sklon
     const pitch = (pitchDeg * Math.PI) / 180;
     const halfSpan = CLEAR.h / 2;
     const rise = halfSpan * Math.tan(pitch);
     const ridgeH = plateH + rise;
     const rafterLen = Math.hypot(halfSpan, rise);
-    const spacing = Math.min(120, Math.max(60, Number(state.roofRafterSpacing) || 90));
+    const spacing = 90; // fixní osová vzdálenost krokví
     // kleština 150×60 mm — výška × šířka
     const collarH = 15;
     const collarW = 6;
@@ -4351,14 +4354,65 @@
     };
   }
 
+  function roofRafterXs(r) {
+    const xs = [];
+    const margin = r.rafterW;
+    for (let x = margin; x <= CLEAR.w - margin + 0.1; x += r.spacing) xs.push(x);
+    if (xs.length && CLEAR.w - margin - xs[xs.length - 1] > r.spacing * 0.35) {
+      xs.push(CLEAR.w - margin);
+    }
+    if (!xs.length) xs.push(CLEAR.w / 2);
+    return xs;
+  }
+
+  function livingCollarCandidates(r, xs = roofRafterXs(r)) {
+    return xs.filter((x) => x <= r.livingX1 + r.spacing * 0.55);
+  }
+
+  function loftLengthFromCollarCount(count, spacing = 90) {
+    const n = Math.max(1, Math.round(Number(count) || 1));
+    return n * spacing;
+  }
+
+  function clampRoofControls() {
+    const r = roofParams();
+    const candidates = livingCollarCandidates(r);
+    const maxCount = Math.max(1, candidates.length);
+    let count = Math.round(Number(state.livingCollarCount) || maxCount);
+    count = Math.min(maxCount, Math.max(1, count));
+    state.livingCollarCount = count;
+    const maxLoft = Math.max(r.spacing, Math.min(r.livingX1, maxCount * r.spacing));
+    const minLoft = r.spacing;
+    let loft = Number(state.loftLengthCm);
+    if (!Number.isFinite(loft) || loft <= 0) loft = loftLengthFromCollarCount(count, r.spacing);
+    state.loftLengthCm = Math.min(maxLoft, Math.max(minLoft, Math.round(loft / 10) * 10));
+    const countEl = document.getElementById("roof-collar-count");
+    if (countEl) {
+      countEl.max = String(maxCount);
+      countEl.value = String(count);
+    }
+    const countLab = document.getElementById("roof-collar-count-val");
+    if (countLab) countLab.textContent = String(count);
+    const loftEl = document.getElementById("roof-loft-len");
+    if (loftEl) {
+      loftEl.min = String(minLoft);
+      loftEl.max = String(Math.max(minLoft, Math.floor(maxLoft / 10) * 10));
+      loftEl.value = String(state.loftLengthCm);
+    }
+    const loftLab = document.getElementById("roof-loft-len-val");
+    if (loftLab) loftLab.textContent = String(state.loftLengthCm);
+  }
+
   function syncRoofHint() {
     const el = document.getElementById("roof-hint");
     if (!el) return;
+    clampRoofControls();
     const r = roofParams();
     const loftClear = Math.max(0, r.ridgeH - (r.livingBottom + r.collarH));
     el.textContent =
-      `Hřeben ~${Math.round(r.ridgeH)} cm · kleština jinde spodek ~${Math.round(r.midCollarBottom)} cm · ` +
-      `obývák spodek ${Math.round(r.livingBottom)} cm · světlost loftu pod hřebenem ~${Math.round(loftClear)} cm.`;
+      `Sklon ${r.pitchDeg}° · osová ${r.spacing} cm · hřeben ~${Math.round(r.ridgeH)} cm · ` +
+      `pohyblivé kleštiny ${state.livingCollarCount}× (spodek ${Math.round(r.livingBottom)} cm) · ` +
+      `loft ${state.loftLengthCm} cm · světlost pod hřebenem ~${Math.round(loftClear)} cm.`;
   }
 
   /**
@@ -4367,6 +4421,7 @@
    */
   function pushRoofStructure3d(boxes) {
     const r = roofParams();
+    clampRoofControls();
     const wood = "#a67c52";
     const woodDark = "#8b6914";
     const woodLight = "#c4a574";
@@ -4393,16 +4448,9 @@
       color: woodDark,
     });
 
-    // Osové pozice krokví po delší straně
-    const xs = [];
-    const margin = r.rafterW;
-    for (let x = margin; x <= CLEAR.w - margin + 0.1; x += r.spacing) xs.push(x);
-    if (xs.length && CLEAR.w - margin - xs[xs.length - 1] > r.spacing * 0.35) {
-      xs.push(CLEAR.w - margin);
-    }
-    if (!xs.length) xs.push(CLEAR.w / 2);
-
-    const livingCollars = []; // { x0, x1, elevTop } pro podlahu loftu
+    const xs = roofRafterXs(r);
+    const livingXs = livingCollarCandidates(r, xs);
+    const movableSet = new Set(livingXs.slice(0, state.livingCollarCount));
 
     for (const x of xs) {
       // Severní krokve: z = 0 → ridge, stoupá s +Z
@@ -4422,9 +4470,9 @@
         color: wood,
       });
 
-      // Kleština mezi párem krokví — snížená nad obývákem
-      const inLiving = x <= r.livingX1 + r.spacing * 0.55;
-      const collarBottom = inLiving ? r.livingBottom : r.midCollarBottom;
+      // Kleština mezi párem krokví — pohyblivé jen vybraný počet od západu
+      const movable = movableSet.has(x);
+      const collarBottom = movable ? r.livingBottom : r.midCollarBottom;
       const collarMidY = collarBottom + r.collarH / 2;
       const abovePlate = Math.max(0, collarMidY - r.plateH);
       const frac = r.rise > 1 ? Math.min(0.98, abovePlate / r.rise) : 0;
@@ -4438,15 +4486,8 @@
         d: span,
         h: r.collarH,
         elev: collarBottom,
-        color: inLiving ? "#b8956a" : woodLight,
+        color: movable ? "#b8956a" : woodLight,
       });
-      if (inLiving) {
-        livingCollars.push({
-          x0: x - r.spacing / 2,
-          x1: x + r.spacing / 2,
-          elevTop: collarBottom + r.collarH,
-        });
-      }
     }
 
     // Štítové výplně Z + V (nad korunou → hřeben) — hrubý schodový náznak
@@ -4478,33 +4519,35 @@
       }
     }
 
-    // Podlaha loftu nad sníženými kleštinami (obývák)
-    if (state.showLoftDeck && livingCollars.length) {
+    // Podlaha loftu — délka nastavitelná (default = počet pohyblivých kleštin × osová)
+    if (state.showLoftDeck && state.loftLengthCm > 0) {
       const deckT = 2.2;
-      const x0 = Math.max(0, Math.min(...livingCollars.map((c) => c.x0)));
-      const x1 = Math.min(r.livingX1, Math.max(...livingCollars.map((c) => c.x1)));
-      const elevTop = livingCollars[0].elevTop;
+      const x0 = Math.max(0, r.rafterW * 0.5);
+      const x1 = Math.min(r.livingX1, x0 + state.loftLengthCm);
+      const elevTop = r.livingBottom + r.collarH;
       const plank = 12;
       const gap = 0.6;
-      boxes.push({
-        x: x0, y: 8, w: Math.max(10, x1 - x0), d: CLEAR.h - 16,
-        h: deckT * 0.5, elev: elevTop,
-        color: "#9a7b4f", opacity: 0.92,
-      });
-      for (let px = x0 + 1; px < x1 - 2; px += plank + gap) {
-        const pw = Math.min(plank, x1 - px - 1);
+      if (x1 - x0 > 8) {
         boxes.push({
-          x: px, y: 10, w: pw, d: CLEAR.h - 20,
-          h: deckT, elev: elevTop + deckT * 0.4,
-          color: ((px / (plank + gap)) | 0) % 2 === 0 ? "#c4a574" : "#b8956a",
+          x: x0, y: 8, w: Math.max(10, x1 - x0), d: CLEAR.h - 16,
+          h: deckT * 0.5, elev: elevTop,
+          color: "#9a7b4f", opacity: 0.92,
+        });
+        for (let px = x0 + 1; px < x1 - 2; px += plank + gap) {
+          const pw = Math.min(plank, x1 - px - 1);
+          boxes.push({
+            x: px, y: 10, w: pw, d: CLEAR.h - 20,
+            h: deckT, elev: elevTop + deckT * 0.4,
+            color: ((px / (plank + gap)) | 0) % 2 === 0 ? "#c4a574" : "#b8956a",
+          });
+        }
+        // nízké zábradlí na východním konci loftu
+        boxes.push({
+          x: Math.max(x0, x1 - 4), y: 12, w: 3, d: CLEAR.h - 24,
+          h: 42, elev: elevTop + deckT,
+          color: "#8b6914", opacity: 0.75,
         });
       }
-      // nízké zábradlí u TV příčky
-      boxes.push({
-        x: Math.max(x0, r.livingX1 - 4), y: 12, w: 3, d: CLEAR.h - 24,
-        h: 42, elev: elevTop + deckT,
-        color: "#8b6914", opacity: 0.75,
-      });
     }
   }
 
@@ -4530,9 +4573,9 @@
       target: { x: tv.x - 40, y: lookY, z: tv.y + tv.d * 0.55 },
       fov: 70,
     };
-    // ze vstupních dveří (jih) — dovnitř chaty (na sever)
+    // ze vstupních dveří (jih) — dovnitř chaty (na sever); šipkami lze vyjít ven
     const door = {
-      eye: { x: entryMid, y: EYE, z: CLEAR.h - 18 },
+      eye: { x: entryMid, y: EYE, z: CLEAR.h - 28 },
       target: { x: entryMid, y: lookY, z: CLEAR.h * 0.35 },
       fov: 72,
     };
@@ -4557,15 +4600,17 @@
       fov: 68,
     };
     // stání na loftu — výhled podél hřebene / dolů do obýváku
+    const loftLen = Math.max(90, Number(state.loftLengthCm) || 360);
+    const loftMidX = Math.min(roof.livingX1 - 20, Math.max(40, loftLen * 0.55));
     const loftEyeClear = Math.max(80, Math.min(140, roof.ridgeH - loftElev - 35));
     const loft = {
       eye: {
-        x: Math.min(roof.livingX1 - 40, Math.max(40, roof.livingX1 * 0.55)),
+        x: loftMidX,
         y: loftElev + loftEyeClear,
         z: roof.halfSpan + 25,
       },
       target: {
-        x: roof.livingX1 + 80,
+        x: Math.min(roof.livingX1 + 40, loftLen + 60),
         y: loftElev - 20,
         z: roof.halfSpan,
       },
@@ -4636,9 +4681,27 @@
 
     if (state.showRoof) pushRoofStructure3d(boxes);
 
+    // před vstupními dveřmi — venkovní plocha (pro chůzi ven)
+    const entry = southDoorClear();
+    const outDepth = 160;
+    const outPadX = 40;
+    boxes.push({
+      x: entry.x0 - outPadX,
+      y: CLEAR.h + WALL * 0.15,
+      w: (entry.x1 - entry.x0) + outPadX * 2,
+      d: outDepth,
+      h: 1.5,
+      color: "#cfd8dc",
+      opacity: 0.95,
+    });
+
     return {
       roomH, clearW: CLEAR.w, clearH: CLEAR.h, boxes,
       cameras: buildView3dCameras(),
+      walk: {
+        door: { x0: entry.x0, x1: entry.x1 },
+        outsideDepth: outDepth,
+      },
     };
   }
 
@@ -5257,9 +5320,9 @@
       ["sill-h", "windowSillH", "sill-h-val"],
       ["door-open-h", "doorOpeningH", "door-open-h-val"],
       ["door-leaf-h", "doorLeafH", "door-leaf-h-val"],
-      ["roof-pitch", "roofPitchDeg", "roof-pitch-val"],
-      ["roof-spacing", "roofRafterSpacing", "roof-spacing-val"],
       ["roof-living-collar", "livingCollarBottom", "roof-living-collar-val"],
+      ["roof-collar-count", "livingCollarCount", "roof-collar-count-val"],
+      ["roof-loft-len", "loftLengthCm", "roof-loft-len-val"],
     ];
     for (const [id, key, lab] of map) {
       const input = document.getElementById(id);
@@ -5272,6 +5335,7 @@
     if (roofShow) roofShow.checked = !!state.showRoof;
     const loftDeck = document.getElementById("roof-loft-deck");
     if (loftDeck) loftDeck.checked = !!state.showLoftDeck;
+    clampRoofControls();
     syncRoofHint();
     clampBedOuter();
   }
@@ -5314,6 +5378,21 @@
         state.doorOffset = v;
         clampDoorOffset();
         document.getElementById(lab).textContent = String(Math.round(state.doorOffset));
+        render();
+        return;
+      } else if (key === "livingCollarCount") {
+        state.livingCollarCount = Math.max(1, Math.round(v));
+        // default délka loftu vždy sleduje počet pohyblivých kleštin
+        state.loftLengthCm = loftLengthFromCollarCount(state.livingCollarCount);
+        clampRoofControls();
+        syncRoofHint();
+        render();
+        return;
+      } else if (key === "loftLengthCm" || key === "livingCollarBottom") {
+        state[key] = v;
+        clampRoofControls();
+        syncRoofHint();
+        document.getElementById(lab).textContent = String(Math.round(state[key]));
         render();
         return;
       }
@@ -5441,9 +5520,9 @@
   bindRange("sill-h", "windowSillH", "sill-h-val");
   bindRange("door-open-h", "doorOpeningH", "door-open-h-val");
   bindRange("door-leaf-h", "doorLeafH", "door-leaf-h-val");
-  bindRange("roof-pitch", "roofPitchDeg", "roof-pitch-val");
-  bindRange("roof-spacing", "roofRafterSpacing", "roof-spacing-val");
   bindRange("roof-living-collar", "livingCollarBottom", "roof-living-collar-val");
+  bindRange("roof-collar-count", "livingCollarCount", "roof-collar-count-val");
+  bindRange("roof-loft-len", "loftLengthCm", "roof-loft-len-val");
   document.getElementById("roof-show")?.addEventListener("change", (e) => {
     state.showRoof = e.target.checked;
     render();
@@ -5922,9 +6001,17 @@
     if (state.doorLeafH == null) state.doorLeafH = 190;
     if (state.showRoof == null) state.showRoof = true;
     if (state.showLoftDeck == null) state.showLoftDeck = true;
-    if (state.roofPitchDeg == null) state.roofPitchDeg = 35;
-    if (state.roofRafterSpacing == null) state.roofRafterSpacing = 90;
+    state.roofPitchDeg = 30;
+    state.roofRafterSpacing = 90;
     if (state.livingCollarBottom == null) state.livingCollarBottom = 210;
+    if (state.livingCollarCount == null) {
+      const cand = livingCollarCandidates(roofParams());
+      state.livingCollarCount = Math.min(4, Math.max(1, cand.length));
+    }
+    if (state.loftLengthCm == null) {
+      state.loftLengthCm = loftLengthFromCollarCount(state.livingCollarCount);
+    }
+    clampRoofControls();
     state.elevWalls = normalizeElevWalls(state.elevWalls, data.elevWall || state.elevWall);
     delete state.elevWall;
     syncSlidersFromState();

@@ -138,10 +138,29 @@ export function createViewer(container) {
     camera.position.addScaledVector(forwardV, forward);
     camera.position.addScaledVector(rightV, strafe);
     camera.position.y = eyeY();
-    // drž ve světlosti místnosti
+    // světlost místnosti; před vstupními dveřmi (jih / +Z) lze vyjít ven
     const m = 15;
-    camera.position.x = Math.min(viewer.room.w - m, Math.max(m, camera.position.x));
-    camera.position.z = Math.min(viewer.room.d - m, Math.max(m, camera.position.z));
+    const door = viewer.room.door;
+    const outD = Math.max(0, Number(viewer.room.outsideDepth) || 0);
+    let x = camera.position.x;
+    let z = camera.position.z;
+    const doorPad = 20;
+    const southInside = viewer.room.d - m;
+    const inDoorX = door
+      && x >= door.x0 - doorPad
+      && x <= door.x1 + doorPad;
+    const isOutside = z > southInside;
+    if (isOutside && door && outD > 0) {
+      // venku — držet se v koridoru dveří
+      x = Math.min(door.x1 + doorPad, Math.max(door.x0 - doorPad, x));
+      z = Math.min(viewer.room.d + outD, Math.max(southInside, z));
+    } else {
+      x = Math.min(viewer.room.w - m, Math.max(m, x));
+      const zMax = (inDoorX && outD > 0) ? viewer.room.d + outD : southInside;
+      z = Math.min(zMax, Math.max(m, z));
+    }
+    camera.position.x = x;
+    camera.position.z = z;
   };
 
   const onDown = (e) => {
@@ -247,7 +266,14 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
   const roomH = spec.roomH || 210;
   const clearW = spec.clearW || 906;
   const clearD = spec.clearH || 333;
-  viewer.room = { w: clearW, d: clearD, h: roomH };
+  const walk = spec.walk || {};
+  viewer.room = {
+    w: clearW,
+    d: clearD,
+    h: roomH,
+    door: walk.door || null,
+    outsideDepth: walk.outsideDepth || 0,
+  };
   viewer.cameras = spec.cameras || {};
 
   addBox(viewer.root, {
