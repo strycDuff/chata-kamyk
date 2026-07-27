@@ -782,6 +782,8 @@
     font-family: var(--plan-font);
   }
   .canvas-wrap svg.measuring { cursor: crosshair; }
+  .canvas-wrap svg.elev-space-pan { cursor: grab; }
+  .canvas-wrap svg.elev-panning { cursor: grabbing; }
   .canvas-wrap .handle { cursor: ew-resize; }
   .canvas-wrap .handle-ns { cursor: ns-resize; }
   .canvas-wrap .handle:hover,
@@ -961,6 +963,10 @@
             <label class="chk"><input type="checkbox" data-wall="south"> <span class="elec-ico">↓</span> Jih</label>
             <label class="chk"><input type="checkbox" data-wall="west"> <span class="elec-ico">←</span> Západ</label>
           </div>
+          <div class="spacer"></div>
+          <button type="button" class="btn" id="elev-fit-strip" title="Zobrazit celý pás stěn">Fit pás</button>
+          <button type="button" class="btn" id="elev-fit-wall" title="Přiblížit na vybranou (nebo první) stěnu">Fit stěna</button>
+          <span class="hint" style="margin:0">Kolečko = zoom · prostředním tlačítkem nebo mezerníkem + tažením posun</span>
         </div>
         <div class="view3d-bar" id="view3d-bar" hidden>
           <span class="elev-wall-bar-label">Pohled zevnitř</span>
@@ -1493,6 +1499,7 @@
     elecRunDraft: null, // elev: [{along,h}]
     elecRoutePointIds: [], // selection for next propose
     elecDraftRunId: null,
+    elevView: { scale: 1, panX: 0, panY: 0 }, // elev strip zoom/pan (viewport preference)
   };
 
   let furnIdSeq = 1;
@@ -1829,6 +1836,77 @@
       if (i < ring.length - 1) x += ELEV_CORNER_GAP;
     }
     return { panels, totalW: x, roomH: state.roomClearH };
+  }
+
+  const ELEV_PAD = 36;
+
+  /** Full-strip viewBox rectangle at scale 1 (before elevView pan/zoom is applied). */
+  function elevBaseViewBox() {
+    const { totalW, roomH } = elevStripLayout();
+    const baseW = Math.max(totalW, 40) + ELEV_PAD * 2;
+    const baseH = roomH + ELEV_PAD * 2 + 10;
+    return {
+      baseW, baseH,
+      cx: -ELEV_PAD + baseW / 2,
+      cy: -ELEV_PAD + baseH / 2,
+    };
+  }
+
+  function clampElevScale(s) {
+    return Math.min(8, Math.max(0.5, Number(s) || 1));
+  }
+
+  function ensureElevView() {
+    const v = state.elevView;
+    if (!v || !Number.isFinite(v.scale) || !Number.isFinite(v.panX) || !Number.isFinite(v.panY)) {
+      state.elevView = { scale: 1, panX: 0, panY: 0 };
+    }
+    return state.elevView;
+  }
+
+  /** Current elev SVG viewBox as `x y w h`, incorporating elevView zoom/pan. */
+  function elevViewBoxString() {
+    const base = elevBaseViewBox();
+    const view = ensureElevView();
+    const scale = clampElevScale(view.scale);
+    const vw = base.baseW / scale;
+    const vh = base.baseH / scale;
+    const vx = base.cx - vw / 2 + (view.panX || 0);
+    const vy = base.cy - vh / 2 + (view.panY || 0);
+    return `${vx} ${vy} ${vw} ${vh}`;
+  }
+
+  /** Zoom/pan so the given logical (cm) bounds are centered and fully visible. */
+  function fitElevToBounds(x0, x1, y0, y1) {
+    const base = elevBaseViewBox();
+    const desiredW = Math.max(1, x1 - x0);
+    const desiredH = Math.max(1, y1 - y0);
+    const scale = clampElevScale(Math.min(base.baseW / desiredW, base.baseH / desiredH));
+    state.elevView = {
+      scale,
+      panX: (x0 + x1) / 2 - base.cx,
+      panY: (y0 + y1) / 2 - base.cy,
+    };
+  }
+
+  function resetElevView() {
+    state.elevView = { scale: 1, panX: 0, panY: 0 };
+  }
+
+  /** Fit to the selected point's wall panel, else the first visible panel. */
+  function fitElevToActiveWall() {
+    const { panels, roomH } = elevStripLayout();
+    if (!panels.length) return;
+    let target = panels[0];
+    const sel = state.elecSelectedKind === "point" && state.elecSelectedId
+      ? findElecPoint(state.elecSelectedId)
+      : null;
+    if (sel) {
+      const hitPanel = panels.find((pnl) => elecPointOnWall(sel, pnl.wall));
+      if (hitPanel) target = hitPanel;
+    }
+    const marginX = 24;
+    fitElevToBounds(target.x0 - marginX, target.x1 + marginX, -30, roomH + 40);
   }
 
   function alongToStripX(panel, along) {
@@ -3320,11 +3398,12 @@
 
   function renderElevationView() {
     const { panels, totalW, roomH } = elevStripLayout();
-    const pad = 36;
     const svg = el("svg", {
-      viewBox: `${-pad} ${-pad} ${Math.max(totalW, 40) + pad * 2} ${roomH + pad * 2 + 10}`,
+      viewBox: elevViewBoxString(),
       id: "plan-svg",
     });
+    if (spacePanning) svg.classList.add("elev-space-pan");
+    if (state.drag && state.drag.type === "elev-pan") svg.classList.add("elev-panning");
     const g = el("g", { id: "plan-root" });
 
     const banner = el("text", {
@@ -4737,6 +4816,7 @@
   }
 
   let hoverRaf = 0;
+  let spacePanning = false;
 
   function render() {
     clampSink();
@@ -4994,9 +5074,74 @@
   }
 
   const wrapEl = document.getElementById("canvas-wrap");
+
+  function elevViewActive() {
+    return state.tab === "electro" && state.elecStep === "elev";
+  }
+
+  wrapEl.addEventListener("wheel", (evt) => {
+    if (!elevViewActive()) return;
+    const svg = currentSvg();
+    if (!svg) return;
+    evt.preventDefault();
+    const p = svgPoint(svg, evt);
+    const base = elevBaseViewBox();
+    const view = ensureElevView();
+    const oldScale = clampElevScale(view.scale);
+    const oldVw = base.baseW / oldScale;
+    const oldVh = base.baseH / oldScale;
+    const oldVx = base.cx - oldVw / 2 + (view.panX || 0);
+    const oldVy = base.cy - oldVh / 2 + (view.panY || 0);
+    const fx = (p.x - oldVx) / oldVw;
+    const fy = (p.y - oldVy) / oldVh;
+    const factor = Math.exp(-evt.deltaY * 0.0015);
+    const newScale = clampElevScale(oldScale * factor);
+    const newVw = base.baseW / newScale;
+    const newVh = base.baseH / newScale;
+    const newVx = p.x - fx * newVw;
+    const newVy = p.y - fy * newVh;
+    view.scale = newScale;
+    view.panX = newVx - (base.cx - newVw / 2);
+    view.panY = newVy - (base.cy - newVh / 2);
+    render();
+  }, { passive: false });
+
+  window.addEventListener("keydown", (evt) => {
+    if (evt.code !== "Space") return;
+    const tag = evt.target && evt.target.tagName;
+    if (["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(tag) || evt.target?.isContentEditable) return;
+    if (!elevViewActive()) return;
+    evt.preventDefault();
+    if (!spacePanning) {
+      spacePanning = true;
+      render();
+    }
+  });
+  window.addEventListener("keyup", (evt) => {
+    if (evt.code !== "Space") return;
+    if (spacePanning) {
+      spacePanning = false;
+      render();
+    }
+  });
+  window.addEventListener("blur", () => {
+    if (spacePanning) {
+      spacePanning = false;
+      render();
+    }
+  });
+
   wrapEl.addEventListener("mousedown", (evt) => {
     const svg = currentSvg();
     if (!svg) return;
+
+    if (elevViewActive() && (evt.button === 1 || (evt.button === 0 && spacePanning))) {
+      state.drag = { type: "elev-pan", lastX: evt.clientX, lastY: evt.clientY };
+      evt.preventDefault();
+      render();
+      return;
+    }
+
     const p = svgPoint(svg, evt);
 
     if (state.tab === "furniture" && !state.measureMode) {
@@ -5188,6 +5333,17 @@
   wrapEl.addEventListener("mousemove", (evt) => {
     const svg = currentSvg();
     if (!svg) return;
+    if (state.drag && state.drag.type === "elev-pan") {
+      const p0 = svgPoint(svg, { clientX: state.drag.lastX, clientY: state.drag.lastY });
+      const p1 = svgPoint(svg, evt);
+      const view = ensureElevView();
+      view.panX -= (p1.x - p0.x);
+      view.panY -= (p1.y - p0.y);
+      state.drag.lastX = evt.clientX;
+      state.drag.lastY = evt.clientY;
+      render();
+      return;
+    }
     const p = svgPoint(svg, evt);
     if (state.drag) {
       onDrag(p);
@@ -5476,6 +5632,14 @@
     state.elevWalls = normalizeElevWalls([...set]);
     state.elecRunDraft = null;
     state.elecCursor = null;
+    render();
+  });
+  document.getElementById("elev-fit-strip")?.addEventListener("click", () => {
+    resetElevView();
+    render();
+  });
+  document.getElementById("elev-fit-wall")?.addEventListener("click", () => {
+    fitElevToActiveWall();
     render();
   });
   bindSeg("elec-step", "elecStep", (v) => v, () => {
@@ -5873,6 +6037,7 @@
       savedAt, appVersion, appBuild, appCommit, ...rest
     } = data;
     Object.assign(state, rest);
+    ensureElevView();
     if (state.kitchenLeft == null) state.kitchenLeft = 313;
     if (state.kitchenLen == null) state.kitchenLen = 160;
     if (state.bedFrameOffset == null) state.bedFrameOffset = 2.5;
