@@ -552,10 +552,17 @@ export function createViewer(container) {
     window.removeEventListener("keyup", onKeyUp);
   };
 
-  const tick = () => {
+  // Frame-rate independent fly speed (matches former 4.2 / 3.2 cm @ 60fps).
+  const MOVE_CMS = 4.2 * 60; // ≈ 2.5 m/s
+  const VERT_CMS = 3.2 * 60;
+  let lastTickMs = performance.now();
+  const tick = (nowMs) => {
     viewer.raf = requestAnimationFrame(tick);
-    const speed = 4.2; // cm / frame @60fps ≈ 2.5 m/s
-    const vSpeed = 3.2;
+    const now = typeof nowMs === "number" ? nowMs : performance.now();
+    const dt = Math.min(0.05, Math.max(0, (now - lastTickMs) / 1000));
+    lastTickMs = now;
+    const speed = MOVE_CMS * dt;
+    const vSpeed = VERT_CMS * dt;
     let fwd = 0;
     let strafe = 0;
     let vert = 0;
