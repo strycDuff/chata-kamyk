@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>Plánovač půdorysu · Chata Kamyk</title>
 <link rel="stylesheet" href="../assets/site.css">
@@ -705,6 +705,7 @@
     flex-direction: column;
     overflow: hidden;
     background: #f8f9fa;
+    position: relative;
   }
   .elev-wall-bar {
     display: flex;
@@ -754,9 +755,11 @@
   }
   .view3d-bar[hidden] { display: none !important; }
   .view3d-bar .seg { margin: 0; }
+  .view3d-bar .spacer { flex: 1; min-width: 8px; }
   .canvas-wrap.view3d-host {
     padding: 0;
     display: flex;
+    position: relative;
   }
   .canvas-wrap.view3d-host canvas {
     display: block;
@@ -766,6 +769,126 @@
     border: 0;
     flex: 1;
     min-height: calc(100vh - 160px);
+  }
+  .view3d-touch {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: none;
+  }
+  @media (hover: none), (pointer: coarse) {
+    .view3d-touch[data-show="1"] { display: block; }
+  }
+  @media (max-width: 960px) {
+    .view3d-touch[data-show="1"] { display: block; }
+  }
+  .stage.is-view3d-fs .view3d-touch[data-show="1"] { display: block; }
+  .v3d-stick {
+    pointer-events: auto;
+    position: absolute;
+    /* Keep full pad above home indicator / browser chrome */
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    width: 118px;
+    height: 118px;
+    border-radius: 50%;
+    background: rgba(28, 36, 44, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .stage.is-view3d-fs .v3d-stick {
+    bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  }
+  .v3d-stick-move { left: max(16px, env(safe-area-inset-left, 0px)); }
+  .v3d-stick-vert { right: max(16px, env(safe-area-inset-right, 0px)); }
+  .v3d-stick-knob {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 46px;
+    height: 46px;
+    margin: -23px 0 0 -23px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(20, 28, 36, 0.25);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+    will-change: transform;
+  }
+  .v3d-stick-label {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -20px;
+    bottom: auto;
+    text-align: center;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+    pointer-events: none;
+  }
+  .view3d-fs-exit {
+    pointer-events: auto;
+    position: absolute;
+    top: max(12px, env(safe-area-inset-top, 0px));
+    right: max(12px, env(safe-area-inset-right, 0px));
+    z-index: 6;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 10px 14px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    background: rgba(20, 28, 36, 0.72);
+    color: #fff;
+    cursor: pointer;
+    display: none;
+    touch-action: manipulation;
+  }
+  .stage.is-view3d-fs .view3d-fs-exit { display: inline-flex; align-items: center; gap: 6px; }
+  .stage.is-view3d-fs,
+  .stage:fullscreen,
+  .stage:-webkit-full-screen {
+    width: 100%;
+    height: 100%;
+    background: #0f1419;
+  }
+  /* In-app immersive mode (not browser Fullscreen API) — swipe look cannot dismiss it. */
+  html.is-view3d-fs-lock,
+  body.is-view3d-fs-lock {
+    overflow: hidden !important;
+    overscroll-behavior: none;
+    touch-action: none;
+    height: 100%;
+    height: 100dvh;
+  }
+  .stage.is-view3d-fs-fallback {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    width: 100%;
+    /* Prefer dynamic/small viewport — 100vh alone sits under mobile browser chrome */
+    height: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+  .stage.is-view3d-fs .canvas-wrap {
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+  .stage.is-view3d-fs .canvas-wrap.view3d-host canvas {
+    min-height: 0;
+    touch-action: none;
+  }
+  .stage.is-view3d-fs .view3d-bar {
+    background: rgba(255, 255, 255, 0.92);
+    touch-action: manipulation;
   }
   .canvas-wrap {
     min-height: 0;
@@ -988,9 +1111,22 @@
             <button type="button" data-v="roof">Ke krovu</button>
             <button type="button" data-v="loft">Z loftu</button>
           </div>
-          <span class="hint" style="margin:0">Táhni = rozhled · WASD / šipky = pohyb · Space = nahoru · LCtrl = dolů</span>
+          <span class="hint" id="view3d-hint" style="margin:0">Táhni = rozhled · páčky = pohyb · WASD / šipky = pohyb · Space = nahoru · LCtrl = dolů</span>
+          <span class="spacer"></span>
+          <button type="button" class="btn" id="view3d-fs" title="Celá obrazovka">Celá obrazovka</button>
         </div>
         <div class="canvas-wrap" id="canvas-wrap"></div>
+        <div class="view3d-touch" id="view3d-touch" data-show="0" aria-hidden="true">
+          <div class="v3d-stick v3d-stick-move" id="v3d-stick-move" role="application" aria-label="Pohyb vpřed, vzad a do stran">
+            <div class="v3d-stick-knob" id="v3d-stick-move-knob"></div>
+            <span class="v3d-stick-label">Pohyb</span>
+          </div>
+          <div class="v3d-stick v3d-stick-vert" id="v3d-stick-vert" role="application" aria-label="Pohyb nahoru a dolů">
+            <div class="v3d-stick-knob" id="v3d-stick-vert-knob"></div>
+            <span class="v3d-stick-label">Výška</span>
+          </div>
+          <button type="button" class="view3d-fs-exit" id="view3d-fs-exit" title="Ukončit celou obrazovku">✕ Ukončit</button>
+        </div>
       </div>
       <aside class="side" id="side">
         <h1 id="side-title">Půdorys</h1>
@@ -1368,7 +1504,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.26.1";
+  const APP_VERSION = "3.27.5";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -5736,6 +5872,19 @@
       wrap.innerHTML = "";
       wrap.appendChild(view3dViewer.renderer.domElement);
     }
+    // Drop focus from side-panel controls so WASD / Space / LCtrl work immediately.
+    const ae = document.activeElement;
+    if (
+      ae &&
+      ae !== document.body &&
+      (ae.tagName === "INPUT" ||
+        ae.tagName === "TEXTAREA" ||
+        ae.tagName === "SELECT" ||
+        ae.isContentEditable ||
+        ae.tagName === "BUTTON")
+    ) {
+      ae.blur();
+    }
     view3dViewer.preset = view3dPreset;
     mod.rebuild(view3dViewer, buildView3dSpec(), { applyCamera: first || !view3dMountedOnce });
     view3dMountedOnce = true;
@@ -5806,6 +5955,8 @@
     const view3dBar = document.getElementById("view3d-bar");
     if (elevBar) elevBar.hidden = !showElev;
     if (view3dBar) view3dBar.hidden = !show3d;
+    syncView3dTouchUi(show3d);
+    if (!show3d && isView3dFullscreen()) exitView3dFullscreen({ silent: true });
 
     if (showSkica) {
       if (view3dViewer) disposeView3d();
@@ -6968,6 +7119,195 @@
     state.showInteriorLights = e.target.checked;
     render();
   });
+
+  function setView3dFsLock(on) {
+    document.documentElement.classList.toggle("is-view3d-fs-lock", !!on);
+    document.body.classList.toggle("is-view3d-fs-lock", !!on);
+  }
+
+  function isView3dFullscreen() {
+    const stage = document.getElementById("stage");
+    if (!stage) return false;
+    return stage.classList.contains("is-view3d-fs-fallback");
+  }
+
+  function syncView3dFsButtons() {
+    const on = isView3dFullscreen();
+    const stage = document.getElementById("stage");
+    stage?.classList.toggle("is-view3d-fs", on);
+    setView3dFsLock(on);
+    const enter = document.getElementById("view3d-fs");
+    if (enter) {
+      enter.textContent = on ? "Ukončit FS" : "Celá obrazovka";
+      enter.title = on ? "Ukončit celou obrazovku" : "Celá obrazovka";
+      enter.setAttribute("aria-pressed", on ? "true" : "false");
+    }
+  }
+
+  function syncView3dTouchUi(show3d) {
+    const touch = document.getElementById("view3d-touch");
+    if (!touch) return;
+    const on = !!show3d;
+    touch.dataset.show = on ? "1" : "0";
+    touch.setAttribute("aria-hidden", on ? "false" : "true");
+    if (!on && view3dViewer && view3dMod?.setAxes) {
+      view3dMod.setAxes(view3dViewer, null);
+    }
+  }
+
+  function enterView3dFullscreen() {
+    const stage = document.getElementById("stage");
+    if (!stage || isView3dFullscreen()) {
+      syncView3dFsButtons();
+      return;
+    }
+    // Use in-app overlay instead of browser Fullscreen API: native FS exits on
+    // edge swipe / pull-down on tablets, which conflicts with look-down.
+    stage.classList.add("is-view3d-fs-fallback");
+    syncView3dFsButtons();
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+  }
+
+  function exitView3dFullscreen({ silent = false } = {}) {
+    const stage = document.getElementById("stage");
+    const wasOn = !!stage?.classList.contains("is-view3d-fs-fallback");
+    stage?.classList.remove("is-view3d-fs-fallback");
+    // Clear any leftover native fullscreen from older builds.
+    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fsEl) {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen;
+      try {
+        exit?.call(document);
+      } catch {
+        /* ignore */
+      }
+    }
+    syncView3dFsButtons();
+    if (!silent || wasOn) {
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new Event("resize"));
+      });
+    }
+  }
+
+  function toggleView3dFullscreen() {
+    if (isView3dFullscreen()) exitView3dFullscreen();
+    else enterView3dFullscreen();
+  }
+
+  function bindView3dStick(el, knob, mode) {
+    if (!el || !knob) return;
+    const dead = 0.18;
+    let activeId = null;
+
+    const apply = (clientX, clientY) => {
+      const rect = el.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const maxR = Math.min(rect.width, rect.height) * 0.42;
+      let dx = clientX - cx;
+      let dy = clientY - cy;
+      const len = Math.hypot(dx, dy) || 1;
+      if (len > maxR) {
+        dx = (dx / len) * maxR;
+        dy = (dy / len) * maxR;
+      }
+      knob.style.transform = `translate(${dx}px, ${dy}px)`;
+      let nx = dx / maxR;
+      let ny = dy / maxR;
+      if (Math.hypot(nx, ny) < dead) {
+        nx = 0;
+        ny = 0;
+      }
+      if (!view3dViewer) return;
+      if (mode === "move") {
+        // Screen up = forward, right = strafe right
+        if (view3dMod?.setAxes) view3dMod.setAxes(view3dViewer, { fwd: -ny, strafe: nx });
+        else {
+          view3dViewer.axes.fwd = Math.max(-1, Math.min(1, -ny));
+          view3dViewer.axes.strafe = Math.max(-1, Math.min(1, nx));
+        }
+      } else {
+        // Screen up = ascend
+        if (view3dMod?.setAxes) view3dMod.setAxes(view3dViewer, { vert: -ny });
+        else view3dViewer.axes.vert = Math.max(-1, Math.min(1, -ny));
+      }
+    };
+
+    const reset = () => {
+      activeId = null;
+      knob.style.transform = "translate(0px, 0px)";
+      if (!view3dViewer) return;
+      if (mode === "move") {
+        if (view3dMod?.setAxes) view3dMod.setAxes(view3dViewer, { fwd: 0, strafe: 0 });
+        else {
+          view3dViewer.axes.fwd = 0;
+          view3dViewer.axes.strafe = 0;
+        }
+      } else if (view3dMod?.setAxes) {
+        view3dMod.setAxes(view3dViewer, { vert: 0 });
+      } else {
+        view3dViewer.axes.vert = 0;
+      }
+    };
+
+    el.addEventListener("pointerdown", (e) => {
+      if (e.button != null && e.button !== 0) return;
+      activeId = e.pointerId;
+      el.setPointerCapture?.(e.pointerId);
+      e.preventDefault();
+      e.stopPropagation();
+      apply(e.clientX, e.clientY);
+    });
+    el.addEventListener("pointermove", (e) => {
+      if (activeId !== e.pointerId) return;
+      e.preventDefault();
+      e.stopPropagation();
+      apply(e.clientX, e.clientY);
+    });
+    const end = (e) => {
+      if (activeId != null && e.pointerId !== activeId) return;
+      e.preventDefault();
+      e.stopPropagation();
+      reset();
+    };
+    el.addEventListener("pointerup", end);
+    el.addEventListener("pointercancel", end);
+    el.addEventListener("lostpointercapture", () => {
+      if (activeId != null) reset();
+    });
+  }
+
+  bindView3dStick(
+    document.getElementById("v3d-stick-move"),
+    document.getElementById("v3d-stick-move-knob"),
+    "move",
+  );
+  bindView3dStick(
+    document.getElementById("v3d-stick-vert"),
+    document.getElementById("v3d-stick-vert-knob"),
+    "vert",
+  );
+
+  document.getElementById("view3d-fs")?.addEventListener("click", () => {
+    toggleView3dFullscreen();
+  });
+  document.getElementById("view3d-fs-exit")?.addEventListener("click", () => {
+    exitView3dFullscreen();
+  });
+  // Block page rubber-band / pull-to-refresh while immersive — look swipe must not dismiss.
+  document.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!document.documentElement.classList.contains("is-view3d-fs-lock")) return;
+      e.preventDefault();
+    },
+    { passive: false },
+  );
+  // Fullscreen exits only via the buttons (not Escape / swipe / browser chrome).
+  syncView3dFsButtons();
 
   // Variants
   function loadVariants() {

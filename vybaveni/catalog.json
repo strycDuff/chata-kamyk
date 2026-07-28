@@ -1,0 +1,770 @@
+{
+  "version": 1,
+  "title": "Vybavení chaty Kamyk",
+  "source": "one-time dump 2026-07-27 (+ plochy z finálního snapshotu)",
+  "sheetUrl": "https://docs.google.com/spreadsheets/d/18asT-A1AkngcVJPKqhLKENiv1F7gVgDLqL8XSw79ooc/edit?gid=0#gid=0",
+  "areas": {
+    "bathFloor": { "net": 2.17, "buy": 2.5, "label": "Koupelna podlaha" },
+    "bathTileDecor": { "net": 6.35, "buy": 7, "label": "Koupelna dekor (WC+sprcha/vana)" },
+    "bathTileMain": { "net": 4.95, "buy": 5.5, "label": "Koupelna obklad gris" },
+    "kitchenFloor": { "net": 3.26, "buy": 4, "label": "Kuchyně podlaha" },
+    "kitchenSplash": { "net": 1.09, "buy": 1.5, "label": "Kuchyně splashback" },
+    "livingFloor": { "net": 17.68, "buy": 19.5, "label": "Obývak podlaha" },
+    "bedFloor": { "net": 7.06, "buy": 8, "label": "Ložnice podlaha" }
+  },
+  "rooms": [
+    {
+      "id": "bath",
+      "name": "Koupelna",
+      "items": [
+        {
+          "id": "bath-tub",
+          "label": "Vana",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "jika-siena",
+              "name": "Jika Siena 105×70 smalt",
+              "url": "https://www.siko.cz/obdelnikova-vana-jika-siena-105x70-cm-smaltovana-ocel-leva-i-prava-h2340000000001/p/3400.0.000.000.1",
+              "price": 4233,
+              "note": "105 cm — do světlosti 100 cm neprojde"
+            },
+            {
+              "id": "talia-10070",
+              "name": "Talia 100×70 (Baumax)",
+              "url": "https://www.baumax.cz/vrobek/vana-talia-10070-nohy,31854.html",
+              "price": 2346,
+              "note": "100×70 — těsně ano; doporučeno +4–5 cm příčky",
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "bath-tub-cover",
+          "label": "Kryt k vaně Talia",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "talia-cover",
+              "name": "Kryt Talia 100×70",
+              "url": "https://www.baumax.cz/vrobek/kryt-na-vanu-talia-10070,109987.html",
+              "price": 1399,
+              "note": "Jen k levnější vaně",
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "bath-screen",
+          "label": "Zástěna k vaně",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "wila-900",
+              "name": "Aqualine Wila 900×1400 černá",
+              "url": "https://www.obkladyadlazby.cz/aqualine-wila-vanova-zastena-900x1400mm-skladaci--cerna--cire-sklo-aq5742b/",
+              "price": 4233,
+              "default": true
+            },
+            {
+              "id": "vilma-600",
+              "name": "Vilma 600×1400 černá",
+              "url": "https://sanea.cz/vany-vanove-zasteny-prislusenstvi_c235621905860162/vilma-vanova-zastena-600x1400mm-cerna-cire-sklo_p56200",
+              "price": 3119
+            }
+          ]
+        },
+        {
+          "id": "bath-tile-decor",
+          "label": "Obklad dekor (za vanu a WC)",
+          "unit": "m2",
+          "areaKey": "bathTileDecor",
+          "options": [
+            {
+              "id": "kalina-patchwork",
+              "name": "Kalina patchwork gris",
+              "url": "https://www.bauhaus.cz/dekor-kalina-patchwork-gris-28961589",
+              "price": 499,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "bath-tile-main",
+          "label": "Obklad",
+          "unit": "m2",
+          "areaKey": "bathTileMain",
+          "options": [
+            {
+              "id": "kalina-gris",
+              "name": "Kalina gris",
+              "url": "https://www.bauhaus.cz/obklad-kalina-gris-28999429",
+              "price": 399,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "bath-floor",
+          "label": "Podlaha",
+          "unit": "m2",
+          "areaKey": "bathFloor",
+          "options": [
+            {
+              "id": "blacktex-zinc",
+              "name": "Beauflor Blacktex Zinc",
+              "url": "https://www.bauhaus.cz/beauflor-blacktex-pvc-podlaha-na-metraz-zinc-990d-29453256",
+              "price": 399,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "bath-light",
+          "label": "Světlo",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "ranarp",
+              "name": "IKEA RANARP 3× bodové černá",
+              "url": "https://www.ikea.com/cz/cs/p/ranarp-stropni-bodove-osvetleni-3-svetla-cerna-70396390/",
+              "price": 999,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "bath-shower",
+          "label": "Sprchová hlavice / systém",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "rea-black",
+              "name": "REA Black sprchový systém 3F",
+              "url": "https://www.baumax.cz/vrobek/rea-black-sprchovy-system-3f,115367.html",
+              "price": 1299,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "bath-tap-tub",
+          "label": "Vanová baterie",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "neptun-tub",
+              "name": "Neptun Black vanová",
+              "url": "https://www.baumax.cz/vrobek/vanova-baterie-neptun-black,155553.html",
+              "price": 1399,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "bath-tap-sink",
+          "label": "Umyvadlová baterie",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "neptun-sink",
+              "name": "Neptun Black umyvadlová",
+              "url": "https://www.baumax.cz/vrobek/umyvadlova-baterie-neptun-black,155552.html",
+              "price": 899,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "bath-sink",
+          "label": "Umyvadlo",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "anita",
+              "name": "Umyvadlo na desku Anita",
+              "url": "https://www.baumax.cz/vrobek/umyvadlo-na-desku-anita,157857.html",
+              "price": 1231,
+              "default": true
+            },
+            {
+              "id": "naomi",
+              "name": "Umyvadlo Naomi REA",
+              "url": "https://www.baumax.cz/vrobek/umyvadlo-na-desku-naomi-rea-u0630,188520.html",
+              "price": 1679
+            }
+          ]
+        },
+        {
+          "id": "bath-vanity",
+          "label": "Skříňka s umyvadlem",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "adel-40",
+              "name": "Adel White 40 cm + umyvadlo",
+              "url": "https://www.dobresny.cz/detail/nabytek/koupelnove-skrinky-s-umyvadlem/koupelnova-skrinka-adel-white-40-cm-umyvadlo.html",
+              "price": 3843,
+              "note": "Alternativa k samostatnému umyvadlu",
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "bath-tall",
+          "label": "Vysoká skříň",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "adel-tall",
+              "name": "Adel White vysoká",
+              "url": "https://www.dobresny.cz/detail/nabytek/koupelnove-skrinky/koupelnova-vysoka-skrinka-adel-white.html",
+              "price": 3500,
+              "default": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kitchen",
+      "name": "Kuchyně",
+      "items": [
+        {
+          "id": "kit-sink",
+          "label": "Dřez",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "peter-100",
+              "name": "Peter 100 Steingran černá 50×52",
+              "url": "https://www.baumax.cz/vrobek/drez-peter-100-steingran-cerna-50x52x20-sifon,138058.html",
+              "price": 2990,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "kit-tap",
+          "label": "Dřezová baterie",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "neptun-pull",
+              "name": "Neptun Black otočný výtok",
+              "url": "https://www.baumax.cz/vrobek/drezova-baterie-s-otocnym-vytokem-neptun-black,155555.html",
+              "price": 899,
+              "default": true
+            },
+            {
+              "id": "neptun-arm",
+              "name": "Neptun Black otočné ramínko",
+              "url": "https://www.baumax.cz/vrobek/drezova-baterie-s-otocnym-raminkem-neptun-black-c,155554.html",
+              "price": 999
+            }
+          ]
+        },
+        {
+          "id": "kit-splash",
+          "label": "Obklad splashback",
+          "unit": "m2",
+          "areaKey": "kitchenSplash",
+          "options": [
+            {
+              "id": "kit-kalina-patch",
+              "name": "Kalina patchwork gris",
+              "url": "https://www.bauhaus.cz/dekor-kalina-patchwork-gris-28961589",
+              "price": 499,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "kit-floor",
+          "label": "Podlaha",
+          "unit": "m2",
+          "areaKey": "kitchenFloor",
+          "options": [
+            {
+              "id": "kit-aged-oak",
+              "name": "Beauflor Novo Aged Oak",
+              "url": "https://www.bauhaus.cz/beauflor-novo-pvc-podlaha-na-metraz-aged-oak-25350975",
+              "price": 269,
+              "default": true
+            },
+            {
+              "id": "kit-prima",
+              "name": "Prima PVC 07",
+              "url": "https://www.bauhaus.cz/prima-pvc-podlaha-na-metraz-07-25408096",
+              "price": 359
+            }
+          ]
+        },
+        {
+          "id": "kit-oven",
+          "label": "Skříňka trouba",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "metod-oven",
+              "name": "METOD MAXIMERA vest. spotřebiče Enköping",
+              "url": "https://www.ikea.com/cz/cs/p/metod-maximera-vysoka-skrinka-na-vest-spotrebice-bila-enkoeping-bila-vzor-dreva-s29473579/",
+              "price": 3150,
+              "note": "Linka snapshot 181 cm — hlídat součet šířek",
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "kit-sink-cab",
+          "label": "Skříňka dřez",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "metod-sink",
+              "name": "METOD MAXIMERA dřez 3 čela Enköping",
+              "url": "https://www.ikea.com/cz/cs/p/metod-maximera-skrinka-na-drez-3-cela-2-zasuvky-bila-enkoeping-bila-vzor-dreva-s09473410/",
+              "price": 4120,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "kit-cab-60",
+          "label": "Skříňka 60",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "metod-60",
+              "name": "METOD MAXIMERA 60 Enköping",
+              "url": "https://www.ikea.com/cz/cs/p/metod-maximera-spod-sk-3cela-2niz-1str-1vys-zas-bila-enkoeping-bila-vzor-dreva-s69473389/",
+              "price": 5520,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "kit-cab-40",
+          "label": "Skříňka 40",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "metod-40",
+              "name": "METOD drátěné koše Enköping",
+              "url": "https://www.ikea.com/cz/cs/p/metod-spodni-skrinka-s-drat-kosi-bila-enkoeping-bila-vzor-dreva-s29473367/",
+              "price": 2200,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "kit-lamp",
+          "label": "Lustr (2×)",
+          "unit": "ks",
+          "qty": 2,
+          "options": [
+            {
+              "id": "torared-kit",
+              "name": "TORARED HAVSDJUP rákos černá",
+              "url": "https://www.ikea.com/cz/cs/p/torared-havsdjup-zavesna-lampa-rucne-vyrobene-rakos-cerna-s99611049/",
+              "price": 449,
+              "default": true
+            },
+            {
+              "id": "solklint-kit",
+              "name": "SOLKLINT mosaz / sklo",
+              "url": "https://www.ikea.com/cz/cs/p/solklint-zavesna-lampa-mosaz-cire-sede-sklo-10430778/",
+              "price": 899
+            }
+          ]
+        },
+        {
+          "id": "kit-handles",
+          "label": "Úchytky",
+          "unit": "bal",
+          "qty": 1,
+          "options": [
+            {
+              "id": "eneryda-129",
+              "name": "ENERYDA černá 129 Kč (2 ks)",
+              "url": "https://www.ikea.com/cz/cs/p/eneryda-uchytka-cerna-80347506/",
+              "price": 129,
+              "note": "Balení 2 ks — počet balení dopočítat podle dvířek",
+              "default": true
+            },
+            {
+              "id": "eneryda-199",
+              "name": "ENERYDA černá 199 Kč (2 ks)",
+              "url": "https://www.ikea.com/cz/cs/p/eneryda-uchytka-cerna-70347516/",
+              "price": 199,
+              "note": "Balení 2 ks"
+            }
+          ]
+        },
+        {
+          "id": "kit-top",
+          "label": "Pracovní deska",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "ekbacken",
+              "name": "EKBACKEN černý laminát 1,86 m",
+              "url": "https://www.ikea.com/cz/cs/p/ekbacken-pracovni-deska-cerna-laminat-10589674/",
+              "price": 1590,
+              "note": "Pasuje na linku 1,81 m",
+              "default": true
+            },
+            {
+              "id": "saeljan",
+              "name": "SÄLJAN tmavě šedá 2,46 m",
+              "url": "https://www.ikea.com/cz/cs/p/saeljan-pracovni-deska-tmave-seda-vzor-kamen-laminat-30604334/",
+              "price": 1990,
+              "note": "Delší než linka"
+            }
+          ]
+        },
+        {
+          "id": "kit-shelf",
+          "label": "Police",
+          "unit": "ks",
+          "qty": 2,
+          "options": [
+            {
+              "id": "lack-shelf",
+              "name": "LACK police bílá",
+              "url": "https://www.ikea.com/cz/cs/p/lack-nastenna-police-bila-90282180/",
+              "price": 299,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "kit-bracket",
+          "label": "Konzola k polici",
+          "unit": "ks",
+          "qty": 4,
+          "options": [
+            {
+              "id": "ramshult",
+              "name": "RAMSHULT konzola bílá",
+              "url": "https://www.ikea.com/cz/cs/p/ramshult-konzola-bila-80399897/",
+              "price": 99,
+              "default": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "living",
+      "name": "Obývací pokoj",
+      "items": [
+        {
+          "id": "liv-besta",
+          "label": "Skříň BESTÅ",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "besta-doors",
+              "name": "BESTÅ policový díl LAPPVIKEN",
+              "url": "https://www.ikea.com/cz/cs/p/besta-policovy-dil-s-dvirky-bila-lappviken-bila-s39429699/",
+              "price": 4650,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "liv-besta-glass",
+          "label": "Prosklená skříň BESTÅ",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "besta-glass",
+              "name": "BESTÅ prosklená LAPPVIKEN",
+              "url": "https://www.ikea.com/cz/cs/p/besta-ulozna-sestava-s-prosklenymi-dvirky-bila-lappviken-bile-cire-sklo-s59622846/",
+              "price": 6120,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "liv-rug",
+          "label": "Koberec",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "lokaltag-liv",
+              "name": "LOKALTAG béžová/šedá",
+              "url": "https://www.ikea.com/cz/cs/p/lokaltag-koberec-nizky-vlas-bezova-seda-10623220/",
+              "price": 1490,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "liv-ceiling",
+          "label": "Stropní světlo",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "solklint-ceil",
+              "name": "SOLKLINT stropní mosaz",
+              "url": "https://www.ikea.com/cz/cs/p/solklint-stropni-osvetleni-mosaz-cire-sede-sklo-40472031/",
+              "price": 899,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "liv-table-lamp",
+          "label": "Stolní lampa",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "solklint-table",
+              "name": "SOLKLINT stolní mosaz",
+              "url": "https://www.ikea.com/cz/cs/p/solklint-stolni-lampa-mosaz-cire-sede-sklo-70464275/",
+              "price": 699,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "liv-sofa",
+          "label": "Gauč",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "vejlby",
+              "name": "JYSK VEJLBY rozkládací s lenoškou",
+              "url": "https://jysk.cz/obyvaci-pokoj/rozkladaci-pohovky/rozkladaci-pohovka-s-lenoskou-vejlby-tm-sedy-potah",
+              "price": 13500,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "liv-floor",
+          "label": "Podlaha",
+          "unit": "m2",
+          "areaKey": "livingFloor",
+          "options": [
+            {
+              "id": "liv-aged-oak",
+              "name": "Beauflor Novo Aged Oak",
+              "url": "https://www.bauhaus.cz/beauflor-novo-pvc-podlaha-na-metraz-aged-oak-25350975",
+              "price": 269,
+              "default": true
+            },
+            {
+              "id": "liv-prima",
+              "name": "Prima PVC 07",
+              "url": "https://www.bauhaus.cz/prima-pvc-podlaha-na-metraz-07-25408096",
+              "price": 359
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bed",
+      "name": "Ložnice",
+      "items": [
+        {
+          "id": "bed-floor",
+          "label": "Podlaha",
+          "unit": "m2",
+          "areaKey": "bedFloor",
+          "options": [
+            {
+              "id": "bed-aged-oak",
+              "name": "Beauflor Novo Aged Oak",
+              "url": "https://www.bauhaus.cz/beauflor-novo-pvc-podlaha-na-metraz-aged-oak-25350975",
+              "price": 269,
+              "default": true
+            },
+            {
+              "id": "bed-prima",
+              "name": "Prima PVC 07",
+              "url": "https://www.bauhaus.cz/prima-pvc-podlaha-na-metraz-07-25408096",
+              "price": 359
+            }
+          ]
+        },
+        {
+          "id": "bed-lamp",
+          "label": "Lustr (2×)",
+          "unit": "ks",
+          "qty": 2,
+          "options": [
+            {
+              "id": "torared-bed",
+              "name": "TORARED HAVSDJUP rákos",
+              "url": "https://www.ikea.com/cz/cs/p/torared-havsdjup-zavesna-lampa-rucne-vyrobene-rakos-cerna-s99611049/",
+              "price": 449,
+              "default": true
+            },
+            {
+              "id": "solklint-bed",
+              "name": "SOLKLINT mosaz / sklo",
+              "url": "https://www.ikea.com/cz/cs/p/solklint-zavesna-lampa-mosaz-cire-sede-sklo-10430778/",
+              "price": 899
+            }
+          ]
+        },
+        {
+          "id": "bed-handles",
+          "label": "Úchytky",
+          "unit": "bal",
+          "qty": 1,
+          "options": [
+            {
+              "id": "bed-eneryda-129",
+              "name": "ENERYDA 129 Kč (2 ks)",
+              "url": "https://www.ikea.com/cz/cs/p/eneryda-uchytka-cerna-80347506/",
+              "price": 129,
+              "note": "Balení 2 ks",
+              "default": true
+            },
+            {
+              "id": "bed-eneryda-199",
+              "name": "ENERYDA 199 Kč (2 ks)",
+              "url": "https://www.ikea.com/cz/cs/p/eneryda-uchytka-cerna-70347516/",
+              "price": 199,
+              "note": "Balení 2 ks"
+            }
+          ]
+        },
+        {
+          "id": "bed-frame",
+          "label": "Postel",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "montreal",
+              "name": "Montreal velvet 140×200 šedá",
+              "url": "https://www.kancelar24.cz/zbozi/postel-montreal-velvet-140-x-200-cm--seda/",
+              "price": 6000,
+              "note": "Pasuje na bedVariant 140",
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "bed-mattress",
+          "label": "Matrace",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "lillelv",
+              "name": "JYSK Lillelv 140×200 velmi tvrdá",
+              "url": "https://jysk.cz/loznice/matrace/penove-matrace/penova-matrace-140200-cm-lillelv-velmi-tvrda",
+              "price": 3500,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "bed-topper",
+          "label": "Svrchní matrace",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "kvisten",
+              "name": "JYSK Kvisten 140×200",
+              "url": "https://jysk.cz/loznice/matrace/vrchni-matrace/vrchni-matrace-140200-cm-kvisten-seda?article=3444557",
+              "price": 3250,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "bed-wardrobe",
+          "label": "Skříň",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "lastare-ward",
+              "name": "LASTARE šatní sestava bílá",
+              "url": "https://www.ikea.com/cz/cs/p/lastare-satni-sestava-bila-s79613308/",
+              "price": 3630,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "bed-dresser",
+          "label": "Komoda (2×)",
+          "unit": "ks",
+          "qty": 2,
+          "options": [
+            {
+              "id": "lastare-dresser",
+              "name": "LASTARE komoda 4 zásuvky",
+              "url": "https://www.ikea.com/cz/cs/p/lastare-komoda-se-4-zasuvkami-bila-40599351/",
+              "price": 2450,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "bed-wall-lamp",
+          "label": "Lampa za postel",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "solklint-wall",
+              "name": "SOLKLINT nástěnná mosaz",
+              "url": "https://www.ikea.com/cz/cs/p/solklint-nastenna-lampa-mosaz-cire-sede-sklo-20464065/",
+              "price": 549,
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "bed-rug",
+          "label": "Koberec",
+          "unit": "ks",
+          "qty": 1,
+          "options": [
+            {
+              "id": "lokaltag-bed",
+              "name": "LOKALTAG béžová/šedá",
+              "url": "https://www.ikea.com/cz/cs/p/lokaltag-koberec-nizky-vlas-bezova-seda-60623232/",
+              "price": 599,
+              "default": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

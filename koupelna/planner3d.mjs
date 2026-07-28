@@ -386,6 +386,8 @@ export function createViewer(container) {
     room: { w: 906, d: 333, h: 210 },
     look: { yaw: 0, pitch: 0 },
     keys: new Set(),
+    /** Virtual stick axes in [-1, 1]: fwd (+forward), strafe (+right), vert (+up). */
+    axes: { fwd: 0, strafe: 0, vert: 0 },
     flyY: 180,
     raf: 0,
     _ro: null,
@@ -457,6 +459,20 @@ export function createViewer(container) {
   };
 
   const onDown = (e) => {
+    // Only block default for touch (page scroll / rubber-band). Mouse preventDefault
+    // would keep focus on side-panel inputs and mute WASD outside fullscreen.
+    if (e.pointerType === "touch") e.preventDefault();
+    const ae = document.activeElement;
+    if (
+      ae &&
+      ae !== document.body &&
+      (ae.tagName === "INPUT" ||
+        ae.tagName === "TEXTAREA" ||
+        ae.tagName === "SELECT" ||
+        ae.isContentEditable)
+    ) {
+      ae.blur();
+    }
     viewer._drag = { x: e.clientX, y: e.clientY };
     canvas.setPointerCapture?.(e.pointerId);
     canvas.style.cursor = "grabbing";
@@ -467,6 +483,7 @@ export function createViewer(container) {
   };
   const onMove = (e) => {
     if (!viewer._drag) return;
+    if (e.pointerType === "touch") e.preventDefault();
     const dx = e.clientX - viewer._drag.x;
     const dy = e.clientY - viewer._drag.y;
     viewer._drag.x = e.clientX;
@@ -482,8 +499,16 @@ export function createViewer(container) {
     e.preventDefault();
     moveBy(-e.deltaY * 0.12, 0, 0);
   };
-  const isTypingTarget = (t) =>
-    t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+  const isTypingTarget = (t) => {
+    if (!t) return false;
+    if (t.isContentEditable) return true;
+    const tag = t.tagName;
+    if (tag === "TEXTAREA" || tag === "SELECT") return true;
+    if (tag !== "INPUT") return false;
+    // Side-panel sliders/checkboxes often keep focus; don't mute WASD for those.
+    const type = String(t.type || "text").toLowerCase();
+    return !["range", "checkbox", "radio", "button", "submit", "reset", "file", "color", "hidden"].includes(type);
+  };
 
   const MOVE_KEYS = new Set([
     "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
@@ -527,10 +552,17 @@ export function createViewer(container) {
     window.removeEventListener("keyup", onKeyUp);
   };
 
-  const tick = () => {
+  // Frame-rate independent fly speed (matches former 4.2 / 3.2 cm @ 60fps).
+  const MOVE_CMS = 4.2 * 60; // ≈ 2.5 m/s
+  const VERT_CMS = 3.2 * 60;
+  let lastTickMs = performance.now();
+  const tick = (nowMs) => {
     viewer.raf = requestAnimationFrame(tick);
-    const speed = 4.2; // cm / frame @60fps ≈ 2.5 m/s
-    const vSpeed = 3.2;
+    const now = typeof nowMs === "number" ? nowMs : performance.now();
+    const dt = Math.min(0.05, Math.max(0, (now - lastTickMs) / 1000));
+    lastTickMs = now;
+    const speed = MOVE_CMS * dt;
+    const vSpeed = VERT_CMS * dt;
     let fwd = 0;
     let strafe = 0;
     let vert = 0;
@@ -540,6 +572,10 @@ export function createViewer(container) {
     if (viewer.keys.has("ArrowRight") || viewer.keys.has("d")) strafe += speed;
     if (viewer.keys.has("Space")) vert += vSpeed;
     if (viewer.keys.has("ControlLeft")) vert -= vSpeed;
+    const ax = viewer.axes || { fwd: 0, strafe: 0, vert: 0 };
+    fwd += (Number(ax.fwd) || 0) * speed;
+    strafe += (Number(ax.strafe) || 0) * speed;
+    vert += (Number(ax.vert) || 0) * vSpeed;
     if (fwd || strafe || vert) moveBy(fwd, strafe, vert);
     renderer.render(scene, camera);
   };
@@ -631,11 +667,31 @@ export function rebuild(viewer, spec, { applyCamera = false } = {}) {
   if (applyCamera) setCameraView(viewer, viewer.preset || "sofa");
 }
 
+/** Set virtual stick axes (values clamped to [-1, 1]). Pass partial or null to clear. */
+export function setAxes(viewer, partial) {
+  if (!viewer?.axes) return;
+  if (!partial) {
+    viewer.axes.fwd = 0;
+    viewer.axes.strafe = 0;
+    viewer.axes.vert = 0;
+    return;
+  }
+  const clamp = (v) => Math.max(-1, Math.min(1, Number(v) || 0));
+  if ("fwd" in partial) viewer.axes.fwd = clamp(partial.fwd);
+  if ("strafe" in partial) viewer.axes.strafe = clamp(partial.strafe);
+  if ("vert" in partial) viewer.axes.vert = clamp(partial.vert);
+}
+
 export function dispose(viewer) {
   if (!viewer) return;
   cancelAnimationFrame(viewer.raf);
   viewer._ro?.disconnect();
   viewer._disposeInput?.();
+  if (viewer.axes) {
+    viewer.axes.fwd = 0;
+    viewer.axes.strafe = 0;
+    viewer.axes.vert = 0;
+  }
   clearGroup(viewer.root);
   viewer.renderer.dispose();
   viewer.renderer.domElement.remove();
