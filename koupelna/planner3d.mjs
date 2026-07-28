@@ -459,7 +459,20 @@ export function createViewer(container) {
   };
 
   const onDown = (e) => {
-    e.preventDefault();
+    // Only block default for touch (page scroll / rubber-band). Mouse preventDefault
+    // would keep focus on side-panel inputs and mute WASD outside fullscreen.
+    if (e.pointerType === "touch") e.preventDefault();
+    const ae = document.activeElement;
+    if (
+      ae &&
+      ae !== document.body &&
+      (ae.tagName === "INPUT" ||
+        ae.tagName === "TEXTAREA" ||
+        ae.tagName === "SELECT" ||
+        ae.isContentEditable)
+    ) {
+      ae.blur();
+    }
     viewer._drag = { x: e.clientX, y: e.clientY };
     canvas.setPointerCapture?.(e.pointerId);
     canvas.style.cursor = "grabbing";
@@ -470,7 +483,7 @@ export function createViewer(container) {
   };
   const onMove = (e) => {
     if (!viewer._drag) return;
-    e.preventDefault();
+    if (e.pointerType === "touch") e.preventDefault();
     const dx = e.clientX - viewer._drag.x;
     const dy = e.clientY - viewer._drag.y;
     viewer._drag.x = e.clientX;
@@ -486,8 +499,16 @@ export function createViewer(container) {
     e.preventDefault();
     moveBy(-e.deltaY * 0.12, 0, 0);
   };
-  const isTypingTarget = (t) =>
-    t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+  const isTypingTarget = (t) => {
+    if (!t) return false;
+    if (t.isContentEditable) return true;
+    const tag = t.tagName;
+    if (tag === "TEXTAREA" || tag === "SELECT") return true;
+    if (tag !== "INPUT") return false;
+    // Side-panel sliders/checkboxes often keep focus; don't mute WASD for those.
+    const type = String(t.type || "text").toLowerCase();
+    return !["range", "checkbox", "radio", "button", "submit", "reset", "file", "color", "hidden"].includes(type);
+  };
 
   const MOVE_KEYS = new Set([
     "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",

@@ -1504,7 +1504,7 @@
 <script>
 (() => {
   // BUILD_META_START
-  const APP_VERSION = "3.27.3";
+  const APP_VERSION = "3.27.4";
   const APP_BUILD = 47;
   const APP_COMMIT = "";
   // BUILD_META_END
@@ -5871,6 +5871,19 @@
     } else if (!wrap.contains(view3dViewer.renderer.domElement)) {
       wrap.innerHTML = "";
       wrap.appendChild(view3dViewer.renderer.domElement);
+    }
+    // Drop focus from side-panel controls so WASD / Space / LCtrl work immediately.
+    const ae = document.activeElement;
+    if (
+      ae &&
+      ae !== document.body &&
+      (ae.tagName === "INPUT" ||
+        ae.tagName === "TEXTAREA" ||
+        ae.tagName === "SELECT" ||
+        ae.isContentEditable ||
+        ae.tagName === "BUTTON")
+    ) {
+      ae.blur();
     }
     view3dViewer.preset = view3dPreset;
     mod.rebuild(view3dViewer, buildView3dSpec(), { applyCamera: first || !view3dMountedOnce });
