@@ -8,8 +8,8 @@ Podrobný popis modulů, souřadnic a deploye: [docs/stav-projektu.md](docs/stav
 
 ## Živě
 
+- https://chata.kamaik.cz/
 - https://chata-kamyk.pages.dev/
-- https://chata.kamaik.cz/ — custom domain na stejném Pages projektu. Hostname začne fungovat, až v zóně `kamaik.cz` bude proxied CNAME `chata` → `chata-kamyk.pages.dev`. OAuth token wrangleru umí Pages, ne zápis DNS.
 
 ## Lokálně
 

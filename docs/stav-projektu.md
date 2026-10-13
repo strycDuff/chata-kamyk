@@ -176,8 +176,10 @@ node --test koupelna/*.test.mjs
 
 Produkce:
 
-- https://chata-kamyk.pages.dev/ — výchozí Pages hostname, tohle deploy aktualizuje hned
-- https://chata.kamaik.cz/ — custom domain přidaná 13. 10. 2026 na projekt `chata-kamyk` (zóna `kamaik.cz`, stejný účet). Stav po přidání: `pending`, ověření hlásí `CNAME record not set`. Až v DNS bude proxied CNAME `chata` → `chata-kamyk.pages.dev`, certifikát se dodělá sám. Token z `wrangler login` má `pages:write` a `zone:read`, zápis DNS vrací 403.
+- https://chata.kamaik.cz/ — custom domain projektu `chata-kamyk`. Proxied CNAME `chata` → `chata-kamyk.pages.dev` v zóně `kamaik.cz`.
+- https://chata-kamyk.pages.dev/ — výchozí Pages hostname
+
+DNS zápis nejde přes `wrangler login` (má jen `zone:read`). Token `cursor-chata-kamyk` je v klíčence macOS (`security find-generic-password -s cloudflare-api-token -a kamaik`). Umí DNS edit na zóně `kamaik.cz` a Pages edit na účtu.
 
 Skript nastavuje `NODE_TLS_REJECT_UNAUTHORIZED=0`, protože na téhle síti OAuth k Cloudflare bez toho nedoběhne.
 
