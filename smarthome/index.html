@@ -2,6 +2,7 @@
 <html lang="cs">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Elektroinstalace &amp; SmartHome · Chata Kamyk</title>
 <link rel="stylesheet" href="../assets/site.css">
 <style>
@@ -143,10 +144,12 @@
   }
   @media screen {
     body {
-      max-width: 1180px;
-      margin: 0 auto;
-      padding: 18px 20px 40px;
+      margin: 0;
       font-size: 10.5pt;
+    }
+    .doc-wrap {
+      max-width: min(210mm, 1180px);
+      padding: 18px 20px 40px;
     }
     table.sortable { font-size: 8.5pt; }
     .shop-wrap { overflow-x: auto; }
@@ -189,6 +192,7 @@
   <a class="brand" href="../">Chata Kamyk</a>
   <a href="../">Přehled</a>
   <a href="../koupelna/">Plánovač</a>
+  <a href="../vybaveni/">Vybavení</a>
   <a class="active" href="./">SmartHome</a>
 </nav>
 <div class="doc-wrap">
